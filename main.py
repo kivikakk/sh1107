@@ -10,8 +10,6 @@ from amaranth.hdl import Fragment
 from amaranth.sim import Simulator
 from amaranth_boards.icebreaker import ICEBreakerPlatform
 
-from .top import Top
-
 SIM_CLOCK = 1e-6
 
 
@@ -27,8 +25,8 @@ class NEElaboratable(Elaboratable, metaclass=ABCMeta):
 
 
 def main(cls: NEElaboratable):
-    if len(sys.argv) != 2 or sys.argv[1] not in ["sim", "formal", "build"]:
-        print(f"Usage: python {sys.argv[0]} sim|formal|build")
+    if len(sys.argv) < 2 or sys.argv[1] not in ["sim", "formal", "build"]:
+        print(f"Usage: python -m oled.main sim|formal|build")
         sys.exit(1)
 
     def outfile(ext):
@@ -64,8 +62,9 @@ def main(cls: NEElaboratable):
         subprocess.run(f"sby -f {sby_file}", shell=True)
 
     else:
-        ICEBreakerPlatform().build(cls(), do_program=True)
+        ICEBreakerPlatform().build(cls(), do_program=sys.argv[-1] == "-p")
 
 
 if __name__ == "__main__":
+    from .top import Top
     main(Top)
