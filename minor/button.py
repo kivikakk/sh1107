@@ -1,38 +1,37 @@
-import contextlib
-from typing import Optional
+from typing import Optional, Final
 
-from amaranth import Elaboratable, Module, Signal
+from amaranth import Elaboratable, Module, Signal, Value
 from amaranth.build import Platform
 
 from .debounce import Debounce
 
 
 class Button(Elaboratable):
-    DEBOUNCE_SECS = 1e-2
+    DEBOUNCE_SECS: Final[float] = 1e-2
 
-    def __init__(self, *, switch=Signal(), debounce_count=None):
-        self.switch = switch
+    __switch: Signal
+    __registered: Signal
+    __debounce: Debounce
 
-        self.registered = Signal()
-        self.debounce = Debounce(secs=self.DEBOUNCE_SECS, count=debounce_count)
+    o_down: Value
+    o_up: Value
+
+    def __init__(self, *, switch: Signal = Signal(), debounce_count: int = 0):
+        self.__switch = switch
+
+        self.__registered = Signal()
+        self.__debounce = Debounce(secs=self.DEBOUNCE_SECS, count=debounce_count)
+
+        self.o_down = ~self.__registered & self.__debounce.output
+        self.o_up = self.__registered & ~self.__debounce.output
 
     def elaborate(self, _: Optional[Platform]) -> Module:
         m = Module()
 
-        m.submodules.debounce = self.debounce
+        m.submodules.debounce = self.__debounce
 
-        m.d.comb += self.debounce.input.eq(self.switch)
+        m.d.comb += self.__debounce.input.eq(self.__switch)
 
-        m.d.sync += self.registered.eq(self.debounce.output)
+        m.d.sync += self.__registered.eq(self.__debounce.output)
 
         return m
-
-    @contextlib.contextmanager
-    def Down(self, m: Module):
-        with m.If(~self.registered & self.debounce.output):
-            yield
-
-    @contextlib.contextmanager
-    def Up(self, m: Module):
-        with m.If(self.registered & ~self.debounce.output):
-            yield

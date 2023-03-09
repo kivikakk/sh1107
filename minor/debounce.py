@@ -3,40 +3,38 @@ from typing import Optional
 from amaranth import Elaboratable, Module, Signal
 from amaranth.build import Platform
 
-from ..main import SIM_CLOCK
-
 
 class Debounce(Elaboratable):
-    def __init__(self, *, secs=None, count=None):
-        self.input = Signal()
-        self.output = Signal()
+    i: Signal
+    o: Signal
 
-        if count is None:
-            self.secs = secs
-            self.set_clks_per_sec(1//SIM_CLOCK)
-        else:
-            self.set_count(count)
+    __secs: Optional[float]
+    __clk_counter_max: int
+    __clk_counter: Signal
 
-    def set_clks_per_sec(self, clks_per_sec):
-        self.set_count(int(clks_per_sec * self.secs))
+    def __init__(self, *, secs=None, count=0):
+        self.i = Signal()
+        self.o = Signal()
 
-    def set_count(self, count):
-        self.count = count
-        self.timer = Signal(range(self.count+1))
+        self.__secs = secs
+        self.__clk_counter_max = count
+        self.__clk_counter = Signal(range(self.__clk_counter_max))
 
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
 
         if platform:
-            self.set_clks_per_sec(platform.default_clk_frequency)
+            self.__clk_counter_max = int(platform.default_clk_frequency * self.__secs)
+            self.__clk_counter = Signal(range(self.__clk_counter_max))
 
-        with m.If(self.input == self.output):
-            m.d.sync += self.timer.eq(0)
+        FULL_CLOCK = self.__clk_counter == self.__clk_counter_max - 1
+
+        with m.If(self.i == self.o):
+            m.d.sync += self.__clk_counter.eq(0)
+        with m.Elif(FULL_CLOCK):
+            m.d.sync += self.o.eq(self.i)
+            m.d.sync += self.__clk_counter.eq(0)
         with m.Else():
-            with m.If(self.timer == self.count):
-                m.d.sync += self.output.eq(self.input)
-                m.d.sync += self.timer.eq(0)
-            with m.Else():
-                m.d.sync += self.timer.eq(self.timer + 1)
+            m.d.sync += self.__clk_counter.eq(self.__clk_counter + 1)
 
         return m

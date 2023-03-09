@@ -11,9 +11,6 @@ from .i2c import I2C
 
 
 class Top(NEElaboratable):
-    def __init__(self):
-        self.led = Signal()
-
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
 
@@ -25,11 +22,32 @@ class Top(NEElaboratable):
             self.button = platform.request("button")
 
         m.submodules.button = button = Button(switch=self.button)
-        with button.Up(m):
-            m.d.sync += i2c.i_stb.eq(1)
 
         with m.If(i2c.i_stb):
             m.d.sync += i2c.i_stb.eq(0)
+
+        with m.FSM():
+            with m.State("IDLE"):
+                with m.If(button.o_up & i2c.fifo.w_rdy):
+                    m.d.sync += i2c.i_addr.eq(0x3C)
+                    m.d.sync += i2c.i_rw.eq(0)
+                    m.d.sync += i2c.i_stb.eq(1)
+                    m.d.sync += i2c.fifo.w_data.eq(0x00)
+                    m.d.sync += i2c.fifo.w_en.eq(1)
+                    m.next = "FIRST_DONE"
+            with m.State("FIRST_DONE"):
+                m.d.sync += i2c.i_stb.eq(0)
+                m.d.sync += i2c.fifo.w_en.eq(0)
+                # Wait until we need the next byte.
+                m.next = "WAIT_SECOND"
+            with m.State("WAIT_SECOND"):
+                with m.If(i2c.fifo.w_rdy):
+                    m.d.sync += i2c.fifo.w_data.eq(0xAF)
+                    m.d.sync += i2c.fifo.w_en.eq(1)
+                    m.next = "SECOND_DONE"
+            with m.State("SECOND_DONE"):
+                m.d.sync += i2c.fifo.w_en.eq(0)
+                m.next = "IDLE"
 
         m.d.comb += self.led_busy.eq(i2c.o_busy)
         m.d.comb += self.led_ack.eq(i2c.o_ack)
@@ -51,11 +69,11 @@ class Top(NEElaboratable):
             assert (yield self.rx)
             yield self.rx.eq(0)
             yield
-            yield from assert_state('START')
+            yield from assert_state("START")
             yield
-            yield from assert_state('ALIGN')
+            yield from assert_state("ALIGN")
             yield
-            yield from assert_state('ALIGN')
+            yield from assert_state("ALIGN")
 
             d = C(0b10101100)
 
@@ -63,15 +81,15 @@ class Top(NEElaboratable):
                 yield self.rx.eq(d[i])
                 for _ in range(3):
                     yield
-                    yield from assert_state('DATA', i)
+                    yield from assert_state("DATA", i)
 
             yield self.rx.eq(1)
             for _ in range(3):
                 yield
-                yield from assert_state('STOP')
+                yield from assert_state("STOP")
 
             yield
-            yield from assert_state('START')
+            yield from assert_state("START")
             assert (yield self.uartrx.data == 0b00110101)
             assert (yield self.uartrx.out == 0b10101100)
             assert (yield self.ssa.digit == 0b1010)
@@ -80,23 +98,27 @@ class Top(NEElaboratable):
         sim.add_clock(SIM_CLOCK)
         sim.add_sync_process(bench)
 
-        return [self.rx,
-                self.uartrx.fsm.state,
-                self.uartrx.index,
-                self.uartrx.out,
-                self.uartrx.out_inv,
-                self.ssa.digit,
-                self.ssb.digit]
+        return [
+            self.rx,
+            self.uartrx.fsm.state,
+            self.uartrx.index,
+            self.uartrx.out,
+            self.uartrx.out_inv,
+            self.ssa.digit,
+            self.ssb.digit,
+        ]
 
     @classmethod
     def formal(cls) -> Tuple[Module, List[Signal]]:
         m = Module()
-        m.submodules.c = c = cls(uart_options={
-            'parity': None,
-            'data_bits': 5,
-            'stop_bits': 1,
-            'count': 1,
-        })
+        m.submodules.c = c = cls(
+            uart_options={
+                "parity": None,
+                "data_bits": 5,
+                "stop_bits": 1,
+                "count": 1,
+            }
+        )
 
         sync_clk = ClockSignal("sync")
         sync_rst = ResetSignal("sync")

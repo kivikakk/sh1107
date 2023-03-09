@@ -1,13 +1,36 @@
 from typing import Optional
 
-from amaranth import Elaboratable, Signal, Module, C
+from amaranth import Elaboratable, Signal, Module
 from amaranth.build import Platform, Attrs
+from amaranth.lib.fifo import SyncFIFO
 from amaranth_boards.resources import I2CResource
 
 
 class I2C(Elaboratable):
+    i_addr: Signal
+    i_rw: Signal
+    i_stb: Signal
+
+    fifo: SyncFIFO
+
+    o_busy: Signal
+    o_ack: Signal
+
+    _sda: Signal
+    _scl: Signal
+
+    __clocking: Signal
+    __clk_counter_max: int
+    __clk_counter: Signal
+    __address_ix: Signal
+
     def __init__(self):
+        self.i_addr = Signal(7, reset=0x3C)
+        self.i_rw = Signal()
         self.i_stb = Signal()
+
+        self.fifo = SyncFIFO(width=8, depth=1)
+
         self.o_busy = Signal()
         self.o_ack = Signal()
 
@@ -15,9 +38,11 @@ class I2C(Elaboratable):
         self._scl = Signal(reset=1)
 
         self.__clocking = Signal()
+        self.__clk_counter_max = 4
+        self.__clk_counter = Signal(range(self.__clk_counter_max))
         self.__address_ix = Signal(range(7))
 
-    def assign(self, res: I2CResource):
+    def assign(self, res):
         self._scl = res.scl
         self._sda = res.sda
 
@@ -25,112 +50,113 @@ class I2C(Elaboratable):
         m = Module()
 
         if platform:
-            platform.add_resources([
-                I2CResource(
-                    0, scl="2", sda="1",
-                    conn=("pmod", 0),
-                    attrs=Attrs(
-                        IO_STANDARD="SB_LVCMOS",
-                        PULLUP=1,
+            platform.add_resources(
+                [
+                    I2CResource(
+                        0,
+                        scl="2",
+                        sda="1",
+                        conn=("pmod", 0),
+                        attrs=Attrs(IO_STANDARD="SB_LVCMOS", PULLUP=1),
                     ),
-                ),
-            ])
+                ]
+            )
             plat_i2c = platform.request("i2c")
             self.assign(plat_i2c)
 
-            clk_counter_max = int(platform.default_clk_frequency // 200_000)
-        else:
-            clk_counter_max = 4
-
-        clk_counter_half = int(clk_counter_max // 2)
+            self.__clk_counter_max = int(platform.default_clk_frequency // 200_000)
+            self.__clk_counter = Signal(range(self.__clk_counter_max))
 
         m.d.comb += self._scl.oe.eq(1)
 
-        clk_counter = Signal(range(clk_counter_max))
         with m.If(self.__clocking):
-            with m.If(clk_counter < clk_counter_max - 1):
-                m.d.sync += clk_counter.eq(clk_counter + 1)
+            with m.If(self.__clk_counter < self.__clk_counter_max - 1):
+                m.d.sync += self.__clk_counter.eq(self.__clk_counter + 1)
             with m.Else():
-                m.d.sync += clk_counter.eq(0)
+                m.d.sync += self.__clk_counter.eq(0)
                 m.d.sync += self._scl.o.eq(~self._scl.o)
 
+        HALF_CLOCK = self.__clk_counter == int(self.__clk_counter_max // 2)
+        FULL_CLOCK = self.__clk_counter == self.__clk_counter_max - 1
+
         with m.FSM():
-            with m.State('IDLE'):
+            with m.State("IDLE"):
                 m.d.sync += self._sda.oe.eq(1)
                 m.d.sync += self._sda.o.eq(1)
                 m.d.sync += self._scl.o.eq(1)
 
-                with m.If(self.i_stb):
+                with m.If(self.i_stb & self.fifo.r_rdy):
                     m.d.sync += self.o_busy.eq(1)
                     m.d.sync += self._sda.o.eq(0)
-                    m.d.sync += clk_counter.eq(0)
+                    m.d.sync += self.__clk_counter.eq(0)
                     m.d.sync += self.__clocking.eq(1)
                     m.d.sync += self.__address_ix.eq(0)
-                    m.next = 'START'
+                    m.next = "START"
                     # This edge: SDA goes low.
 
-            with m.State('START'):
-                with m.If(clk_counter == clk_counter_max - 1):
-                    m.next = 'ADDRESS'
+            with m.State("START"):
+                with m.Elif(FULL_CLOCK):
+                    m.next = "ADDRESS"
                     # This edge: SCL goes low.
 
-            with m.State('ADDRESS'):
-                with m.If(clk_counter == clk_counter_half):
+            with m.State("ADDRESS"):
+                with m.If(HALF_CLOCK):
                     # Next edge: SCL goes high -- send address bit. (MSB)
-                    m.d.sync += self._sda.o.eq((C(0x3c, 7)
-                                               >> (6 - self.__address_ix))[0])
-                with m.Elif(clk_counter == clk_counter_max - 1):
-                    m.next = 'ADDRESS_L'
+                    m.d.sync += self._sda.o.eq(
+                        (self.i_addr >> (6 - self.__address_ix))[0]
+                    )
+                with m.Elif(FULL_CLOCK):
+                    m.next = "ADDRESS_L"
 
-            with m.State('ADDRESS_L'):
-                with m.If(clk_counter == clk_counter_max - 1):
-                    with m.If(self.__address_ix == 6):
-                        m.next = 'RW'
-                        # This edge: SCL goes low. Wait for next SCL^ before R/W.
-                    with m.Else():
+            with m.State("ADDRESS_L"):
+                with m.If(FULL_CLOCK):
+                    with m.If(self.__address_ix < 6):
                         m.d.sync += self.__address_ix.eq(self.__address_ix + 1)
-                        m.next = 'ADDRESS'
+                        m.next = "ADDRESS"
                         # This edge: SCL goes low. Wait for next SCL^ before next address bit.
+                    with m.Else():
+                        m.next = "RW"
+                        # This edge: SCL goes low. Wait for next SCL^ before R/W.
 
-            with m.State('RW'):
-                with m.If(clk_counter == clk_counter_half):
+            with m.State("RW"):
+                with m.If(HALF_CLOCK):
                     # Next edge: SCL goes high -- send R/W.
-                    m.d.sync += self._sda.o.eq(1)
-                with m.Elif(clk_counter == clk_counter_max - 1):
-                    m.next = 'RW_L'
+                    # W == 0, R == 1.
+                    m.d.sync += self._sda.o.eq(0)
+                with m.Elif(FULL_CLOCK):
+                    m.next = "RW_L"
 
-            with m.State('RW_L'):
-                with m.If(clk_counter == clk_counter_max - 1):
-                    m.next = 'ACK'
+            with m.State("RW_L"):
+                with m.If(FULL_CLOCK):
+                    m.next = "ACK"
                     # This edge: SCL goes low.
 
-            with m.State('ACK'):
-                with m.If(clk_counter == clk_counter_half):
+            with m.State("ACK"):
+                with m.If(HALF_CLOCK):
                     # Next edge: SCL goes high. Let go of SDA.
                     m.d.sync += self._sda.oe.eq(0)
-                with m.Elif(clk_counter == clk_counter_max - 1):
-                    m.next = 'ACK_L'
+                with m.Elif(FULL_CLOCK):
+                    m.next = "ACK_L"
 
-            with m.State('ACK_L'):
-                with m.If(clk_counter == clk_counter_half):
+            with m.State("ACK_L"):
+                with m.If(HALF_CLOCK):
                     # Next edge: SCL goes low -- read ACK.
-                    m.d.sync += self.o_ack.eq(self._sda.i)
-                with m.Elif(clk_counter == clk_counter_max - 1):
-                    # This edge: SCL goes low.  XXX
-                    m.d.sync += self._sda.oe.eq(1)
-                    m.next = 'FIN'
+                    # SDA should be brought low by the addressee.
+                    m.d.sync += self.o_ack.eq(~self._sda.i)
+                with m.Elif(FULL_CLOCK):
+                    # This edge: SCL goes low.
+                    m.next = "FIN"
 
-            with m.State('FIN'):
-                with m.If(clk_counter == clk_counter_max - 1):
-                    m.d.sync += self.o_busy.eq(0)
+            with m.State("FIN"):
+                with m.If(HALF_CLOCK):
+                    m.d.sync += self._sda.oe.eq(1)
                     m.d.sync += self._sda.o.eq(1)
+                with m.Elif(FULL_CLOCK):
+                    m.d.sync += self.o_busy.eq(0)
                     m.d.sync += self.__clocking.eq(0)
-                    m.next = 'IDLE'
+                    m.next = "IDLE"
 
         return m
-
-    def refactored_wait(self):
-        pass
 
 
 __all__ = ["I2C"]
