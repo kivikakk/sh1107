@@ -20,9 +20,19 @@ class Top(NEElaboratable):
         m.submodules.i2c = i2c = I2C()
 
         if platform:
-            self.led = platform.request("led", 0)
+            self.led_busy = platform.request("led", 0)
+            self.led_ack = platform.request("led", 1)
+            self.button = platform.request("button")
 
-        m.d.comb += self.led.eq(i2c.scl)
+        m.submodules.button = button = Button(switch=self.button)
+        with button.Up(m):
+            m.d.sync += i2c.i_stb.eq(1)
+
+        with m.If(i2c.i_stb):
+            m.d.sync += i2c.i_stb.eq(0)
+
+        m.d.comb += self.led_busy.eq(i2c.o_busy)
+        m.d.comb += self.led_ack.eq(i2c.o_ack)
 
         return m
 
