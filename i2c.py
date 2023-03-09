@@ -42,6 +42,8 @@ class I2C(Elaboratable):
         else:
             clk_counter_max = 4
 
+        clk_counter_half = int(clk_counter_max // 2)
+
         m.d.comb += self._scl.oe.eq(1)
 
         clk_counter = Signal(range(clk_counter_max))
@@ -73,11 +75,12 @@ class I2C(Elaboratable):
                     # This edge: SCL goes low.
 
             with m.State('ADDRESS'):
-                with m.If(clk_counter == clk_counter_max - 1):
-                    m.next = 'ADDRESS_L'
-                    # This edge: SCL goes high -- send address bit. (MSB)
+                with m.If(clk_counter == clk_counter_half):
+                    # Next edge: SCL goes high -- send address bit. (MSB)
                     m.d.sync += self._sda.o.eq((C(0x3c, 7)
                                                >> (6 - self.__address_ix))[0])
+                with m.Elif(clk_counter == clk_counter_max - 1):
+                    m.next = 'ADDRESS_L'
 
             with m.State('ADDRESS_L'):
                 with m.If(clk_counter == clk_counter_max - 1):
@@ -90,25 +93,29 @@ class I2C(Elaboratable):
                         # This edge: SCL goes low. Wait for next SCL^ before next address bit.
 
             with m.State('RW'):
-                with m.If(clk_counter == clk_counter_max - 1):
-                    m.next = 'RW_L'
-                    # This edge: SCL goes high -- send R/W.
+                with m.If(clk_counter == clk_counter_half):
+                    # Next edge: SCL goes high -- send R/W.
                     m.d.sync += self._sda.o.eq(1)
+                with m.Elif(clk_counter == clk_counter_max - 1):
+                    m.next = 'RW_L'
 
             with m.State('RW_L'):
                 with m.If(clk_counter == clk_counter_max - 1):
                     m.next = 'ACK'
-                    # This edge: SCL goes low. Wait for next SCL^ before reading ACK.
-                    m.d.sync += self._sda.oe.eq(0)
+                    # This edge: SCL goes low.
 
             with m.State('ACK'):
-                with m.If(clk_counter == clk_counter_max - 1):
+                with m.If(clk_counter == clk_counter_half):
+                    # Next edge: SCL goes high. Let go of SDA.
+                    m.d.sync += self._sda.oe.eq(0)
+                with m.Elif(clk_counter == clk_counter_max - 1):
                     m.next = 'ACK_L'
-                    # This edge: SCL goes high -- read ACK.
-                    m.d.sync += self.o_ack.eq(self._sda.i)
 
             with m.State('ACK_L'):
-                with m.If(clk_counter == clk_counter_max - 1):
+                with m.If(clk_counter == clk_counter_half):
+                    # Next edge: SCL goes low -- read ACK.
+                    m.d.sync += self.o_ack.eq(self._sda.i)
+                with m.Elif(clk_counter == clk_counter_max - 1):
                     # This edge: SCL goes low.  XXX
                     m.d.sync += self._sda.oe.eq(1)
                     m.next = 'FIN'
