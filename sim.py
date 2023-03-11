@@ -1,4 +1,4 @@
-from typing import List, Tuple, Literal
+from typing import List, Tuple, Literal, Optional
 
 from amaranth import Signal
 from amaranth.sim import Simulator
@@ -60,28 +60,35 @@ def _i2c_send(dut: Top, byte: int, *, next: int | Literal["STOP"] = None):
         assert not (yield dut.i2c._scl.o)
 
 
-def _i2c_ack(dut: Top):
-    # Master releases SDA; we'll ACK by driving SDA low.
+def _i2c_ack(dut: Top, *, ack: bool = True):
+    # Master releases SDA; we ACK by driving SDA low.
     yield
     assert (yield dut.i2c._sda.oe)
-    yield dut.i2c._sda.i.eq(0)
+    if ack:
+        yield dut.i2c._sda.i.eq(0)
     yield
     assert not (yield dut.i2c._sda.oe)
     yield
 
     yield
     assert not (yield dut.i2c._sda.oe)
-    yield dut.i2c._sda.i.eq(1)  # Make it clear we're not trying.
+    if ack:
+        yield dut.i2c._sda.i.eq(1)
     yield
     assert (yield dut.i2c._sda.oe)
     yield
+
+
+def _i2c_nack(dut: Top):
+    yield from _i2c_ack(dut, ack=False)
 
 
 def _i2c_stop(dut: Top):
     # While SCL is low, bring SDA low.
+    last_sda = yield dut.i2c._sda.o
     yield
     assert not (yield dut.i2c._scl.o)
-    # assert (yield dut.i2c._sda.o)  # <- not for 0x8C
+    assert (yield dut.i2c._sda.o) == last_sda
     yield
     assert not (yield dut.i2c._scl.o)
     assert not (yield dut.i2c._sda.o)
@@ -101,6 +108,11 @@ def bench(dut: Top):
     # Init: _sda.i defaults to being held high.
     yield dut.i2c._sda.i.eq(1)
 
+    yield from bench_complete(dut)
+    yield from bench_naks(dut)
+
+
+def bench_complete(dut: Top, *, nak_after: Optional[int] = None):
     # Push the button.
     yield from _i2c_switch(dut)
 
@@ -125,11 +137,20 @@ def bench(dut: Top):
     yield from _i2c_start(dut)
 
     yield from _i2c_send(dut, (0x3C << 1) | 0)
-    yield from _i2c_ack(dut)
-    yield from _i2c_send(dut, 0xAF, next=0x8C)
-    yield from _i2c_ack(dut)
-    yield from _i2c_send(dut, 0x8C, next="STOP")
-    yield from _i2c_ack(dut)
+    if nak_after == 1:
+        yield from _i2c_nack(dut)
+    else:
+        yield from _i2c_ack(dut)
+        yield from _i2c_send(dut, 0xAF, next=0x8C)
+        if nak_after == 2:
+            yield from _i2c_nack(dut)
+        else:
+            yield from _i2c_ack(dut)
+            yield from _i2c_send(dut, 0x8C, next="STOP")
+            if nak_after == 3:
+                yield from _i2c_nack(dut)
+            else:
+                yield from _i2c_ack(dut)
 
     yield from _i2c_stop(dut)
 
@@ -137,7 +158,11 @@ def bench(dut: Top):
         assert (yield dut.i2c._scl.o)
         assert (yield dut.i2c._sda.o)
 
-    # TODO: same test but NACK.  Driver shouldn't send byte.
+
+def bench_naks(dut: Top):
+    yield from bench_complete(dut, nak_after=1)
+    yield from bench_complete(dut, nak_after=2)
+    yield from bench_complete(dut, nak_after=3)
 
 
 def prep() -> Tuple[Top, Simulator, List[Signal]]:
@@ -169,10 +194,13 @@ def prep() -> Tuple[Top, Simulator, List[Signal]]:
             dut.i2c.fifo.r_en,
             dut.i2c.fifo.r_data,
             dut.i2c.fifo.r_level,
-            dut.i2c.o_ack,
             dut.i2c.o_busy,
+            dut.i2c.o_fin,
+            dut.i2c._I2C__clocking,
+            dut.i2c._I2C__clk_counter,
             dut.i2c._I2C__byte,
             dut.i2c._I2C__byte_ix,
+            dut.i2c._I2C__ack,
             dut.i2c._scl.o,
             dut.i2c._sda.oe,
             dut.i2c._sda.o,
