@@ -90,6 +90,11 @@ def _i2c_stop(dut: Top):
     # Then when SCL is high, bring SDA high.
     assert (yield dut.i2c._scl.o)
     assert not (yield dut.i2c._sda.o)
+    yield
+    assert not (yield dut.i2c._sda.o)
+    yield
+    assert (yield dut.i2c._sda.o)
+    yield
 
 
 def bench(dut: Top):
