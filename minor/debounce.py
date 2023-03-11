@@ -8,23 +8,21 @@ class Debounce(Elaboratable):
     i: Signal
     o: Signal
 
-    __secs: Optional[float]
     __clk_counter_max: int
     __clk_counter: Signal
 
-    def __init__(self, *, secs=None, count=0):
+    def __init__(self):
         self.i = Signal()
         self.o = Signal()
-
-        self.__secs = secs
-        self.__clk_counter_max = count
-        self.__clk_counter = Signal(range(self.__clk_counter_max))
 
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
 
         if platform:
-            self.__clk_counter_max = int(platform.default_clk_frequency * self.__secs)
+            self.__clk_counter_max = int(platform.default_clk_frequency * 1e-2)
+            self.__clk_counter = Signal(range(self.__clk_counter_max))
+        else:
+            self.__clk_counter_max = 2
             self.__clk_counter = Signal(range(self.__clk_counter_max))
 
         FULL_CLOCK = self.__clk_counter == self.__clk_counter_max - 1

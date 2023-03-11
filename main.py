@@ -1,42 +1,28 @@
-from abc import ABCMeta, abstractmethod
 import sys
 import subprocess
 import traceback
-from typing import List, Tuple
 
-from amaranth import Elaboratable, Signal, Module
+from amaranth import Elaboratable
 from amaranth.back import rtlil
 from amaranth.hdl import Fragment
-from amaranth.sim import Simulator
 from amaranth_boards.icebreaker import ICEBreakerPlatform
+
+from .sim import prep as prep_sim
+from .formal import formal
 
 SIM_CLOCK = 1e-6
 
 
-class NEElaboratable(Elaboratable, metaclass=ABCMeta):
-    @abstractmethod
-    def prep_sim(self, sim: Simulator) -> List[Signal]:
-        pass
-
-    @classmethod
-    @abstractmethod
-    def formal(cls) -> Tuple[Module, List[Signal]]:
-        pass
-
-
-def main(cls: NEElaboratable):
+def main(cls: Elaboratable):
     if len(sys.argv) < 2 or sys.argv[1] not in ["sim", "formal", "build"]:
-        print(f"Usage: python -m oled.main sim|formal|build")
+        print("Usage: python -m oled.main sim|formal|build")
         sys.exit(1)
 
     def outfile(ext):
         return sys.argv[0].replace(".py", ext)
 
     if sys.argv[1] == "sim":
-        args, kwargs = getattr(cls, 'sim_args', ([], {}))
-        dut = cls(*args, **kwargs)
-        sim = Simulator(dut)
-        traces = dut.prep_sim(sim)
+        _, sim, traces = prep_sim()
 
         gtkw_file = outfile(".gtkw")
         with sim.write_vcd(outfile(".vcd"), gtkw_file=gtkw_file, traces=traces):
@@ -52,7 +38,7 @@ def main(cls: NEElaboratable):
         subprocess.run(cmd, shell=True)
 
     elif sys.argv[1] == "formal":
-        design, ports = cls.formal()
+        design, ports = formal()
         fragment = Fragment.get(design, None)
         output = rtlil.convert(fragment, ports=ports)
         with open(outfile(".il"), "w") as f:
@@ -67,4 +53,5 @@ def main(cls: NEElaboratable):
 
 if __name__ == "__main__":
     from .top import Top
+
     main(Top)

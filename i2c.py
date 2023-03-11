@@ -22,7 +22,8 @@ class I2C(Elaboratable):
     __clocking: Signal
     __clk_counter_max: int
     __clk_counter: Signal
-    __address_ix: Signal
+    __byte: Signal
+    __byte_ix: Signal
 
     def __init__(self):
         self.i_addr = Signal(7, reset=0x3C)
@@ -40,7 +41,9 @@ class I2C(Elaboratable):
         self.__clocking = Signal()
         self.__clk_counter_max = 4
         self.__clk_counter = Signal(range(self.__clk_counter_max))
-        self.__address_ix = Signal(range(7))
+
+        self.__byte = Signal(8)
+        self.__byte_ix = Signal(range(7))
 
     def assign(self, res):
         self._scl = res.scl
@@ -90,30 +93,33 @@ class I2C(Elaboratable):
                     m.d.sync += self._sda.o.eq(0)
                     m.d.sync += self.__clk_counter.eq(0)
                     m.d.sync += self.__clocking.eq(1)
-                    m.d.sync += self.__address_ix.eq(0)
+
+                    m.d.sync += self.__byte.eq((self.i_addr << 1) | self.i_rw)
+                    m.d.sync += self.__byte_ix.eq(0)
+
                     m.next = "START"
                     # This edge: SDA goes low.
 
             with m.State("START"):
                 with m.Elif(FULL_CLOCK):
-                    m.next = "ADDRESS"
+                    m.next = "DATA"
                     # This edge: SCL goes low.
 
-            with m.State("ADDRESS"):
+            with m.State("DATA"):
                 with m.If(HALF_CLOCK):
-                    # Next edge: SCL goes high -- send address bit. (MSB)
+                    # Next edge: SCL goes high -- send bit. (MSB)
                     m.d.sync += self._sda.o.eq(
-                        (self.i_addr >> (6 - self.__address_ix))[0]
+                        (self.__byte >> (7 - self.__byte_ix)) & 0x1
                     )
                 with m.Elif(FULL_CLOCK):
-                    m.next = "ADDRESS_L"
+                    m.next = "DATA_L"
 
-            with m.State("ADDRESS_L"):
+            with m.State("DATA_L"):
                 with m.If(FULL_CLOCK):
-                    with m.If(self.__address_ix < 6):
-                        m.d.sync += self.__address_ix.eq(self.__address_ix + 1)
-                        m.next = "ADDRESS"
-                        # This edge: SCL goes low. Wait for next SCL^ before next address bit.
+                    with m.If(self.__byte_ix < 7):
+                        m.d.sync += self.__byte_ix.eq(self.__byte_ix + 1)
+                        m.next = "DATA"
+                        # This edge: SCL goes low. Wait for next SCL^ before next data bit.
                     with m.Else():
                         m.next = "RW"
                         # This edge: SCL goes low. Wait for next SCL^ before R/W.
