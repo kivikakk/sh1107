@@ -126,21 +126,8 @@ class I2C(Elaboratable):
                         m.next = "DATA"
                         # This edge: SCL goes low. Wait for next SCL^ before next data bit.
                     with m.Else():
-                        m.next = "RW"
+                        m.next = "ACK"
                         # This edge: SCL goes low. Wait for next SCL^ before R/W.
-
-            with m.State("RW"):
-                with m.If(HALF_CLOCK):
-                    # Next edge: SCL goes high -- send R/W.
-                    # W == 0, R == 1.
-                    m.d.sync += self._sda.o.eq(0)
-                with m.Elif(FULL_CLOCK):
-                    m.next = "RW_L"
-
-            with m.State("RW_L"):
-                with m.If(FULL_CLOCK):
-                    m.next = "ACK"
-                    # This edge: SCL goes low.
 
             with m.State("ACK"):
                 with m.If(HALF_CLOCK):
@@ -154,13 +141,13 @@ class I2C(Elaboratable):
                     # Next edge: SCL goes low -- read ACK.
                     # SDA should be brought low by the addressee.
                     m.d.sync += self.o_ack.eq(~self._sda.i)
+                    m.d.sync += self._sda.oe.eq(1)
                 with m.Elif(FULL_CLOCK):
                     # This edge: SCL goes low.
                     m.next = "FIN"
 
             with m.State("FIN"):
                 with m.If(HALF_CLOCK):
-                    m.d.sync += self._sda.oe.eq(1)
                     m.d.sync += self._sda.o.eq(1)
                 with m.Elif(FULL_CLOCK):
                     m.d.sync += self.o_busy.eq(0)

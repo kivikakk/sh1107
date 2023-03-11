@@ -9,6 +9,9 @@ SIM_CLOCK = 1e-6
 
 
 def bench(dut: Top):
+    # Init: _sda.i defaults to being held high.
+    yield dut.i2c._sda.i.eq(1)
+
     # Push the button.
     yield dut.switch.eq(1)
     yield
@@ -50,12 +53,12 @@ def bench(dut: Top):
     # I2C clock starts.
     assert not (yield dut.i2c._scl.o)
     assert not (yield dut.i2c._sda.o)
-    yield
-    yield
-    yield
 
     # Address: 0b111100 / RW: 0b0
-    for bit in [0, 1, 1, 1, 1, 0, 0, 0]:
+    for bit in [0, 1, 1, 1, 1, 0, 0] + [0]:
+        yield
+        yield
+        yield
         assert (yield dut.i2c._scl.o)
         if bit:
             assert (yield dut.i2c._sda.o)
@@ -66,9 +69,22 @@ def bench(dut: Top):
         yield
 
         assert not (yield dut.i2c._scl.o)
-        yield
-        yield
-        yield
+
+    # Master releases SDA; we'll ACK by driving SDA low.
+    yield dut.i2c._sda.i.eq(0)
+    yield
+    assert (yield dut.i2c._sda.oe)
+    yield
+    assert not (yield dut.i2c._sda.oe)
+    yield
+
+    yield
+    assert not (yield dut.i2c._sda.oe)
+    yield
+    assert (yield dut.i2c._sda.oe)
+    yield
+
+    # TODO: same test but NACK.  Driver shouldn't send byte.
 
 
 def prep() -> Tuple[Top, Simulator, List[Signal]]:
