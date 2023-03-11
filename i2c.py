@@ -173,7 +173,7 @@ class I2C(Elaboratable):
                     # This edge: stop clocking.  Ensure we keep SCL high.
                     m.d.sync += self.__clocking.eq(0)
                     m.d.sync += self.o_busy.eq(0)
-                    m.d.sync += self._scl.o.eq(0)
+                    m.d.sync += self._scl.o.eq(1)
                     m.next = "IDLE"
 
         return m
