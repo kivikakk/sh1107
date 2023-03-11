@@ -10,8 +10,6 @@ from amaranth_boards.icebreaker import ICEBreakerPlatform
 from .sim import prep as prep_sim
 from .formal import formal
 
-SIM_CLOCK = 1e-6
-
 
 def main(cls: Elaboratable):
     if len(sys.argv) < 2 or sys.argv[1] not in ["sim", "formal", "build"]:

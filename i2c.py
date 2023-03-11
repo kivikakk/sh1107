@@ -1,6 +1,7 @@
 from typing import Optional
 
 from amaranth import Elaboratable, Signal, Module
+from amaranth.lib.io import Pin
 from amaranth.build import Platform, Attrs
 from amaranth.lib.fifo import SyncFIFO
 from amaranth_boards.resources import I2CResource
@@ -16,8 +17,8 @@ class I2C(Elaboratable):
     o_busy: Signal
     o_ack: Signal
 
-    _sda: Signal
-    _scl: Signal
+    _sda: Pin
+    _scl: Pin
 
     __clocking: Signal
     __clk_counter_max: int
@@ -35,8 +36,8 @@ class I2C(Elaboratable):
         self.o_busy = Signal()
         self.o_ack = Signal()
 
-        self._sda = Signal(reset=1)
-        self._scl = Signal(reset=1)
+        self._sda = Pin(1, "io")
+        self._scl = Pin(1, "io")
 
         self.__clocking = Signal()
         self.__clk_counter_max = 4
@@ -101,7 +102,7 @@ class I2C(Elaboratable):
                     # This edge: SDA goes low.
 
             with m.State("START"):
-                with m.Elif(FULL_CLOCK):
+                with m.If(FULL_CLOCK):
                     m.next = "DATA"
                     # This edge: SCL goes low.
 

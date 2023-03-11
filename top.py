@@ -16,11 +16,15 @@ class Top(Elaboratable):
         if platform:
             self.led_busy = platform.request("led", 0)
             self.led_ack = platform.request("led", 1)
+            m.d.comb += self.led_busy.eq(i2c.o_busy)
+            m.d.comb += self.led_ack.eq(i2c.o_ack)
+
             self.button = platform.request("button")
         else:
             self.button = Signal()
 
-        m.submodules.button = button = Button(switch=self.button)
+        m.submodules.button = button = Button()
+        m.d.comb += button.i_switch.eq(self.button)
 
         with m.If(i2c.i_stb):
             m.d.sync += i2c.i_stb.eq(0)
@@ -47,8 +51,5 @@ class Top(Elaboratable):
             with m.State("SECOND_DONE"):
                 m.d.sync += i2c.fifo.w_en.eq(0)
                 m.next = "IDLE"
-
-        m.d.comb += self.led_busy.eq(i2c.o_busy)
-        m.d.comb += self.led_ack.eq(i2c.o_ack)
 
         return m

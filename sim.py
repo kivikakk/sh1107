@@ -4,7 +4,8 @@ from amaranth import Signal
 from amaranth.sim import Simulator, Delay
 
 from .top import Top
-from .main import SIM_CLOCK
+
+SIM_CLOCK = 1e-6
 
 
 def bench(dut: Top):
@@ -17,9 +18,12 @@ def bench(dut: Top):
 def prep() -> Tuple[Top, Simulator, List[Signal]]:
     dut = Top()
 
+    def bench_wrapper():
+        yield from bench(dut)
+
     sim = Simulator(dut)
     sim.add_clock(SIM_CLOCK)
-    sim.add_sync_process(lambda: bench(dut))
+    sim.add_sync_process(bench_wrapper)
 
     return (
         dut,
@@ -38,7 +42,9 @@ def prep() -> Tuple[Top, Simulator, List[Signal]]:
             dut.i2c.fifo.r_level,
             dut.i2c.o_ack,
             dut.i2c.o_busy,
-            dut.i2c._scl,
-            dut.i2c._sda,
+            dut.i2c._scl.o,
+            dut.i2c._sda.oe,
+            dut.i2c._sda.o,
+            dut.i2c._sda.i,
         ],
     )
