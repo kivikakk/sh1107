@@ -28,11 +28,12 @@ class Top(Elaboratable):
 
         with m.FSM():
             with m.State("IDLE"):
-                with m.If(button.o_up & i2c.fifo.w_rdy):
+                with m.If(button.o_up):
                     m.d.sync += i2c.i_addr.eq(0x3C)
                     m.d.sync += i2c.i_rw.eq(0)
-                    m.d.sync += i2c.fifo.w_data.eq(0xAF)  # 0x00 later really
-                    m.d.sync += i2c.fifo.w_en.eq(1)
+                    with m.If(i2c.fifo.w_rdy):
+                        m.d.sync += i2c.fifo.w_data.eq(0xAF)  # 0x00 later really
+                        m.d.sync += i2c.fifo.w_en.eq(1)
                     m.next = "FIRST_QUEUED"
             with m.State("FIRST_QUEUED"):
                 m.d.sync += i2c.i_stb.eq(1)
@@ -47,6 +48,9 @@ class Top(Elaboratable):
                     m.d.sync += i2c.fifo.w_data.eq(0x8C)  # 0xAF later really
                     m.d.sync += i2c.fifo.w_en.eq(1)
                     m.next = "SECOND_DONE"
+                with m.Elif(~i2c.o_busy & ~i2c.o_fin):
+                    # Failed.
+                    m.next = "IDLE"
             with m.State("SECOND_DONE"):
                 m.d.sync += i2c.fifo.w_en.eq(0)
                 m.next = "IDLE"

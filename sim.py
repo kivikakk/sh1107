@@ -109,10 +109,10 @@ def bench(dut: Top):
     yield dut.i2c._sda.i.eq(1)
 
     yield from bench_complete(dut)
-    yield from bench_naks(dut)
+    yield from bench_nacks(dut)
 
 
-def bench_complete(dut: Top, *, nak_after: Optional[int] = None):
+def bench_complete(dut: Top, *, nack_after: Optional[int] = None):
     # Push the button.
     yield from _i2c_switch(dut)
 
@@ -137,17 +137,17 @@ def bench_complete(dut: Top, *, nak_after: Optional[int] = None):
     yield from _i2c_start(dut)
 
     yield from _i2c_send(dut, (0x3C << 1) | 0)
-    if nak_after == 1:
+    if nack_after == 1:
         yield from _i2c_nack(dut)
     else:
         yield from _i2c_ack(dut)
         yield from _i2c_send(dut, 0xAF, next=0x8C)
-        if nak_after == 2:
+        if nack_after == 2:
             yield from _i2c_nack(dut)
         else:
             yield from _i2c_ack(dut)
             yield from _i2c_send(dut, 0x8C, next="STOP")
-            if nak_after == 3:
+            if nack_after == 3:
                 yield from _i2c_nack(dut)
             else:
                 yield from _i2c_ack(dut)
@@ -159,10 +159,10 @@ def bench_complete(dut: Top, *, nak_after: Optional[int] = None):
         assert (yield dut.i2c._sda.o)
 
 
-def bench_naks(dut: Top):
-    yield from bench_complete(dut, nak_after=1)
-    yield from bench_complete(dut, nak_after=2)
-    yield from bench_complete(dut, nak_after=3)
+def bench_nacks(dut: Top):
+    yield from bench_complete(dut, nack_after=1)
+    yield from bench_complete(dut, nack_after=2)
+    yield from bench_complete(dut, nack_after=3)
 
 
 def prep() -> Tuple[Top, Simulator, List[Signal]]:
