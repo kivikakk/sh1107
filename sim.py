@@ -71,17 +71,64 @@ def bench(dut: Top):
         assert not (yield dut.i2c._scl.o)
 
     # Master releases SDA; we'll ACK by driving SDA low.
-    yield dut.i2c._sda.i.eq(0)
     yield
     assert (yield dut.i2c._sda.oe)
+    yield dut.i2c._sda.i.eq(0)
     yield
     assert not (yield dut.i2c._sda.oe)
     yield
 
     yield
     assert not (yield dut.i2c._sda.oe)
+    yield dut.i2c._sda.i.eq(1)  # Make it clear we're not trying.
     yield
     assert (yield dut.i2c._sda.oe)
+    yield
+
+    # Data: 0b10101111
+    for bit in [1, 0, 1, 0, 1, 1, 1, 1]:
+        yield
+        yield
+        yield
+        assert (yield dut.i2c._scl.o)
+        if bit:
+            assert (yield dut.i2c._sda.o)
+        else:
+            assert not (yield dut.i2c._sda.o)
+        yield
+        yield
+        yield
+
+        assert not (yield dut.i2c._scl.o)
+
+    # Repeat: master releases SDA; we'll ACK by driving SDA low.
+    yield
+    assert (yield dut.i2c._sda.oe)
+    yield dut.i2c._sda.i.eq(0)
+    yield
+    assert not (yield dut.i2c._sda.oe)
+    yield
+
+    yield
+    assert not (yield dut.i2c._sda.oe)
+    yield dut.i2c._sda.i.eq(1)  # Make it clear we're not trying.
+    yield
+    assert (yield dut.i2c._sda.oe)
+    yield
+
+    # While SCL is low, bring SDA low.
+    yield
+    yield
+    assert not (yield dut.i2c._scl.o)
+    assert (yield dut.i2c._sda.o)
+    yield
+    assert not (yield dut.i2c._scl.o)
+    assert not (yield dut.i2c._sda.o)
+    yield
+
+    # Then when SCL is high, bring SDA high.
+    assert (yield dut.i2c._scl.o)
+    assert not (yield dut.i2c._sda.o)
     yield
 
     # TODO: same test but NACK.  Driver shouldn't send byte.
@@ -118,6 +165,8 @@ def prep() -> Tuple[Top, Simulator, List[Signal]]:
             dut.i2c.fifo.r_level,
             dut.i2c.o_ack,
             dut.i2c.o_busy,
+            dut.i2c._I2C__byte,
+            dut.i2c._I2C__byte_ix,
             dut.i2c._scl.o,
             dut.i2c._sda.oe,
             dut.i2c._sda.o,

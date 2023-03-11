@@ -110,6 +110,13 @@ class I2C(Elaboratable):
                     m.next = "DATA"
                     # This edge: SCL goes low.
 
+            # This comes from ACK_L.
+            with m.State("DATA_OBTAIN"):
+                m.d.sync += self.__byte.eq(self.fifo.r_data)
+                m.d.sync += self.__byte_ix.eq(0)
+                m.d.sync += self.fifo.r_en.eq(0)
+                m.next = "DATA"
+
             with m.State("DATA"):
                 with m.If(HALF_CLOCK):
                     # Next edge: SCL goes high -- send bit. (MSB)
@@ -144,14 +151,29 @@ class I2C(Elaboratable):
                     m.d.sync += self._sda.oe.eq(1)
                 with m.Elif(FULL_CLOCK):
                     # This edge: SCL goes low.
-                    m.next = "FIN"
+                    with m.If(self.fifo.r_rdy):
+                        m.d.sync += self.fifo.r_en.eq(1)
+                        m.next = "DATA_OBTAIN"
+                    with m.Else():
+                        m.next = "FIN"
 
             with m.State("FIN"):
                 with m.If(HALF_CLOCK):
+                    # Next edge: SCL goes high -- bring SDA low.
+                    m.d.sync += self._sda.o.eq(0)
+                with m.Elif(FULL_CLOCK):
+                    # This edge: SCL goes high.
+                    m.next = "STOP"
+
+            with m.State("STOP"):
+                with m.If(HALF_CLOCK):
+                    # Next edge: we'll stop clocking.  Bring SDA high.
                     m.d.sync += self._sda.o.eq(1)
                 with m.Elif(FULL_CLOCK):
-                    m.d.sync += self.o_busy.eq(0)
+                    # This edge: stop clocking.  Ensure we keep SCL high.
                     m.d.sync += self.__clocking.eq(0)
+                    m.d.sync += self.o_busy.eq(0)
+                    m.d.sync += self._scl.o.eq(0)
                     m.next = "IDLE"
 
         return m
