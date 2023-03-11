@@ -1,6 +1,6 @@
 from typing import Optional
 
-from amaranth import Elaboratable, Module, Signal, Value
+from amaranth import Elaboratable, Module, Signal
 from amaranth.build import Platform
 
 from .debounce import Debounce
@@ -9,8 +9,8 @@ from .debounce import Debounce
 class Button(Elaboratable):
     i_switch: Signal
 
-    o_down: Value
-    o_up: Value
+    o_down: Signal
+    o_up: Signal
 
     __registered: Signal
     __debounce: Debounce
@@ -21,8 +21,8 @@ class Button(Elaboratable):
 
         self.i_switch = Signal()
 
-        self.o_down = ~self.__registered & self.__debounce.o
-        self.o_up = self.__registered & ~self.__debounce.o
+        self.o_down = Signal()
+        self.o_up = Signal()
 
     def elaborate(self, _: Optional[Platform]) -> Module:
         m = Module()
@@ -31,5 +31,8 @@ class Button(Elaboratable):
 
         m.d.comb += self.__debounce.i.eq(self.i_switch)
         m.d.sync += self.__registered.eq(self.__debounce.o)
+
+        m.d.comb += self.o_down.eq(~self.__registered & self.__debounce.o)
+        m.d.comb += self.o_up.eq(self.__registered & ~self.__debounce.o)
 
         return m

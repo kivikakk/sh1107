@@ -40,8 +40,6 @@ class I2C(Elaboratable):
         self._scl = Pin(1, "io")
 
         self.__clocking = Signal()
-        self.__clk_counter_max = 4
-        self.__clk_counter = Signal(range(self.__clk_counter_max))
 
         self.__byte = Signal(8)
         self.__byte_ix = Signal(range(7))
@@ -52,6 +50,8 @@ class I2C(Elaboratable):
 
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
+
+        m.submodules.fifo = self.fifo
 
         if platform:
             platform.add_resources(
@@ -69,6 +69,9 @@ class I2C(Elaboratable):
             self.assign(plat_i2c)
 
             self.__clk_counter_max = int(platform.default_clk_frequency // 200_000)
+            self.__clk_counter = Signal(range(self.__clk_counter_max))
+        else:
+            self.__clk_counter_max = 2
             self.__clk_counter = Signal(range(self.__clk_counter_max))
 
         m.d.comb += self._scl.oe.eq(1)

@@ -1,7 +1,7 @@
 from typing import List, Tuple
 
 from amaranth import Signal
-from amaranth.sim import Simulator, Delay
+from amaranth.sim import Simulator
 
 from .top import Top
 
@@ -9,10 +9,19 @@ SIM_CLOCK = 1e-6
 
 
 def bench(dut: Top):
-    yield dut.button.eq(1)
-    yield Delay(1e-3)
-    yield dut.button.eq(0)
-    yield Delay(1e-3)
+    yield dut.switch.eq(1)
+    yield
+    yield
+    yield dut.switch.eq(0)
+    yield
+    assert (yield dut.button.o_down)
+    yield
+    yield
+    assert (yield dut.button.o_up)
+    assert not (yield dut.i2c.i_stb)
+    yield
+    assert (yield dut.i2c.i_stb)
+    assert (yield dut.i2c.fifo.w_en)
 
 
 def prep() -> Tuple[Top, Simulator, List[Signal]]:
@@ -29,6 +38,10 @@ def prep() -> Tuple[Top, Simulator, List[Signal]]:
         dut,
         sim,
         [
+            dut.switch,
+            dut.button.i_switch,
+            dut.button.o_down,
+            dut.button.o_up,
             dut.i2c.i_addr,
             dut.i2c.i_rw,
             dut.i2c.i_stb,
