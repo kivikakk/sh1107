@@ -31,13 +31,15 @@ class Top(Elaboratable):
                 with m.If(button.o_up & i2c.fifo.w_rdy):
                     m.d.sync += i2c.i_addr.eq(0x3C)
                     m.d.sync += i2c.i_rw.eq(0)
-                    m.d.sync += i2c.i_stb.eq(1)
                     m.d.sync += i2c.fifo.w_data.eq(0xAF)  # 0x00 later really
                     m.d.sync += i2c.fifo.w_en.eq(1)
-                    m.next = "FIRST_DONE"
-            with m.State("FIRST_DONE"):
-                m.d.sync += i2c.i_stb.eq(0)
+                    m.next = "FIRST_QUEUED"
+            with m.State("FIRST_QUEUED"):
+                m.d.sync += i2c.i_stb.eq(1)
                 m.d.sync += i2c.fifo.w_en.eq(0)
+                m.next = "FIRST_READY"
+            with m.State("FIRST_READY"):
+                m.d.sync += i2c.i_stb.eq(0)
                 # Wait until we need the next byte.
                 m.next = "WAIT_SECOND"
             with m.State("WAIT_SECOND"):

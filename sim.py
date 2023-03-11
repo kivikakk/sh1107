@@ -9,6 +9,7 @@ SIM_CLOCK = 1e-6
 
 
 def bench(dut: Top):
+    # Push the button.
     yield dut.switch.eq(1)
     yield
     yield
@@ -18,10 +19,56 @@ def bench(dut: Top):
     yield
     yield
     assert (yield dut.button.o_up)
-    assert not (yield dut.i2c.i_stb)
     yield
-    assert (yield dut.i2c.i_stb)
+
+    # Enqueue the data.
+    assert not (yield dut.i2c.i_stb)
     assert (yield dut.i2c.fifo.w_en)
+    assert (yield dut.i2c.fifo.w_data) == 0xAF
+    assert not (yield dut.i2c.fifo.r_rdy)
+    assert (yield dut.i2c.fifo.r_level) == 0
+    yield
+
+    # Data is enqueued, we're strobing I2C.  I2C still high.
+    assert (yield dut.i2c.i_stb)
+    assert not (yield dut.i2c.fifo.w_en)
+    assert (yield dut.i2c.fifo.r_rdy)
+    assert (yield dut.i2c.fifo.r_level) == 1
+
+    assert (yield dut.i2c._scl.o)
+    assert (yield dut.i2c._sda.o)
+    yield
+
+    # Strobed.  I2C start condition.
+    assert not (yield dut.i2c.i_stb)
+    assert (yield dut.i2c._scl.o)
+    assert not (yield dut.i2c._sda.o)
+    yield
+    yield
+    yield
+
+    # I2C clock starts.
+    assert not (yield dut.i2c._scl.o)
+    assert not (yield dut.i2c._sda.o)
+    yield
+    yield
+    yield
+
+    # Address: 0b111100 / RW: 0b0
+    for bit in [0, 1, 1, 1, 1, 0, 0, 0]:
+        assert (yield dut.i2c._scl.o)
+        if bit:
+            assert (yield dut.i2c._sda.o)
+        else:
+            assert not (yield dut.i2c._sda.o)
+        yield
+        yield
+        yield
+
+        assert not (yield dut.i2c._scl.o)
+        yield
+        yield
+        yield
 
 
 def prep() -> Tuple[Top, Simulator, List[Signal]]:

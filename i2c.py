@@ -71,7 +71,8 @@ class I2C(Elaboratable):
             self.__clk_counter_max = int(platform.default_clk_frequency // 200_000)
             self.__clk_counter = Signal(range(self.__clk_counter_max))
         else:
-            self.__clk_counter_max = 2
+            # 3 is necessary such that HALF_CLOCK != FULL_CLOCK.
+            self.__clk_counter_max = 3
             self.__clk_counter = Signal(range(self.__clk_counter_max))
 
         m.d.comb += self._scl.oe.eq(1)
