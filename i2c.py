@@ -6,6 +6,8 @@ from amaranth.build import Platform, Attrs
 from amaranth.lib.fifo import SyncFIFO
 from amaranth_boards.resources import I2CResource
 
+from .config import SIM_CLOCK
+
 
 class I2C(Elaboratable):
     i_addr: Signal
@@ -67,12 +69,9 @@ class I2C(Elaboratable):
             plat_i2c = platform.request("i2c")
             self.assign(plat_i2c)
 
-            self.__clk_counter_max = int(platform.default_clk_frequency // 200_000)
-            self.__clk_counter = Signal(range(self.__clk_counter_max))
-        else:
-            # 3 is necessary such that HALF_CLOCK != FULL_CLOCK.
-            self.__clk_counter_max = 3
-            self.__clk_counter = Signal(range(self.__clk_counter_max))
+        freq = platform.default_clk_frequency if platform else int(1 // SIM_CLOCK)
+        self.__clk_counter_max = int(freq // 200_000)
+        self.__clk_counter = Signal(range(self.__clk_counter_max))
 
         m.d.comb += self._scl.oe.eq(1)
 

@@ -5,20 +5,14 @@ from amaranth.sim import Simulator, Delay, Settle
 
 from .top import Top
 from .config import SIM_CLOCK
-from .minor import Debounce
 
 
 def _i2c_switch(dut: Top):
-    yield dut.switch.eq(1)
-    yield Delay(Debounce.HOLD_TIME)
-    yield dut.switch.eq(0)
+    # Force the button push, we don't need to test it here.
+    yield dut.button.o_up.eq(1)
+    yield Delay(SIM_CLOCK)
     yield Settle()
-    assert (yield dut.button.o_down)
-    yield Delay(Debounce.HOLD_TIME)
-    yield Settle()
-    assert (yield dut.button.o_up)
-    yield Delay(1 * SIM_CLOCK)
-    yield Settle()
+    yield dut.button.o_up.eq(0)
 
 
 def _i2c_start(dut: Top):
@@ -26,7 +20,7 @@ def _i2c_start(dut: Top):
     assert not (yield dut.i2c.i_stb)
     assert (yield dut.i2c._scl.o)
     assert not (yield dut.i2c._sda.o)
-    yield Delay(3 * SIM_CLOCK)
+    yield Delay(5e-06)
     yield Settle()
 
     # I2C clock starts.
@@ -36,7 +30,7 @@ def _i2c_start(dut: Top):
 
 def _i2c_send(dut: Top, byte: int, *, next: int | Literal["STOP"] = None):
     for bit in range(8):
-        yield Delay(2 * SIM_CLOCK)
+        yield Delay(SIM_CLOCK * 2)
         yield Settle()
         if bit == 0:
             if isinstance(next, int):
@@ -44,7 +38,7 @@ def _i2c_send(dut: Top, byte: int, *, next: int | Literal["STOP"] = None):
                 assert (yield dut.i2c.fifo.w_data) == next
             elif next == "STOP":
                 assert not (yield dut.i2c.fifo.w_en)
-        yield Delay(1 * SIM_CLOCK)
+        yield Delay(5e-06 - SIM_CLOCK * 2)
         yield Settle()
         if bit == 0 and isinstance(next, int):
             assert not (yield dut.i2c.fifo.w_en)
@@ -53,7 +47,7 @@ def _i2c_send(dut: Top, byte: int, *, next: int | Literal["STOP"] = None):
             assert (yield dut.i2c._sda.o)
         else:
             assert not (yield dut.i2c._sda.o)
-        yield Delay(3 * SIM_CLOCK)
+        yield Delay(5e-06)
         yield Settle()
 
         assert not (yield dut.i2c._scl.o)
@@ -62,20 +56,20 @@ def _i2c_send(dut: Top, byte: int, *, next: int | Literal["STOP"] = None):
 def _i2c_ack(dut: Top, *, ack: bool = True):
     # Master releases SDA; we ACK by driving SDA low.
     assert (yield dut.i2c._sda.oe)
-    yield Delay(1 * SIM_CLOCK)
+    yield Delay(1e-06)
     if ack:
         yield dut.i2c._sda.i.eq(0)
-    yield Delay(1 * SIM_CLOCK)
+    yield Delay(3e-06)
     yield Settle()
     assert not (yield dut.i2c._sda.oe)
-    yield Delay(1 * SIM_CLOCK)
+    yield Delay(1e-06)
 
-    yield Delay(2 * SIM_CLOCK)
+    yield Delay(4e-06)
     yield Settle()
     assert (yield dut.i2c._sda.oe)
     if ack:
         yield dut.i2c._sda.i.eq(1)
-    yield Delay(1 * SIM_CLOCK)
+    yield Delay(1e-06)
 
 
 def _i2c_nack(dut: Top):
@@ -85,25 +79,26 @@ def _i2c_nack(dut: Top):
 def _i2c_stop(dut: Top):
     # While SCL is low, bring SDA low.
     last_sda = yield dut.i2c._sda.o
-    yield Delay(1 * SIM_CLOCK)
+    yield Delay(1e-06)
     assert not (yield dut.i2c._scl.o)
     assert (yield dut.i2c._sda.o) == last_sda
-    yield Delay(1 * SIM_CLOCK)
+    yield Delay(3e-06)
     yield Settle()
     assert not (yield dut.i2c._scl.o)
     assert not (yield dut.i2c._sda.o)
-    yield Delay(1 * SIM_CLOCK)
+    yield Delay(1e-06)
     yield Settle()
 
     # Then when SCL is high, bring SDA high.
     assert (yield dut.i2c._scl.o)
     assert not (yield dut.i2c._sda.o)
-    yield Delay(1 * SIM_CLOCK)
+    yield Delay(1e-06)
     assert not (yield dut.i2c._sda.o)
-    yield Delay(1 * SIM_CLOCK)
+    yield Delay(3e-06)
     yield Settle()
     assert (yield dut.i2c._sda.o)
-    yield Delay(1 * SIM_CLOCK)
+    yield Delay(1e-06)
+    yield Settle()
 
 
 def bench(dut: Top):
@@ -124,7 +119,7 @@ def bench_complete(dut: Top, *, nack_after: Optional[int] = None):
     assert (yield dut.i2c.fifo.w_data) == 0xAF
     assert not (yield dut.i2c.fifo.r_rdy)
     assert (yield dut.i2c.fifo.r_level) == 0
-    yield Delay(1 * SIM_CLOCK)
+    yield Delay(SIM_CLOCK)
     yield Settle()
 
     # Data is enqueued, we're strobing I2C.  I2C still high.
@@ -135,7 +130,7 @@ def bench_complete(dut: Top, *, nack_after: Optional[int] = None):
 
     assert (yield dut.i2c._scl.o)
     assert (yield dut.i2c._sda.o)
-    yield Delay(1 * SIM_CLOCK)
+    yield Delay(SIM_CLOCK)
     yield Settle()
 
     yield from _i2c_start(dut)
@@ -159,6 +154,8 @@ def bench_complete(dut: Top, *, nack_after: Optional[int] = None):
     yield from _i2c_stop(dut)
 
     for _ in range(3):
+        yield Delay(SIM_CLOCK)
+        yield Settle()
         assert (yield dut.i2c._scl.o)
         assert (yield dut.i2c._sda.o)
 
@@ -183,9 +180,6 @@ def prep() -> Tuple[Top, Simulator, List[Signal]]:
         dut,
         sim,
         [
-            dut.switch,
-            dut.button.i_switch,
-            dut.button.o_down,
             dut.button.o_up,
             dut.i2c.i_addr,
             dut.i2c.i_rw,
