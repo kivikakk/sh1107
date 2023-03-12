@@ -15,7 +15,6 @@ class I2C(Elaboratable):
     fifo: SyncFIFO
 
     o_busy: Signal
-    o_fin: Signal
     o_ack: Signal
 
     _sda: Pin
@@ -35,16 +34,14 @@ class I2C(Elaboratable):
         self.fifo = SyncFIFO(width=8, depth=1)
 
         self.o_busy = Signal()
-        self.o_fin = Signal()
+        self.o_ack = Signal(reset=1)
 
         self._sda = Pin(1, "io")
         self._scl = Pin(1, "io")
 
         self.__clocking = Signal()
-
         self.__byte = Signal(8)
         self.__byte_ix = Signal(range(7))
-        self.__ack = Signal()
 
     def assign(self, res):
         self._scl = res.scl
@@ -149,13 +146,13 @@ class I2C(Elaboratable):
                 with m.If(HALF_CLOCK):
                     # Next edge: SCL goes low -- read ACK.
                     # SDA should be brought low by the addressee.
-                    m.d.sync += self.__ack.eq(~self._sda.i)
+                    m.d.sync += self.o_ack.eq(~self._sda.i)
                     m.d.sync += self._sda.oe.eq(1)
                 with m.Elif(FULL_CLOCK):
                     # This edge: SCL goes low.
                     with m.If(self.fifo.r_rdy):
                         m.d.sync += self.fifo.r_en.eq(1)
-                        with m.If(self.__ack):
+                        with m.If(self.o_ack):
                             m.next = "DATA_OBTAIN"
                         with m.Else():
                             m.next = "FIN_EMPTY"
@@ -182,7 +179,6 @@ class I2C(Elaboratable):
                     # This edge: stop clocking.  Ensure we keep SCL high.
                     m.d.sync += self.__clocking.eq(0)
                     m.d.sync += self.o_busy.eq(0)
-                    m.d.sync += self.o_fin.eq(self.__ack)
                     m.d.sync += self._scl.o.eq(1)
                     m.next = "IDLE"
 
