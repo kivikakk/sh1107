@@ -194,8 +194,6 @@ def prep() -> Tuple[Top, Simulator, List[Signal]]:
             dut.i2c.fifo.r_level,
             dut.i2c.o_busy,
             dut.i2c.o_ack,
-            dut.i2c._I2C__clocking,
-            dut.i2c._I2C__clk_counter,
             dut.i2c._I2C__byte,
             dut.i2c._I2C__byte_ix,
             dut.i2c._scl.o,
