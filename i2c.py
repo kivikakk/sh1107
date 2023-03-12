@@ -153,11 +153,18 @@ class I2C(Elaboratable):
                     m.d.sync += self._sda.oe.eq(1)
                 with m.Elif(FULL_CLOCK):
                     # This edge: SCL goes low.
-                    with m.If(self.__ack & self.fifo.r_rdy):
+                    with m.If(self.fifo.r_rdy):
                         m.d.sync += self.fifo.r_en.eq(1)
-                        m.next = "DATA_OBTAIN"
+                        with m.If(self.__ack):
+                            m.next = "DATA_OBTAIN"
+                        with m.Else():
+                            m.next = "FIN_EMPTY"
                     with m.Else():
                         m.next = "FIN"
+
+            with m.State("FIN_EMPTY"):
+                m.d.sync += self.fifo.r_en.eq(0)
+                m.next = "FIN"
 
             with m.State("FIN"):
                 with m.If(HALF_CLOCK):

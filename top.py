@@ -44,12 +44,12 @@ class Top(Elaboratable):
                 # Wait until we need the next byte.
                 m.next = "WAIT_SECOND"
             with m.State("WAIT_SECOND"):
-                with m.If(i2c.fifo.w_rdy):
+                with m.If(i2c.o_busy & i2c.fifo.w_rdy):
                     m.d.sync += i2c.fifo.w_data.eq(0x8C)  # 0xAF later really
                     m.d.sync += i2c.fifo.w_en.eq(1)
                     m.next = "SECOND_DONE"
                 with m.Elif(~i2c.o_busy & ~i2c.o_fin):
-                    # Failed.
+                    # Failed.  Empty the queue.
                     m.next = "IDLE"
             with m.State("SECOND_DONE"):
                 m.d.sync += i2c.fifo.w_en.eq(0)
