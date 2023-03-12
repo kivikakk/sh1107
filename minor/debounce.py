@@ -1,10 +1,14 @@
-from typing import Optional
+from typing import Optional, Final
 
 from amaranth import Elaboratable, Module, Signal
 from amaranth.build import Platform
 
+from ..config import SIM_CLOCK
+
 
 class Debounce(Elaboratable):
+    HOLD_TIME: Final[float] = 1e-2
+
     i: Signal
     o: Signal
 
@@ -18,12 +22,9 @@ class Debounce(Elaboratable):
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
 
-        if platform:
-            self.__clk_counter_max = int(platform.default_clk_frequency * 1e-2)
-            self.__clk_counter = Signal(range(self.__clk_counter_max))
-        else:
-            self.__clk_counter_max = 2
-            self.__clk_counter = Signal(range(self.__clk_counter_max))
+        freq = platform.default_clk_frequency if platform else int(1 // SIM_CLOCK)
+        self.__clk_counter_max = int(freq * self.HOLD_TIME)
+        self.__clk_counter = Signal(range(self.__clk_counter_max))
 
         FULL_CLOCK = self.__clk_counter == self.__clk_counter_max - 1
 
