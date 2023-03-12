@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Literal
 
 from amaranth import Elaboratable, Signal, Module
 from amaranth.lib.io import Pin
@@ -10,6 +10,8 @@ from .config import SIM_CLOCK
 
 
 class I2C(Elaboratable):
+    speed: int
+
     i_addr: Signal
     i_rw: Signal
     i_stb: Signal
@@ -28,7 +30,9 @@ class I2C(Elaboratable):
     __byte: Signal
     __byte_ix: Signal
 
-    def __init__(self):
+    def __init__(self, *, speed: Literal[100_000, 400_000] = 100_000):
+        self.speed = speed
+
         self.i_addr = Signal(7, reset=0x3C)
         self.i_rw = Signal()
         self.i_stb = Signal()
@@ -70,7 +74,7 @@ class I2C(Elaboratable):
             self.assign(plat_i2c)
 
         freq = platform.default_clk_frequency if platform else int(1 / SIM_CLOCK)
-        self.__clk_counter_max = int(freq // 200_000)
+        self.__clk_counter_max = int(freq // (self.speed * 2))
         self.__clk_counter = Signal(range(self.__clk_counter_max))
 
         m.d.comb += self._scl.oe.eq(1)

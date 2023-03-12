@@ -167,7 +167,7 @@ def bench_nacks(dut: Top):
 
 
 def prep() -> Tuple[Top, Simulator, List[Signal]]:
-    dut = Top()
+    dut = Top(speed=400_000)
 
     def bench_wrapper():
         yield from bench(dut)
