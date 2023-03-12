@@ -1,1 +1,1 @@
-SIM_CLOCK = 1e-6
+SIM_CLOCK = 1 / 12e6

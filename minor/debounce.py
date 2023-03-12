@@ -22,7 +22,7 @@ class Debounce(Elaboratable):
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
 
-        freq = platform.default_clk_frequency if platform else int(1 // SIM_CLOCK)
+        freq = platform.default_clk_frequency if platform else int(1 / SIM_CLOCK)
         self.__clk_counter_max = int(freq * self.HOLD_TIME)
         self.__clk_counter = Signal(range(self.__clk_counter_max))
 

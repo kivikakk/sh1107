@@ -69,7 +69,7 @@ class I2C(Elaboratable):
             plat_i2c = platform.request("i2c")
             self.assign(plat_i2c)
 
-        freq = platform.default_clk_frequency if platform else int(1 // SIM_CLOCK)
+        freq = platform.default_clk_frequency if platform else int(1 / SIM_CLOCK)
         self.__clk_counter_max = int(freq // 200_000)
         self.__clk_counter = Signal(range(self.__clk_counter_max))
 
