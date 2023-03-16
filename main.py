@@ -66,8 +66,15 @@ def main():
     build_parser = subparsers.add_parser(
         "build", help="build the design, and optionally program it"
     )
-    build_parser.add_argument("-p", "--program", action="store_true")
-    build_parser.add_argument("-v", "--verilog", action="store_true")
+    build_parser.add_argument(
+        "-p",
+        "--program",
+        action="store_true",
+        help="program the design onto the iCEBreaker",
+    )
+    build_parser.add_argument(
+        "-v", "--verilog", action="store_true", help="output debug Verilog"
+    )
     build_parser.set_defaults(func=build)
 
     args = parser.parse_args()

@@ -1,6 +1,6 @@
 from typing import Optional
 
-from amaranth import Elaboratable, Module, Signal
+from amaranth import Elaboratable, Module, Signal, Mux
 from amaranth.build import Platform
 
 from .minor import Button
@@ -23,6 +23,8 @@ class Top(Elaboratable):
         else:
             self.switch = Signal()
 
+        was_turned_on = Signal()
+
         m.submodules.button = self.button = button = Button()
         m.d.comb += button.i_switch.eq(self.switch)
 
@@ -32,7 +34,7 @@ class Top(Elaboratable):
                     m.d.sync += i2c.i_addr.eq(0x3C)
                     m.d.sync += i2c.i_rw.eq(0)
                     with m.If(i2c.fifo.w_rdy):
-                        m.d.sync += i2c.fifo.w_data.eq(0xAF)  # 0x00 later really
+                        m.d.sync += i2c.fifo.w_data.eq(0x00)
                         m.d.sync += i2c.fifo.w_en.eq(1)
                     m.next = "FIRST_QUEUED"
             with m.State("FIRST_QUEUED"):
@@ -45,7 +47,8 @@ class Top(Elaboratable):
                 m.next = "WAIT_SECOND"
             with m.State("WAIT_SECOND"):
                 with m.If(i2c.o_busy & i2c.o_ack & i2c.fifo.w_rdy):
-                    m.d.sync += i2c.fifo.w_data.eq(0x8C)  # 0xAF later really
+                    m.d.sync += i2c.fifo.w_data.eq(Mux(was_turned_on, 0xAE, 0xAF))
+                    m.d.sync += was_turned_on.eq(~was_turned_on)
                     m.d.sync += i2c.fifo.w_en.eq(1)
                     m.next = "SECOND_DONE"
                 with m.Elif(~i2c.o_busy):
