@@ -3,12 +3,11 @@ import subprocess
 import traceback
 from argparse import ArgumentParser
 
-from amaranth import Elaboratable
 from amaranth.back import rtlil
 from amaranth.hdl import Fragment
 from amaranth_boards.icebreaker import ICEBreakerPlatform
 
-from .sim import prep as prep_sim
+from .sim import BENCHES
 from .formal import formal as prep_formal
 from .top import Top
 
@@ -17,8 +16,8 @@ def _outfile(ext):
     return sys.argv[0].replace(".py", ext)
 
 
-def sim(_a):
-    _, sim, traces = prep_sim()
+def sim(args):
+    _, sim, traces = BENCHES[args.bench](speed=400_000 if args.hispeed else 100_000)
 
     gtkw_file = _outfile(".gtkw")
     with sim.write_vcd(_outfile(".vcd"), gtkw_file=gtkw_file, traces=traces):
@@ -47,7 +46,7 @@ def formal(_):
 
 def build(args):
     ICEBreakerPlatform().build(
-        Top(),
+        Top(speed=100_000),
         do_program=args.program,
         debug_verilog=args.verilog,
     )
@@ -59,6 +58,11 @@ def main():
 
     sim_parser = subparsers.add_parser("sim", help="simulate the design")
     sim_parser.set_defaults(func=sim)
+
+    sim_parser.add_argument("bench", choices=BENCHES.keys(), help="which bench to run")
+    sim_parser.add_argument(
+        "-s", "--hispeed", action="store_true", help="sim at 400kHz"
+    )
 
     formal_parser = subparsers.add_parser("formal", help="formally verify the design")
     formal_parser.set_defaults(func=formal)

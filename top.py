@@ -1,32 +1,68 @@
-from typing import Optional
+from typing import Optional, cast
 
-from amaranth import Elaboratable, Module, Signal, Mux
+from amaranth import Elaboratable, Module, Signal, Mux, Memory
 from amaranth.build import Platform
 
 from .minor import Button
-from .i2c import I2C
+from .i2c import I2C, Speed
+from .command import Command
+
+with Command.writer() as w:
+    # Adapted from juniper.
+
+    w.write([0, 0xAE])  # disp off
+    w.write([0, 0xD5, 0x80])  # clk div +15%/1
+    w.write([0, 0xA8, 0x7F])  # set multiplex 128 (por)
+    w.write([0, 0xD3, 0])  # display offset por
+    w.write([0, 0xDC, 0])  # start line por
+    w.write([0, 0xAD, 0x8B])  # enable charge pump when display on por
+    w.write([0, 0xA0])  # seg remap por
+    w.write([0, 0xC0])  # com out scan dir por
+    # w.write([0, 0xDA, 0x12]) # 12 set compins
+    w.write([0, 0x81, 0x80])  # set contrast
+    # set precharge: 2 dclks (por), 2 dclks (por)
+    w.write([0, 0xD9, 0x22])
+    w.write([0, 0xDB, 0x40])  # set vcom deselect: 1//
+    w.write([0, 0xA6])  # display non-inverted (por)
+
+    # fill
+    # show
+    # poweron
+
+    INIT_SEQUENCE = w.done()
+
+POWEROFF_SEQUENCE = Command.write([0, 0xAE])
 
 
 class Top(Elaboratable):
+    speed: Speed
+
+    def __init__(self, *, speed: Speed):
+        self.speed = speed
+
+        self.init_sequence = Memory(
+            width=8, depth=len(INIT_SEQUENCE), init=INIT_SEQUENCE
+        )
+
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
 
-        m.submodules.i2c = self.i2c = i2c = I2C()
+        m.submodules.i2c = self.i2c = i2c = I2C(speed=self.speed)
 
         if platform:
-            self.led_busy = platform.request("led", 0)
-            self.led_ack = platform.request("led", 1)
-            m.d.comb += self.led_busy.eq(i2c.o_busy)
-            m.d.comb += self.led_ack.eq(i2c.o_ack)
+            led_busy = cast(Signal, platform.request("led", 0))
+            led_ack = cast(Signal, platform.request("led", 1))
+            m.d.comb += led_busy.eq(i2c.o_busy)
+            m.d.comb += led_ack.eq(i2c.o_ack)
 
-            self.switch = platform.request("button")
+            switch = platform.request("button")
         else:
-            self.switch = Signal()
+            switch = Signal()
 
         was_turned_on = Signal()
 
         m.submodules.button = self.button = button = Button()
-        m.d.comb += button.i_switch.eq(self.switch)
+        m.d.comb += button.i_switch.eq(switch)
 
         with m.FSM():
             with m.State("IDLE"):
