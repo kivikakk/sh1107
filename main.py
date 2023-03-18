@@ -13,6 +13,14 @@ from .i2c import Speed, SPEEDS
 from .formal import formal as prep_formal
 from .top import Top
 
+pyglet_available = False
+try:
+    import pyglet  # noqa: F401
+
+    pyglet_available = True
+except ModuleNotFoundError:
+    pass
+
 
 def _outfile(ext):
     return sys.argv[0].replace(".py", ext)
@@ -144,6 +152,15 @@ def main():
         action="store_true",
         help="output debug Verilog",
     )
+
+    if pyglet_available:
+        from .sim.virtual_sh1107 import vsh
+
+        vsh_parser = subparsers.add_parser(
+            "vsh",
+            help="run the Virtual SH1107",
+        )
+        vsh_parser.set_defaults(func=vsh)
 
     args = parser.parse_args()
     args.func(args)
