@@ -27,7 +27,7 @@ with Command.writer() as w:
 
     # fill
     # show
-    # poweron
+    w.write([0, 0xAF])  # disp on
 
     INIT_SEQUENCE = w.done()
 

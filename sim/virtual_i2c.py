@@ -7,20 +7,13 @@ from ..config import SIM_CLOCK
 from .start_top import Top
 
 
-class I2CVerifier:
+class VirtualI2C:
     dut: Top
     tick: float
 
     def __init__(self, dut: Top):
         self.dut = dut
         self.tick = 0.1 / dut.speed
-
-    def switch(self):
-        # Force the button push, we don't need to test it here.
-        yield self.dut.button.o_up.eq(1)
-        yield Delay(SIM_CLOCK)
-        yield Settle()
-        yield self.dut.button.o_up.eq(0)
 
     def start(self):
         # Strobed.  I2C start condition.
@@ -104,4 +97,4 @@ class I2CVerifier:
         yield Settle()
 
 
-__all__ = ["I2CVerifier"]
+__all__ = ["VirtualI2C"]

@@ -5,16 +5,19 @@ from amaranth.sim import Simulator, Delay, Settle
 
 from ..config import SIM_CLOCK
 from ..i2c import I2C, Speed
-from .i2c_verifier import I2CVerifier
+from ..minor import Button
+from .virtual_i2c import VirtualI2C
 from .start_top import Top
 
 
 class Bench:
-    iv: I2CVerifier
+    button: Button
+    iv: VirtualI2C
     i2c: I2C
 
     def __init__(self, dut: Top):
-        self.iv = I2CVerifier(dut)
+        self.button = dut.button
+        self.iv = VirtualI2C(dut)
         self.i2c = dut.i2c
 
     def __call__(self):
@@ -22,8 +25,11 @@ class Bench:
         yield from self.bench_nacks()
 
     def bench_complete(self, *, nack_after: Optional[int] = None):
-        # Push the button.
-        yield from self.iv.switch()
+        # Force the button push, we don't need to test it here.
+        yield self.button.o_up.eq(1)
+        yield Delay(SIM_CLOCK)
+        yield Settle()
+        yield self.button.o_up.eq(0)
 
         # Enqueue the data.
         assert not (yield self.i2c.i_stb)
