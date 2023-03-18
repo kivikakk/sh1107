@@ -10,8 +10,11 @@ python -m oled-i2c.main build
 python -m oled-i2c.main build -s 400000
 python -m oled-i2c.main build -s 1000000
 
-python -m oled-i2c.main sim start -G
-python -m oled-i2c.main sim start -Gs 400000
-python -m oled-i2c.main sim start -Gs 1000000
+(
+	trap 'buildkite-agent artifact upload oled-i2c/main.vcd' ERR
+	python -m oled-i2c.main sim start -G
+	python -m oled-i2c.main sim start -Gs 400000
+	python -m oled-i2c.main sim start -Gs 1000000
+)
 
 # python -m oled-i2c.main formal
