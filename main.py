@@ -22,18 +22,19 @@ def _outfile(ext):
 def sim(args):
     _, sim, traces = BENCHES[args.bench](speed=cast(Speed, int(args.speed)))
 
-    gtkw_file = _outfile(".gtkw")
+    gtkw_file = _outfile(".gtkw") if args.gtkw else None
     with sim.write_vcd(_outfile(".vcd"), gtkw_file=gtkw_file, traces=traces):
         try:
             sim.run()
         except AssertionError as e:
             traceback.print_exception(e)
 
-    if sys.platform == "darwin":
-        cmd = f"open {gtkw_file}"
-    else:
-        cmd = gtkw_file
-    subprocess.run(cmd, shell=True)
+    if gtkw_file:
+        if sys.platform == "darwin":
+            cmd = f"open {gtkw_file}"
+        else:
+            cmd = gtkw_file
+        subprocess.run(cmd, shell=True)
 
 
 def formal(_):
@@ -88,6 +89,13 @@ def main():
         choices=[str(s) for s in SPEEDS],
         help="bus speed to sim at",
         default=str(SPEEDS[0]),
+    )
+    sim_parser.add_argument(
+        "-G",
+        "--no-gtkw",
+        action="store_false",
+        dest="gtkw",
+        help="don't write and open a GTKWave file on completion",
     )
 
     formal_parser = subparsers.add_parser(
