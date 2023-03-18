@@ -4,17 +4,16 @@ from amaranth import Signal
 from amaranth.sim import Delay, Settle
 
 from ..config import SIM_CLOCK
-from ..i2c import Speed
 from .start_top import Top
 
 
 class I2CVerifier:
     dut: Top
-    speed: Speed
+    tick: float
 
     def __init__(self, dut: Top):
         self.dut = dut
-        self.speed = dut.speed
+        self.tick = 1e-06 if dut.speed == 100_000 else 0.25e-06
 
     def switch(self):
         # Force the button push, we don't need to test it here.
@@ -28,7 +27,7 @@ class I2CVerifier:
         assert not (yield self.dut.i2c.i_stb)
         assert (yield self.dut.i2c._scl.o)
         assert not (yield self.dut.i2c._sda.o)
-        yield Delay(5e-06)
+        yield Delay(5 * self.tick)
         yield Settle()
 
         # I2C clock starts.
@@ -45,7 +44,7 @@ class I2CVerifier:
                     assert (yield self.dut.i2c.fifo.w_data) == next
                 elif next == "STOP":
                     assert not (yield self.dut.i2c.fifo.w_en)
-            yield Delay(5e-06 - SIM_CLOCK * 2)
+            yield Delay(5 * self.tick - SIM_CLOCK * 2)
             yield Settle()
             if bit == 0 and isinstance(next, int):
                 assert not (yield self.dut.i2c.fifo.w_en)
@@ -54,7 +53,7 @@ class I2CVerifier:
                 assert (yield self.dut.i2c._sda.o)
             else:
                 assert not (yield self.dut.i2c._sda.o)
-            yield Delay(5e-06)
+            yield Delay(5 * self.tick)
             yield Settle()
 
             assert not (yield self.dut.i2c._scl.o)
@@ -62,20 +61,20 @@ class I2CVerifier:
     def ack(self, *, ack: bool = True):
         # Master releases SDA; we ACK by driving SDA low.
         assert (yield self.dut.i2c._sda.oe)
-        yield Delay(1e-06)
+        yield Delay(self.tick)
         if ack:
             yield cast(Signal, self.dut.i2c._sda.i).eq(0)
-        yield Delay(3e-06)
+        yield Delay(3 * self.tick)
         yield Settle()
         assert not (yield self.dut.i2c._sda.oe)
-        yield Delay(1e-06)
+        yield Delay(self.tick)
 
-        yield Delay(4e-06)
+        yield Delay(4 * self.tick)
         yield Settle()
         assert (yield self.dut.i2c._sda.oe)
         if ack:
             yield cast(Signal, self.dut.i2c._sda.i).eq(1)
-        yield Delay(1e-06)
+        yield Delay(self.tick)
 
     def nack(self):
         yield from self.ack(ack=False)
@@ -83,25 +82,25 @@ class I2CVerifier:
     def stop(self):
         # While SCL is low, bring SDA low.
         last_sda = yield self.dut.i2c._sda.o
-        yield Delay(1e-06)
+        yield Delay(self.tick)
         assert not (yield self.dut.i2c._scl.o)
         assert (yield self.dut.i2c._sda.o) == last_sda
-        yield Delay(3e-06)
+        yield Delay(3 * self.tick)
         yield Settle()
         assert not (yield self.dut.i2c._scl.o)
         assert not (yield self.dut.i2c._sda.o)
-        yield Delay(1e-06)
+        yield Delay(self.tick)
         yield Settle()
 
         # Then when SCL is high, bring SDA high.
         assert (yield self.dut.i2c._scl.o)
         assert not (yield self.dut.i2c._sda.o)
-        yield Delay(1e-06)
+        yield Delay(self.tick)
         assert not (yield self.dut.i2c._sda.o)
-        yield Delay(3e-06)
+        yield Delay(3 * self.tick)
         yield Settle()
         assert (yield self.dut.i2c._sda.o)
-        yield Delay(1e-06)
+        yield Delay(self.tick)
         yield Settle()
 
 
