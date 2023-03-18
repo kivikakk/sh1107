@@ -198,8 +198,7 @@ class I2C(Elaboratable):
             with m.State("FIN"):
                 with m.If(HALF_CLOCK):
                     # Next edge: SCL goes high -- bring SDA low.
-                    # m.d.sync += self._sda_o.eq(0)
-                    pass
+                    m.d.sync += self._sda_o.eq(0)
                 with m.Elif(FULL_CLOCK):
                     # This edge: SCL goes high.
                     m.next = "STOP"
