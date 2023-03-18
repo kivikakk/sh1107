@@ -1,4 +1,4 @@
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 
 from amaranth import Elaboratable, Signal, Module
 from amaranth.lib.io import Pin
@@ -8,7 +8,17 @@ from amaranth_boards.resources import I2CResource
 
 from .config import SIM_CLOCK
 
-Speed = Literal[100_000, 400_000]
+Speed = Literal[
+    100_000,
+    400_000,
+    1_000_000,
+]
+
+SPEEDS: List[Speed] = [
+    100_000,
+    400_000,
+    1_000_000,
+]
 
 
 class I2C(Elaboratable):
@@ -103,8 +113,13 @@ class I2C(Elaboratable):
         # TODO:  Investigate if these take more/less/same gates
         # if we actually assign them to a signal in comb and use
         # that instead.  (Might need to Settle some more in sim.)
-        HALF_CLOCK = self.__clk_counter == int(self.__clk_counter_max // 2)
-        FULL_CLOCK = self.__clk_counter == self.__clk_counter_max - 1
+        half_clock_tgt = int(self.__clk_counter_max // 2)
+        full_clock_tgt = self.__clk_counter_max - 1
+        assert (
+            0 < half_clock_tgt < full_clock_tgt
+        ), f"cannot clock at {self.speed}Hz with {freq}Hz clock; !(0 < {half_clock_tgt} < {full_clock_tgt})"
+        HALF_CLOCK = self.__clk_counter == half_clock_tgt
+        FULL_CLOCK = self.__clk_counter == full_clock_tgt
 
         with m.FSM():
             with m.State("IDLE"):
@@ -205,4 +220,4 @@ class I2C(Elaboratable):
         return m
 
 
-__all__ = ["I2C", "Speed"]
+__all__ = ["I2C", "Speed", "SPEEDS"]

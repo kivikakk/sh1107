@@ -13,7 +13,7 @@ class I2CVerifier:
 
     def __init__(self, dut: Top):
         self.dut = dut
-        self.tick = 1e-06 if dut.speed == 100_000 else 0.25e-06
+        self.tick = 0.1 / dut.speed
 
     def switch(self):
         # Force the button push, we don't need to test it here.

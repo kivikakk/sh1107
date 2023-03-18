@@ -1,13 +1,16 @@
+import re
 import sys
 import subprocess
 import traceback
 from argparse import ArgumentParser
+from typing import cast
 
 from amaranth.back import rtlil
 from amaranth.hdl import Fragment
 from amaranth_boards.icebreaker import ICEBreakerPlatform
 
 from .sim import BENCHES
+from .i2c import Speed, SPEEDS
 from .formal import formal as prep_formal
 from .top import Top
 
@@ -17,7 +20,7 @@ def _outfile(ext):
 
 
 def sim(args):
-    _, sim, traces = BENCHES[args.bench](speed=400_000 if args.hispeed else 100_000)
+    _, sim, traces = BENCHES[args.bench](speed=cast(Speed, int(args.speed)))
 
     gtkw_file = _outfile(".gtkw")
     with sim.write_vcd(_outfile(".vcd"), gtkw_file=gtkw_file, traces=traces):
@@ -46,29 +49,64 @@ def formal(_):
 
 def build(args):
     ICEBreakerPlatform().build(
-        Top(speed=100_000),
+        Top(speed=cast(Speed, int(args.speed))),
         do_program=args.program,
         debug_verilog=args.verilog,
     )
+    heading = re.compile(r"^\d+\.\d+\. (.+)$", flags=re.MULTILINE)
+    with open("build/top.rpt", "r") as f:
+        dumping = False
+        for line in f:
+            md = heading.match(line)
+            if dumping:
+                if md:
+                    break
+                else:
+                    print(line.rstrip())
+            elif md:
+                if md.group(1) == "Printing statistics.":
+                    dumping = True
 
 
 def main():
     parser = ArgumentParser(prog="fpgaxp.oled.main")
     subparsers = parser.add_subparsers(required=True)
 
-    sim_parser = subparsers.add_parser("sim", help="simulate the design")
+    sim_parser = subparsers.add_parser(
+        "sim",
+        help="simulate the design",
+    )
     sim_parser.set_defaults(func=sim)
-
-    sim_parser.add_argument("bench", choices=BENCHES.keys(), help="which bench to run")
     sim_parser.add_argument(
-        "-s", "--hispeed", action="store_true", help="sim at 400kHz"
+        "bench",
+        choices=BENCHES.keys(),
+        help="which bench to run",
+    )
+    sim_parser.add_argument(
+        "-s",
+        "--speed",
+        choices=[str(s) for s in SPEEDS],
+        help="bus speed to sim at",
+        default=str(SPEEDS[0]),
     )
 
-    formal_parser = subparsers.add_parser("formal", help="formally verify the design")
+    formal_parser = subparsers.add_parser(
+        "formal",
+        help="formally verify the design",
+    )
     formal_parser.set_defaults(func=formal)
 
     build_parser = subparsers.add_parser(
-        "build", help="build the design, and optionally program it"
+        "build",
+        help="build the design, and optionally program it",
+    )
+    build_parser.set_defaults(func=build)
+    build_parser.add_argument(
+        "-s",
+        "--speed",
+        choices=[str(s) for s in SPEEDS],
+        help="bus speed to build at",
+        default=str(SPEEDS[0]),
     )
     build_parser.add_argument(
         "-p",
@@ -77,9 +115,11 @@ def main():
         help="program the design onto the iCEBreaker",
     )
     build_parser.add_argument(
-        "-v", "--verilog", action="store_true", help="output debug Verilog"
+        "-v",
+        "--verilog",
+        action="store_true",
+        help="output debug Verilog",
     )
-    build_parser.set_defaults(func=build)
 
     args = parser.parse_args()
     args.func(args)
