@@ -1,7 +1,6 @@
 import re
 import sys
 import subprocess
-import traceback
 from argparse import ArgumentParser
 from typing import cast
 
@@ -23,11 +22,12 @@ def sim(args):
     _, sim, traces = BENCHES[args.bench](speed=cast(Speed, int(args.speed)))
 
     gtkw_file = _outfile(".gtkw") if args.gtkw else None
+    sim_exc = None
     with sim.write_vcd(_outfile(".vcd"), gtkw_file=gtkw_file, traces=traces):
         try:
             sim.run()
-        except AssertionError as e:
-            traceback.print_exception(e)
+        except AssertionError as exc:
+            sim_exc = exc
 
     if gtkw_file:
         if sys.platform == "darwin":
@@ -35,6 +35,9 @@ def sim(args):
         else:
             cmd = gtkw_file
         subprocess.run(cmd, shell=True)
+
+    if sim_exc:
+        raise sim_exc
 
 
 def formal(_):
