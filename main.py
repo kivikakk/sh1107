@@ -48,25 +48,38 @@ def formal(_):
     subprocess.run(f"sby -f {sby_file}", shell=True)
 
 
+def _print_file_between(path, start, end, *, prefix=None):
+    with open(path, "r") as f:
+        for line in f:
+            if start.match(line):
+                break
+        else:
+            return
+
+        for line in f:
+            if end.match(line):
+                return
+            line = line.rstrip()
+            if prefix is not None:
+                line = line.removeprefix(prefix)
+            print(line)
+
+
 def build(args):
     ICEBreakerPlatform().build(
         Top(speed=cast(Speed, int(args.speed))),
         do_program=args.program,
         debug_verilog=args.verilog,
     )
-    heading = re.compile(r"^\d+\.\d+\. (.+)$", flags=re.MULTILINE)
-    with open("build/top.rpt", "r") as f:
-        dumping = False
-        for line in f:
-            md = heading.match(line)
-            if dumping:
-                if md:
-                    break
-                else:
-                    print(line.rstrip())
-            elif md:
-                if md.group(1) == "Printing statistics.":
-                    dumping = True
+
+    heading = re.compile(r"^\d+\.\d+\. Printing statistics\.$", flags=re.MULTILINE)
+    next_heading = re.compile(r"^\d+\.\d+\. ", flags=re.MULTILINE)
+    _print_file_between("build/top.rpt", heading, next_heading)
+
+    print("Device utilisation:")
+    heading = re.compile(r"^Info: Device utilisation:$", flags=re.MULTILINE)
+    next_heading = re.compile(r"^Info: Placed ", flags=re.MULTILINE)
+    _print_file_between("build/top.tim", heading, next_heading, prefix="Info: ")
 
 
 def main():

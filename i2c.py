@@ -110,9 +110,6 @@ class I2C(Elaboratable):
                 m.d.sync += self.__clk_counter.eq(0)
                 m.d.sync += self._scl_o.eq(~self._scl_o)
 
-        # TODO:  Investigate if these take more/less/same gates
-        # if we actually assign them to a signal in comb and use
-        # that instead.  (Might need to Settle some more in sim.)
         half_clock_tgt = int(self.__clk_counter_max // 2)
         full_clock_tgt = self.__clk_counter_max - 1
         assert (
