@@ -3,7 +3,7 @@ from typing import Literal, cast
 from amaranth import Signal
 from amaranth.sim import Delay, Settle
 
-from .config import SIM_CLOCK
+from config import SIM_CLOCK
 from .start_top import Top
 
 

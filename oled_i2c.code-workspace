@@ -25,12 +25,6 @@
 			"../../3rd/amaranth-soc",
 			"../../3rd/amaranth-boards",
 		],
-		"python.analysis.exclude": [
-			"amaranth",
-			"amaranth-boards",
-			"amaranth-soc",
-			"oss-cad-suite",
-		],
 		// testing
 		"python.testing.unittestEnabled": true,
 		"python.testing.autoTestDiscoverOnSaveEnabled": true,

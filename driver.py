@@ -19,7 +19,7 @@ from oled import Top
 
 def _outfile(dir, ext):
     base = Path(sys.argv[0])
-    return str(base.parent / dir / f"{base.stem}{ext}")
+    return str(base.parent / dir / f"oled_i2c{ext}")
 
 
 def sim(args):
@@ -52,7 +52,7 @@ def formal(_):
         f.write(output)
 
     sby_file = _outfile("formal", ".sby")
-    subprocess.run(f"sby --prefix build/main -f {sby_file}", shell=True)
+    subprocess.run(f"sby --prefix build/oled_i2c -f {sby_file}", shell=True)
 
 
 def _print_file_between(path, start, end, *, prefix=None):
