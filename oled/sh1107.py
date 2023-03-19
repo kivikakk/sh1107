@@ -17,7 +17,15 @@ def _enyom(enum, value):
 
 class SH1107Sequence:
     def __repr__(self) -> str:
-        ppdict = " ".join(f"{k}={hex(v)}" for k, v in self.__dict__.items())
+        def repr_v(v):
+            if isinstance(v, int):
+                return hex(v)
+            elif isinstance(v, list):
+                return f"[{', '.join(repr_v(vv) for vv in v)}]"
+            else:
+                return repr(v)
+
+        ppdict = " ".join(f"{k}={repr_v(v)}" for k, v in self.__dict__.items())
         return f"<{self.__class__.__name__} {ppdict}>"
 
     def __eq__(self, other):
@@ -111,14 +119,16 @@ class SH1107Command(SH1107Sequence, ABC):
         out: List[Self | DataBytes] = []
         for b in msg:
             match state:
-                case State.Control, State.ControlPartialCommand:
+                case State.Control | State.ControlPartialCommand:
                     cb = ControlByte.parse_one(b)
                     assert cb is not None
                     continuation = cb.continuation
                     if state == State.ControlPartialCommand:
                         assert cb.dc == DC.Command, "received data in partial command"
-                    state = State.Command if cb.dc == DC.Command else State.Data
-                    partial = []
+                        state = State.Command
+                    else:
+                        state = State.Command if cb.dc == DC.Command else State.Data
+                        partial = []
 
                 case State.Command:
                     partial.append(b)
@@ -135,7 +145,10 @@ class SH1107Command(SH1107Sequence, ABC):
                     partial.append(b)
                     if continuation:
                         state = State.Control
-                        out.append(DataBytes(partial))
+                        if isinstance(out[-1], DataBytes):
+                            out[-1].data.extend(partial)
+                        else:
+                            out.append(DataBytes(partial))
                         partial = []
 
         match state:
@@ -147,7 +160,11 @@ class SH1107Command(SH1107Sequence, ABC):
                 assert not partial, "Message ended with partial command"
             case State.Data:
                 assert not continuation, "Message ended in data state"
-                out.append(DataBytes(partial))
+                if isinstance(out[-1], DataBytes):
+                    out[-1].data.extend(partial)
+                else:
+                    out.append(DataBytes(partial))
+
         return out
 
 

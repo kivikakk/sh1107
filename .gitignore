@@ -1,8 +1,8 @@
 *.vcd
 *.il
 *.gtkw
-**/*_bmc/*
-**/*_cover/*
-**/*_prove/*
+**/*_bmc/
+**/*_cover/
+**/*_prove/
 **/__pycache__/
 **/build/

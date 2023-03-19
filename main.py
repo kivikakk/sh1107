@@ -8,10 +8,10 @@ from amaranth.back import rtlil
 from amaranth.hdl import Fragment
 from amaranth_boards.icebreaker import ICEBreakerPlatform
 
-from .sim import BENCHES
-from .i2c import Speed
-from .formal import formal as prep_formal
-from .top import Top
+from oled.sim import BENCHES
+from oled.i2c import Speed
+from oled.formal import formal as prep_formal
+from oled.top import Top
 
 
 def _outfile(ext):
@@ -86,7 +86,7 @@ def build(args):
 
 
 def vsh(args):
-    from .sim import virtual_sh1107
+    from oled.sim import virtual_sh1107
 
     virtual_sh1107.run(args)
 

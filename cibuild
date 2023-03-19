@@ -1,23 +1,26 @@
 #!/usr/bin/env bash
 
+PYTHON="${PYTHON:-python}"
 SPEEDS=( 100000 400000 1000000 )
 
-source ~/.asdf/asdf.sh
-cd ..
+if ! type asdf &>/dev/null; then
+	source ~/.asdf/asdf.sh
+fi
+
 set -exuo pipefail
 
-python -m unittest discover -t . -s oled-i2c
+"$PYTHON" -m unittest discover
 
 for speed in "${SPEEDS[@]}"; do
-	python -m oled-i2c.main build -s "$speed"
+	"$PYTHON" -m main build -s "$speed"
 done
 
 (
-	trap 'buildkite-agent artifact upload oled-i2c/main.vcd' ERR
+	trap 'buildkite-agent artifact upload main.vcd' ERR
 
 	for speed in "${SPEEDS[@]}"; do
-		python -m oled-i2c.main sim start -Gs "$speed"
+		"$PYTHON" -m main sim start -Gs "$speed"
 	done
 )
 
-# python -m oled-i2c.main formal
+# "$PYTHON" -m main formal
