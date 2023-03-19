@@ -5,10 +5,13 @@ from amaranth import Module, Signal, Value, ClockSignal, ResetSignal
 # from amaranth.asserts import Assert, Cover, Assume, Initial
 from amaranth.asserts import Cover, Assume
 
-from .i2c import I2C, Speed
+from i2c import I2C, Speed
 
 
 def formal() -> Tuple[Module, List[Signal | Value]]:
+    # XXX(Ari): Next time we work on this, please note some changes I've made
+    # to main.sby, specifically around the "techmap" call.
+    # See https://github.com/amaranth-lang/amaranth/issues/526.
     m = Module()
     m.submodules.dut = dut = I2C(speed=Speed(100_000))
 

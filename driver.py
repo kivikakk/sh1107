@@ -1,29 +1,33 @@
+#!/usr/bin/env python
+
 import importlib.util
 import re
 import sys
 import subprocess
 from argparse import ArgumentParser
+from pathlib import Path
 
 from amaranth.back import rtlil
 from amaranth.hdl import Fragment
 from amaranth_boards.icebreaker import ICEBreakerPlatform
 
-from oled.sim import BENCHES
-from oled.i2c import Speed
-from oled.formal import formal as prep_formal
-from oled.top import Top
+from sim import BENCHES
+from i2c import Speed
+from formal import formal as prep_formal
+from oled import Top
 
 
-def _outfile(ext):
-    return sys.argv[0].replace(".py", ext)
+def _outfile(dir, ext):
+    base = Path(sys.argv[0])
+    return str(base.parent / dir / f"{base.stem}{ext}")
 
 
 def sim(args):
     _, sim, traces = BENCHES[args.bench](speed=Speed(args.speed))
 
-    gtkw_file = _outfile(".gtkw") if args.gtkw else None
+    gtkw_file = _outfile("build", ".gtkw") if args.gtkw else None
     sim_exc = None
-    with sim.write_vcd(_outfile(".vcd"), gtkw_file=gtkw_file, traces=traces):
+    with sim.write_vcd(_outfile("build", ".vcd"), gtkw_file=gtkw_file, traces=traces):
         try:
             sim.run()
         except AssertionError as exc:
@@ -43,12 +47,12 @@ def sim(args):
 def formal(_):
     design, ports = prep_formal()
     fragment = Fragment.get(design, None)
-    output = rtlil.convert(fragment, ports=ports)
-    with open(_outfile(".il"), "w") as f:
+    output = rtlil.convert(fragment, name="formal_top", ports=ports)
+    with open(_outfile("build", ".il"), "w") as f:
         f.write(output)
 
-    sby_file = _outfile(".sby")
-    subprocess.run(f"sby -f {sby_file}", shell=True)
+    sby_file = _outfile("formal", ".sby")
+    subprocess.run(f"sby --prefix build/main -f {sby_file}", shell=True)
 
 
 def _print_file_between(path, start, end, *, prefix=None):
@@ -86,7 +90,7 @@ def build(args):
 
 
 def vsh(args):
-    from oled.sim import virtual_sh1107
+    from sim import virtual_sh1107
 
     virtual_sh1107.run(args)
 

@@ -3,8 +3,8 @@ from typing import Optional, cast
 from amaranth import Elaboratable, Module, Signal
 from amaranth.build import Platform
 
-from ..minor import Button
-from ..i2c import I2C, Speed
+from minor import Button
+from i2c import I2C, Speed
 
 
 class Top(Elaboratable):

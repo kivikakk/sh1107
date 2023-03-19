@@ -15,7 +15,7 @@
 			"../../3rd/amaranth-boards",
 		],
 		// analysis
-		"python.analysis.typeCheckingMode": "basic",
+		"python.analysis.typeCheckingMode": "basic", // TODO: "strict"
 		"python.analysis.diagnosticMode": "workspace",
 		"python.analysis.autoImportCompletions": true,
 		"python.analysis.autoImportUserSymbols": true,

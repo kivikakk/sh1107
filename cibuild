@@ -12,15 +12,15 @@ set -exuo pipefail
 "$PYTHON" -m unittest discover
 
 for speed in "${SPEEDS[@]}"; do
-	"$PYTHON" -m main build -s "$speed"
+	"$PYTHON" driver.py build -s "$speed"
 done
 
 (
 	trap 'buildkite-agent artifact upload main.vcd' ERR
 
 	for speed in "${SPEEDS[@]}"; do
-		"$PYTHON" -m main sim start -Gs "$speed"
+		"$PYTHON" driver.py sim start -Gs "$speed"
 	done
 )
 
-# "$PYTHON" -m main formal
+# "$PYTHON" driver.py formal

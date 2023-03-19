@@ -3,7 +3,7 @@ from typing import Literal, List
 import pyglet
 from pyglet.window import key
 
-from ..sh1107 import SH1107Command
+# from ..oled import SH1107Command
 
 
 def run(_args):

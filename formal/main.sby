@@ -29,8 +29,8 @@ END
 design -stash dff2ff
 read_ilang main.il
 proc
-techmap -map %dff2ff top/w:clk %co
-prep -top top
+techmap -map %dff2ff formal_top/w:clk %co*
+prep -top formal_top
 
 [files]
-main.il
+build/main.il

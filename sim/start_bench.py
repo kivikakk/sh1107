@@ -3,9 +3,9 @@ from typing import List, Tuple, Optional
 from amaranth import Signal
 from amaranth.sim import Simulator, Delay, Settle
 
-from ..config import SIM_CLOCK
-from ..i2c import I2C, Speed
-from ..minor import Button
+from .config import SIM_CLOCK
+from i2c import I2C, Speed
+from minor import Button
 from .virtual_i2c import VirtualI2C
 from .start_top import Top
 

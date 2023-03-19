@@ -3,7 +3,7 @@ from typing import Optional, Final
 from amaranth import Elaboratable, Module, Signal
 from amaranth.build import Platform
 
-from ..config import SIM_CLOCK
+from sim.config import SIM_CLOCK
 
 
 class Debounce(Elaboratable):

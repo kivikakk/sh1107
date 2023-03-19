@@ -3,7 +3,7 @@ from typing import Dict, Protocol, Tuple, List
 from amaranth import Elaboratable, Signal
 from amaranth.sim import Simulator
 
-from ..i2c import Speed
+from i2c import Speed
 from .start_bench import prep_start
 
 

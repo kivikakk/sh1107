@@ -6,7 +6,7 @@ from amaranth.build import Platform, Attrs
 from amaranth.lib.fifo import SyncFIFO
 from amaranth_boards.resources import I2CResource
 
-from .config import SIM_CLOCK
+from sim.config import SIM_CLOCK
 
 
 class Speed:

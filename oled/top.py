@@ -3,13 +3,14 @@ from typing import Optional, cast
 from amaranth import Elaboratable, Module, Signal, Mux, Memory
 from amaranth.build import Platform
 
-from .minor import Button
-from .i2c import I2C, Speed
+from minor import Button
+from i2c import I2C, Speed
 from .command import Command
 
 with Command.writer() as w:
     # Adapted from juniper.
 
+    # TODO: Use SH1107Command.
     w.write([0, 0xAE])  # disp off
     w.write([0, 0xD5, 0x80])  # clk div +15%/1
     w.write([0, 0xA8, 0x7F])  # set multiplex 128 (por)
