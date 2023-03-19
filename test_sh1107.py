@@ -51,10 +51,10 @@ class TestSH1107Command(unittest.TestCase):
     ]
 
     CONTROL_BYTES = [
-        ([0x00], sh1107.ControlByte(False, "Command")),
-        ([0x80], sh1107.ControlByte(True, "Command")),
-        ([0x40], sh1107.ControlByte(False, "Data")),
-        ([0xC0], sh1107.ControlByte(True, "Data")),
+        (0x00, sh1107.ControlByte(False, "Command")),
+        (0x80, sh1107.ControlByte(True, "Command")),
+        (0x40, sh1107.ControlByte(False, "Data")),
+        (0xC0, sh1107.ControlByte(True, "Data")),
     ]
 
     COMPOSE_PAIRS = [
@@ -121,9 +121,9 @@ class TestSH1107Command(unittest.TestCase):
         ),
     ]
 
-    def test_parse(self):
+    def test_parse_one(self):
         for data, value, *_ in self.PAIRS:
-            self.assertEqual(sh1107.SH1107Command.parse(data), value)
+            self.assertEqual(sh1107.SH1107Command.parse_one(data), value)
 
     def test_to_bytes(self):
         for data, value, *maybe in self.PAIRS:
@@ -134,13 +134,17 @@ class TestSH1107Command(unittest.TestCase):
             self.assertEqual(value.to_bytes(), data)
 
     def test_control_bytes(self):
-        for data, value in self.CONTROL_BYTES:
-            self.assertEqual(sh1107.ControlByte.parse(data), value)
-            self.assertEqual(value.to_bytes(), data)
+        for b, cb in self.CONTROL_BYTES:
+            self.assertEqual(sh1107.ControlByte.parse_one(b), cb)
+            self.assertEqual(cb.to_byte(), b)
 
     def test_compose(self):
         for cmds, bytes in self.COMPOSE_PAIRS:
             self.assertEqual(sh1107.SH1107Command.compose(cmds), bytes)
+
+    def test_parse(self):
+        for cmds, bytes in self.COMPOSE_PAIRS:
+            self.assertEqual(sh1107.SH1107Command.parse(bytes), cmds)
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional, Self
 
-from amaranth.lib.enum import IntEnum
+from amaranth.lib.enum import Enum, IntEnum
 
 
 def _enyom(enum, value):
@@ -24,23 +24,24 @@ class SH1107Sequence:
         return type(other) is type(self) and self.__dict__ == other.__dict__
 
 
-class ControlByte(SH1107Sequence):
-    class DC(IntEnum):
-        Command = 0b0
-        Data = 0b1
+class DC(IntEnum):
+    Command = 0b0
+    Data = 0b1
 
+
+class ControlByte(SH1107Sequence):
     def __init__(self, continuation: bool, dc: DC | int | str):
         self.continuation = continuation
-        self.dc = _enyom(self.DC, dc)
+        self.dc = _enyom(DC, dc)
 
     @classmethod
-    def parse(cls, cmd: List[int]) -> Optional[Self]:
-        if len(cmd) != 1 or (cmd[0] & 0x3F) != 0:
+    def parse_one(cls, b: int) -> Optional[Self]:
+        if b & 0x3F:
             return None
-        return cls((cmd[0] & 0x80) == 0x80, cls.DC((cmd[0] & 0x40) == 0x40))
+        return cls((b & 0x80) == 0x80, DC((b & 0x40) == 0x40))
 
-    def to_bytes(self) -> List[int]:
-        return [(self.continuation << 7) | (self.dc << 6)]
+    def to_byte(self) -> int:
+        return (self.continuation << 7) | (self.dc << 6)
 
 
 class DataBytes(SH1107Sequence):
@@ -54,9 +55,9 @@ class DataBytes(SH1107Sequence):
 class SH1107Command(SH1107Sequence, ABC):
     @classmethod
     @abstractmethod
-    def parse(cls, cmd: List[int]) -> Optional[Self]:
+    def parse_one(cls, cmd: List[int]) -> Optional[Self]:
         for subclass in cls.__subclasses__():
-            result = subclass.parse(cmd)
+            result = subclass.parse_one(cmd)
             if result is not None:
                 return result
 
@@ -65,7 +66,7 @@ class SH1107Command(SH1107Sequence, ABC):
         ...
 
     @classmethod
-    def compose(cls, cmds: List[Self | ControlByte | DataBytes]) -> List[int]:
+    def compose(cls, cmds: List[Self | DataBytes]) -> List[int]:
         # Start with a control byte that defines:
         # * Whether we are sending data or commands
         # * If there are any further control bytes
@@ -74,7 +75,6 @@ class SH1107Command(SH1107Sequence, ABC):
 
         dcs = []
         for cmd in cmds:
-            assert not isinstance(cmd, ControlByte)
             dcs.append(isinstance(cmd, DataBytes))
 
         out = []
@@ -83,19 +83,71 @@ class SH1107Command(SH1107Sequence, ABC):
             if not finished_control:
                 if all(dc == dcs[i] for dc in dcs[i:]):
                     finished_control = True
-                    out.extend(ControlByte(False, ControlByte.DC(dcs[i])).to_bytes())
+                    out.append(ControlByte(False, DC(dcs[i])).to_byte())
 
             if not finished_control:
                 for byte in cmd.to_bytes():
-                    out.extend(
-                        ControlByte(
-                            True, ControlByte.DC(isinstance(cmd, DataBytes))
-                        ).to_bytes()
+                    out.append(
+                        ControlByte(True, DC(isinstance(cmd, DataBytes))).to_byte()
                     )
                     out.append(byte)
             else:
                 out.extend(cmd.to_bytes())
 
+        return out
+
+    @classmethod
+    def parse(cls, msg: List[int]) -> Optional[List[Self | DataBytes]]:
+        class State(Enum):
+            Control = 1
+            ControlPartialCommand = 2
+            Command = 3
+            Data = 4
+
+        continuation = True
+        state: State = State.Control
+        partial: List[int] = []
+
+        out: List[Self | DataBytes] = []
+        for b in msg:
+            match state:
+                case State.Control, State.ControlPartialCommand:
+                    cb = ControlByte.parse_one(b)
+                    assert cb is not None
+                    continuation = cb.continuation
+                    if state == State.ControlPartialCommand:
+                        assert cb.dc == DC.Command, "received data in partial command"
+                    state = State.Command if cb.dc == DC.Command else State.Data
+                    partial = []
+
+                case State.Command:
+                    partial.append(b)
+                    px = cls.parse_one(partial)
+                    if px is not None:
+                        partial = []
+                        out.append(px)
+                        if continuation:
+                            state = State.Control
+                    elif continuation:
+                        state = State.ControlPartialCommand
+
+                case State.Data:
+                    partial.append(b)
+                    if continuation:
+                        state = State.Control
+                        out.append(DataBytes(partial))
+                        partial = []
+
+        match state:
+            case State.Control:
+                raise ValueError("Message ended in control state")
+            case State.ControlPartialCommand:
+                raise ValueError("Message ended in control state with partial command")
+            case State.Command:
+                assert not partial, "Message ended with partial command"
+            case State.Data:
+                assert not continuation, "Message ended in data state"
+                out.append(DataBytes(partial))
         return out
 
 
@@ -106,7 +158,7 @@ class SetLowerColumnAddress(SH1107Command):
         self.lower = lower
 
     @classmethod
-    def parse(cls, cmd: List[int]) -> Optional[Self]:
+    def parse_one(cls, cmd: List[int]) -> Optional[Self]:
         if len(cmd) != 1 or not (0 <= cmd[0] <= 0x0F):
             return None
         return cls(cmd[0])
@@ -122,7 +174,7 @@ class SetHigherColumnAddress(SH1107Command):
         self.higher = higher
 
     @classmethod
-    def parse(cls, cmd: List[int]) -> Optional[Self]:
+    def parse_one(cls, cmd: List[int]) -> Optional[Self]:
         if len(cmd) != 1 or not (0x10 <= cmd[0] <= 0x17):
             return None
         return cls(cmd[0] & ~0x10)
@@ -140,7 +192,7 @@ class SetMemoryAddressingMode(SH1107Command):
         self.mode = _enyom(self.Mode, mode)
 
     @classmethod
-    def parse(cls, cmd: List[int]) -> Optional[Self]:
+    def parse_one(cls, cmd: List[int]) -> Optional[Self]:
         if len(cmd) != 1 or not (0x20 <= cmd[0] <= 0x21):
             return None
         return cls(cls.Mode(cmd[0] & ~0x20))
@@ -156,7 +208,7 @@ class SetContrastControlRegister(SH1107Command):
         self.level = level
 
     @classmethod
-    def parse(cls, cmd: List[int]) -> Optional[Self]:
+    def parse_one(cls, cmd: List[int]) -> Optional[Self]:
         if len(cmd) != 2 or cmd[0] != 0x81:
             return None
         return cls(cmd[1])
@@ -174,7 +226,7 @@ class SetSegmentRemap(SH1107Command):
         self.adc = _enyom(self.Adc, adc)
 
     @classmethod
-    def parse(cls, cmd: List[int]) -> Optional[Self]:
+    def parse_one(cls, cmd: List[int]) -> Optional[Self]:
         if len(cmd) != 1 or not (0xA0 <= cmd[0] <= 0xA1):
             return None
         return cls(cls.Adc(cmd[0] & ~0xA0))
@@ -192,7 +244,7 @@ class SetMultiplexRatio(SH1107Command):
         self.ratio = ratio
 
     @classmethod
-    def parse(cls, cmd: List[int]) -> Optional[Self]:
+    def parse_one(cls, cmd: List[int]) -> Optional[Self]:
         if len(cmd) != 2 or cmd[0] != 0xA8:
             return None
         return cls((cmd[1] & 0x7F) + 1)
@@ -207,7 +259,7 @@ class SetEntireDisplayOn(SH1107Command):
         self.on = on
 
     @classmethod
-    def parse(cls, cmd: List[int]) -> Optional[Self]:
+    def parse_one(cls, cmd: List[int]) -> Optional[Self]:
         if len(cmd) != 1 or not (0xA4 <= cmd[0] <= 0xA5):
             return None
         return cls(cmd[0] == 0xA5)
@@ -222,7 +274,7 @@ class SetDisplayReverse(SH1107Command):
         self.reverse = reverse
 
     @classmethod
-    def parse(cls, cmd: List[int]) -> Optional[Self]:
+    def parse_one(cls, cmd: List[int]) -> Optional[Self]:
         if len(cmd) != 1 or not (0xA6 <= cmd[0] <= 0xA7):
             return None
         return cls(cmd[0] == 0xA7)
@@ -238,7 +290,7 @@ class SetDisplayOffset(SH1107Command):
         self.offset = offset
 
     @classmethod
-    def parse(cls, cmd: List[int]) -> Optional[Self]:
+    def parse_one(cls, cmd: List[int]) -> Optional[Self]:
         if len(cmd) != 2 or cmd[0] != 0xD3:
             return None
         return cls(cmd[1] & 0x7F)
@@ -253,7 +305,7 @@ class SetDCDC(SH1107Command):
         self.on = on
 
     @classmethod
-    def parse(cls, cmd: List[int]) -> Optional[Self]:
+    def parse_one(cls, cmd: List[int]) -> Optional[Self]:
         if len(cmd) != 2 or cmd[0] != 0xAD:
             return None
         return cls(cmd[1] == 0x8B)
@@ -268,7 +320,7 @@ class DisplayOn(SH1107Command):
         self.on = on
 
     @classmethod
-    def parse(cls, cmd: List[int]) -> Optional[Self]:
+    def parse_one(cls, cmd: List[int]) -> Optional[Self]:
         if len(cmd) != 1 or not (0xAE <= cmd[0] <= 0xAF):
             return None
         return cls(cmd[0] == 0xAF)
@@ -284,7 +336,7 @@ class SetPageAddress(SH1107Command):
         self.page = page
 
     @classmethod
-    def parse(cls, cmd: List[int]) -> Optional[Self]:
+    def parse_one(cls, cmd: List[int]) -> Optional[Self]:
         if len(cmd) != 1 or not (0xB0 <= cmd[0] <= 0xBF):
             return None
         return cls(cmd[0] & ~0xB0)
@@ -302,7 +354,7 @@ class SetCommonOutputScanDirection(SH1107Command):
         self.direction = _enyom(self.Direction, direction)
 
     @classmethod
-    def parse(cls, cmd: List[int]) -> Optional[Self]:
+    def parse_one(cls, cmd: List[int]) -> Optional[Self]:
         if len(cmd) != 1 or not (0xC0 <= cmd[0] <= 0xCF):
             return None
         return cls(cls.Direction((cmd[0] & 8) == 8))
@@ -337,7 +389,7 @@ class SetDisplayClockFrequency(SH1107Command):
         self.freq = _enyom(self.Freq, freq)
 
     @classmethod
-    def parse(cls, cmd: List[int]) -> Optional[Self]:
+    def parse_one(cls, cmd: List[int]) -> Optional[Self]:
         if len(cmd) != 2 or cmd[0] != 0xD5:
             return None
         return cls((cmd[1] & 0xF) + 1, cls.Freq(cmd[1] >> 4))
@@ -355,7 +407,7 @@ class SetPreDischargePeriod(SH1107Command):
         self.discharge = discharge
 
     @classmethod
-    def parse(cls, cmd: List[int]) -> Optional[Self]:
+    def parse_one(cls, cmd: List[int]) -> Optional[Self]:
         if len(cmd) != 2 or cmd[0] != 0xD9:
             return None
         return cls(cmd[1] & 0xF, cmd[1] >> 4)
@@ -375,7 +427,7 @@ class SetVCOMDeselectLevel(SH1107Command):
         self.level = level
 
     @classmethod
-    def parse(cls, cmd: List[int]) -> Optional[Self]:
+    def parse_one(cls, cmd: List[int]) -> Optional[Self]:
         if len(cmd) != 2 or cmd[0] != 0xDB:
             return None
         return cls(cmd[1])
@@ -391,7 +443,7 @@ class SetDisplayStartColumn(SH1107Command):
         self.column = column
 
     @classmethod
-    def parse(cls, cmd: List[int]) -> Optional[Self]:
+    def parse_one(cls, cmd: List[int]) -> Optional[Self]:
         if len(cmd) != 2 or cmd[0] != 0xDC:
             return None
         return cls(cmd[1] & 0x7F)
@@ -404,7 +456,7 @@ class ReadModifyWrite(SH1107Command):
     # Must be paired with End command.  End causes
     # column/page address to return to where it was before RMW.
     @classmethod
-    def parse(cls, cmd: List[int]) -> Optional[Self]:
+    def parse_one(cls, cmd: List[int]) -> Optional[Self]:
         if len(cmd) != 1 or cmd[0] != 0xE0:
             return None
         return cls()
@@ -415,7 +467,7 @@ class ReadModifyWrite(SH1107Command):
 
 class End(SH1107Command):
     @classmethod
-    def parse(cls, cmd: List[int]) -> Optional[Self]:
+    def parse_one(cls, cmd: List[int]) -> Optional[Self]:
         if len(cmd) != 1 or cmd[0] != 0xEE:
             return None
         return cls()
@@ -426,7 +478,7 @@ class End(SH1107Command):
 
 class Nop(SH1107Command):
     @classmethod
-    def parse(cls, cmd: List[int]) -> Optional[Self]:
+    def parse_one(cls, cmd: List[int]) -> Optional[Self]:
         if len(cmd) != 1 or cmd[0] != 0xE3:
             return None
         return cls()

@@ -3,6 +3,8 @@ from typing import Literal, List
 import pyglet
 from pyglet.window import key
 
+from ..sh1107 import SH1107Command
+
 
 def run(_args):
     v = VirtualSH1107()
@@ -78,3 +80,6 @@ class VirtualSH1107(pyglet.window.Window):
 
     def run(self):
         pyglet.app.run()
+
+
+__all__ = ["run"]

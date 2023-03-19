@@ -6,8 +6,7 @@ source ~/.asdf/asdf.sh
 cd ..
 set -exuo pipefail
 
-python -m oled-i2c.sh1107_unittest
-
+python -m unittest discover -t . -s oled-i2c
 
 for speed in "${SPEEDS[@]}"; do
 	python -m oled-i2c.main build -s "$speed"
