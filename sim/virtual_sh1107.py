@@ -4,7 +4,7 @@ import pyglet
 from pyglet.window import key
 
 
-def vsh(_args):
+def run(_args):
     v = VirtualSH1107()
     v.set_px(0, 0, 1)
     v.set_px(10, 10, 1)

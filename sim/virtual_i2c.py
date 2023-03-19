@@ -13,7 +13,7 @@ class VirtualI2C:
 
     def __init__(self, dut: Top):
         self.dut = dut
-        self.tick = 0.1 / dut.speed
+        self.tick = 0.1 / dut.speed.hz
 
     def start(self):
         # Strobed.  I2C start condition.

@@ -5,12 +5,12 @@ from amaranth import Module, Signal, Value, ClockSignal, ResetSignal
 # from amaranth.asserts import Assert, Cover, Assume, Initial
 from amaranth.asserts import Cover, Assume
 
-from .i2c import I2C
+from .i2c import I2C, Speed
 
 
 def formal() -> Tuple[Module, List[Signal | Value]]:
     m = Module()
-    m.submodules.dut = dut = I2C(speed=100_000)
+    m.submodules.dut = dut = I2C(speed=Speed(100_000))
 
     sync_clk = ClockSignal("sync")
     sync_rst = ResetSignal("sync")

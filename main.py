@@ -1,25 +1,17 @@
+import importlib.util
 import re
 import sys
 import subprocess
 from argparse import ArgumentParser
-from typing import cast
 
 from amaranth.back import rtlil
 from amaranth.hdl import Fragment
 from amaranth_boards.icebreaker import ICEBreakerPlatform
 
 from .sim import BENCHES
-from .i2c import Speed, SPEEDS
+from .i2c import Speed
 from .formal import formal as prep_formal
 from .top import Top
-
-pyglet_available = False
-try:
-    import pyglet  # noqa: F401
-
-    pyglet_available = True
-except ModuleNotFoundError:
-    pass
 
 
 def _outfile(ext):
@@ -27,7 +19,7 @@ def _outfile(ext):
 
 
 def sim(args):
-    _, sim, traces = BENCHES[args.bench](speed=cast(Speed, int(args.speed)))
+    _, sim, traces = BENCHES[args.bench](speed=Speed(args.speed))
 
     gtkw_file = _outfile(".gtkw") if args.gtkw else None
     sim_exc = None
@@ -78,7 +70,7 @@ def _print_file_between(path, start, end, *, prefix=None):
 
 def build(args):
     ICEBreakerPlatform().build(
-        Top(speed=cast(Speed, int(args.speed))),
+        Top(speed=Speed(args.speed)),
         do_program=args.program,
         debug_verilog=args.verilog,
     )
@@ -91,6 +83,12 @@ def build(args):
     heading = re.compile(r"^Info: Device utilisation:$", flags=re.MULTILINE)
     next_heading = re.compile(r"^Info: Placed ", flags=re.MULTILINE)
     _print_file_between("build/top.tim", heading, next_heading, prefix="Info: ")
+
+
+def vsh(args):
+    from .sim import virtual_sh1107
+
+    virtual_sh1107.run(args)
 
 
 def main():
@@ -110,9 +108,9 @@ def main():
     sim_parser.add_argument(
         "-s",
         "--speed",
-        choices=[str(s) for s in SPEEDS],
+        choices=[str(s) for s in Speed.VALID_SPEEDS],
         help="bus speed to sim at",
-        default=str(SPEEDS[0]),
+        default=str(Speed.VALID_SPEEDS[0]),
     )
     sim_parser.add_argument(
         "-G",
@@ -136,9 +134,9 @@ def main():
     build_parser.add_argument(
         "-s",
         "--speed",
-        choices=[str(s) for s in SPEEDS],
+        choices=[str(s) for s in Speed.VALID_SPEEDS],
         help="bus speed to build at",
-        default=str(SPEEDS[0]),
+        default=str(Speed.VALID_SPEEDS[0]),
     )
     build_parser.add_argument(
         "-p",
@@ -153,9 +151,7 @@ def main():
         help="output debug Verilog",
     )
 
-    if pyglet_available:
-        from .sim.virtual_sh1107 import vsh
-
+    if importlib.util.find_spec("pyglet") is not None:
         vsh_parser = subparsers.add_parser(
             "vsh",
             help="run the Virtual SH1107",

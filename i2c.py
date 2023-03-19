@@ -1,4 +1,4 @@
-from typing import Optional, Literal, List
+from typing import Optional, List, Final
 
 from amaranth import Elaboratable, Signal, Module
 from amaranth.lib.io import Pin
@@ -8,21 +8,35 @@ from amaranth_boards.resources import I2CResource
 
 from .config import SIM_CLOCK
 
-Speed = Literal[
-    100_000,
-    400_000,
-    1_000_000,
-]
 
-SPEEDS: List[Speed] = [
-    100_000,
-    400_000,
-    1_000_000,
-]
+class Speed:
+    hz: int
+
+    VALID_SPEEDS: Final[List[int]] = [
+        100_000,
+        400_000,
+        1_000_000,
+    ]
+
+    def __init__(self, hz: int | str):
+        hz = int(hz)
+        assert hz in self.VALID_SPEEDS
+        self.hz = hz
+
+    def __repr__(self) -> str:
+        return f"{self.hz}Hz"
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Speed):
+            return NotImplemented
+        return self.hz == other.hz
+
+    def __hash__(self) -> int:
+        return hash(self.hz)
 
 
 class I2C(Elaboratable):
-    speed: int
+    speed: Speed
 
     i_addr: Signal
     i_rw: Signal
@@ -98,7 +112,7 @@ class I2C(Elaboratable):
             self.assign(scl=plat_i2c.scl, sda=plat_i2c.sda)
 
         freq = platform.default_clk_frequency if platform else int(1 / SIM_CLOCK)
-        self.__clk_counter_max = int(freq // (self.speed * 2))
+        self.__clk_counter_max = int(freq // (self.speed.hz * 2))
         self.__clk_counter = Signal(range(self.__clk_counter_max))
 
         m.d.comb += self._scl_oe.eq(1)
@@ -217,4 +231,4 @@ class I2C(Elaboratable):
         return m
 
 
-__all__ = ["I2C", "Speed", "SPEEDS"]
+__all__ = ["I2C", "Speed"]
