@@ -1,0 +1,53 @@
+{
+	"folders": [
+		{
+			"path": ".",
+		},
+		{
+			"path": "../../3rd",
+		},
+	],
+	"settings": {
+		// autoComplete
+		"python.autoComplete.extraPaths": [
+			"../../3rd/amaranth",
+			"../../3rd/amaranth-soc",
+			"../../3rd/amaranth-boards",
+		],
+		// analysis
+		"python.analysis.typeCheckingMode": "basic",
+		"python.analysis.diagnosticMode": "workspace",
+		"python.analysis.autoImportCompletions": true,
+		"python.analysis.autoImportUserSymbols": true,
+		"python.analysis.importFormat": "relative",
+		"python.analysis.extraPaths": [
+			"../../3rd/amaranth",
+			"../../3rd/amaranth-soc",
+			"../../3rd/amaranth-boards",
+		],
+		"python.analysis.exclude": [
+			"amaranth",
+			"amaranth-boards",
+			"amaranth-soc",
+			"oss-cad-suite",
+		],
+		// testing
+		"python.testing.unittestEnabled": true,
+		"python.testing.autoTestDiscoverOnSaveEnabled": true,
+		"python.testing.pytestEnabled": false,
+		// formatting
+		"[python]": {
+			"editor.defaultFormatter": "ms-python.python",
+		},
+		"python.formatting.provider": "black",
+		// linting
+		"python.linting.flake8Enabled": true,
+		"python.linting.flake8Args": [
+			"--ignore=E501,E203",
+		],
+		"python.linting.ignorePatterns": [
+			// "**/site-packages/**/*.py",
+			"../../3rd/**/*",
+		],
+	}
+}
