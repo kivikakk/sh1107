@@ -3,12 +3,14 @@ from contextlib import contextmanager
 
 from amaranth.lib.enum import IntEnum
 
+from .sh1107 import SH1107Command
+
 
 class _Writer:
     def __init__(self):
         self.buf = []
 
-    def write(self, cmd: List[int]):
+    def write(self, cmd: List[int | SH1107Command]):
         self.buf.extend(Command.write(cmd))
 
     def done(self) -> List[int]:
@@ -22,11 +24,16 @@ class Command(IntEnum):
     FINISH = 0xFF
 
     @staticmethod
-    def write(cmd: List[int]) -> List[int]:
-        assert 1 <= len(cmd) <= 0x81
+    def write(cmd: List[int | SH1107Command]) -> List[int]:
+        out: List[int] = []
         for c in cmd:
-            assert 0 <= c <= 0xFF
-        return [len(cmd)] + cmd
+            if isinstance(c, SH1107Command):
+                out.extend(c.to_bytes())
+            else:
+                assert 0 <= c <= 0xFF
+                out.append(c)
+        assert 1 <= len(out) <= 0x81
+        return [len(out)] + out
 
     @contextmanager
     def writer():
