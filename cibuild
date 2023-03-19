@@ -6,6 +6,8 @@ source ~/.asdf/asdf.sh
 
 cd ..
 
+python -m oled-i2c.sh1107_unittest
+
 python -m oled-i2c.main build
 python -m oled-i2c.main build -s 400000
 python -m oled-i2c.main build -s 1000000

@@ -1,5 +1,4 @@
 import unittest
-from typing import List
 
 from . import sh1107
 
