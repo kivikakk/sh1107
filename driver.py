@@ -90,9 +90,9 @@ def build(args):
 
 
 def vsh(args):
-    from sim import virtual_sh1107
+    from vsh import run
 
-    virtual_sh1107.run(args)
+    run(args)
 
 
 def main():

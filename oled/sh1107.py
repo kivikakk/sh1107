@@ -29,7 +29,9 @@ class SH1107Sequence:
         return f"<{self.__class__.__name__} {ppdict}>"
 
     def __eq__(self, other):
-        return type(other) is type(self) and self.__dict__ == other.__dict__
+        if type(other) is not type(self):
+            return NotImplemented
+        return self.__dict__ == other.__dict__
 
 
 class DC(IntEnum):
@@ -75,12 +77,6 @@ class SH1107Command(SH1107Sequence, ABC):
 
     @classmethod
     def compose(cls, cmds: List[Self | DataBytes]) -> List[int]:
-        # Start with a control byte that defines:
-        # * Whether we are sending data or commands
-        # * If there are any further control bytes
-        # This means that if it's all only data, or all only command,
-        # we only need the very first control byte.
-
         dcs = []
         for cmd in cmds:
             dcs.append(isinstance(cmd, DataBytes))
@@ -95,9 +91,7 @@ class SH1107Command(SH1107Sequence, ABC):
 
             if not finished_control:
                 for byte in cmd.to_bytes():
-                    out.append(
-                        ControlByte(True, DC(isinstance(cmd, DataBytes))).to_byte()
-                    )
+                    out.append(ControlByte(True, DC(dcs[i])).to_byte())
                     out.append(byte)
             else:
                 out.extend(cmd.to_bytes())

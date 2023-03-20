@@ -37,7 +37,7 @@
 		// linting
 		"python.linting.flake8Enabled": true,
 		"python.linting.flake8Args": [
-			"--ignore=E501,E203",
+			"--ignore=E501,E203,W503",
 		],
 		"python.linting.ignorePatterns": [
 			// "**/site-packages/**/*.py",
