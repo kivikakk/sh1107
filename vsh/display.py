@@ -27,20 +27,20 @@ class Display(DisplayBase, Window):
     voyager2: Texture
 
     power: bool
-    dclk_freq: int
-    dclk_ratio: int
-    precharge_period: int
-    discharge_period: int
-    vcom_desel: int
-    all_on: bool
-    reversed: bool
-    contrast: int
-    start_line: int
-    start_column: int
-    page_address: int
-    column_address: int
-    addressing_mode: Literal[0, 1]
-    multiplex: int
+    dclk_freq: int  # NE
+    dclk_ratio: int  # NE
+    precharge_period: int  # NE
+    discharge_period: int  # NE
+    vcom_desel: int  # TODO
+    all_on: bool  # TODO
+    reversed: bool  # TODO
+    contrast: int  # TODO
+    start_line: int  # TODO
+    start_column: int  # TODO
+    page_address: int  # NOP
+    column_address: int  # NOP
+    addressing_mode: Literal[0, 1]  # NOP
+    multiplex: int  # XXX
     segment_remap: bool
     com_scan_reversed: bool
 
@@ -83,7 +83,6 @@ class Display(DisplayBase, Window):
 
     def on_draw(self):
         self.voyager2.blit(0, 0, width=self.WINDOW_WIDTH, height=self.WINDOW_HEIGHT)
-
         self._draw_top()
         self._draw_oled()
 
