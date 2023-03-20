@@ -27,12 +27,22 @@ class Display(DisplayBase, Window):
     voyager2: Texture
 
     power: bool
+    dclk_freq: int
+    dclk_ratio: int
+    precharge_period: int
+    discharge_period: int
+    vcom_desel: int
     all_on: bool
     reversed: bool
+    contrast: int
     start_line: int
     start_column: int
-    y_flipped: bool
-    x_flipped: bool
+    page_address: int
+    column_address: int
+    addressing_mode: Literal[0, 1]
+    multiplex: int
+    segment_remap: bool
+    com_scan_reversed: bool
 
     idata: bytearray
     img: ImageData
@@ -50,12 +60,22 @@ class Display(DisplayBase, Window):
         Texture.default_min_filter = Texture.default_mag_filter = gl.GL_NEAREST
 
         self.power = False
+        self.dclk_freq = 0
+        self.dclk_ratio = 1
+        self.precharge_period = 2
+        self.discharge_period = 2
+        self.vcom_desel = 0x35
         self.all_on = False
         self.reversed = False
+        self.contrast = 0x80
         self.start_line = 0
         self.start_column = 0
-        self.y_flipped = False
-        self.x_flipped = False
+        self.page_address = 0
+        self.column_address = 0
+        self.addressing_mode = 0
+        self.multiplex = 128
+        self.segment_remap = False
+        self.com_scan_reversed = False
 
         self.idata = bytearray(self.BLACK * self.I2C_WIDTH * self.I2C_HEIGHT)
         self.img = ImageData(self.I2C_WIDTH, self.I2C_HEIGHT, "RGBA", bytes(self.idata))
@@ -70,17 +90,24 @@ class Display(DisplayBase, Window):
     TOP_COLS: List[List[Tuple[str, Callable[[Self], bool | str]]]] = [
         [
             ("power on", lambda d: d.power),
+            ("dclk", lambda d: f"{d.dclk_freq}% {d.dclk_ratio}x"),
+            ("pre/dis", lambda d: f"{d.precharge_period}/{d.discharge_period}"),
+            ("vcom desel", lambda d: f"{d.vcom_desel:02x}"),
         ],
         [
             ("all on", lambda d: d.all_on),
             ("reversed", lambda d: d.reversed),
+            ("contrast", lambda d: f"{d.contrast:02x}"),
         ],
         [
             ("start", lambda d: f"{d.start_line:02x}/{d.start_column:02x}"),
+            ("address", lambda d: f"{d.page_address:02x}/{d.column_address:02x}"),
+            ("mode", lambda d: "page" if d.addressing_mode == 0 else "column"),
+            ("multiplex", lambda d: f"{d.multiplex:02x}"),
         ],
         [
-            ("y flipped", lambda d: d.y_flipped),
-            ("x flipped", lambda d: d.x_flipped),
+            ("seg remap", lambda d: d.segment_remap),
+            ("com rev", lambda d: d.com_scan_reversed),
         ],
     ]
 
@@ -90,10 +117,11 @@ class Display(DisplayBase, Window):
         for col in self.TOP_COLS:
             top = self.WINDOW_HEIGHT - self.PADDING
             for name, lamb in col:
-                x = left + self.CHECKBOX_SIZE + self.CHECKBOX_TEXT_GAP
+                x = left
 
                 val: bool | str = lamb(self)
                 if isinstance(val, bool):
+                    x += self.CHECKBOX_SIZE + self.CHECKBOX_TEXT_GAP
                     self.render_text(
                         name, self.WHITE, x=x, y=top, anchor_y="center", bold=val
                     ).draw()
@@ -133,18 +161,30 @@ class Display(DisplayBase, Window):
                 x=(
                     self.PADDING
                     + self.BORDER_WIDTH
-                    + (self.I2C_WIDTH * self.DISPLAY_SCALE if self.x_flipped else 0)
+                    + (
+                        self.I2C_WIDTH * self.DISPLAY_SCALE
+                        if self.com_scan_reversed
+                        else 0
+                    )
                 ),
                 y=(
                     self.PADDING
                     + self.BORDER_WIDTH
-                    + (self.I2C_HEIGHT * self.DISPLAY_SCALE if self.y_flipped else 0)
+                    + (
+                        0
+                        if self.segment_remap
+                        else self.I2C_HEIGHT * self.DISPLAY_SCALE
+                    )
                 ),
                 width=(
-                    self.I2C_WIDTH * self.DISPLAY_SCALE * (-1 if self.x_flipped else 1)
+                    self.I2C_WIDTH
+                    * self.DISPLAY_SCALE
+                    * (-1 if self.com_scan_reversed else 1)
                 ),
                 height=(
-                    self.I2C_HEIGHT * self.DISPLAY_SCALE * (-1 if self.y_flipped else 1)
+                    self.I2C_HEIGHT
+                    * self.DISPLAY_SCALE
+                    * (1 if self.segment_remap else -1)
                 ),
             )
         else:
@@ -182,9 +222,9 @@ class Display(DisplayBase, Window):
             self.power = not self.power
 
         if symbol == key.PAGEUP:
-            self.y_flipped = not self.y_flipped
+            self.segment_remap = not self.segment_remap
         if symbol == key.PAGEDOWN:
-            self.x_flipped = not self.x_flipped
+            self.com_scan_reversed = not self.com_scan_reversed
 
     def run(self):
         pyglet.app.run()
