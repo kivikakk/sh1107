@@ -26,11 +26,15 @@ def run(_args):
 class Display(DisplayBase, Window):
     voyager2: Texture
 
-    idata: bytearray
     power: bool
+    all_on: bool
+    reversed: bool
+    start_line: int
+    start_column: int
     y_flipped: bool
     x_flipped: bool
 
+    idata: bytearray
     img: ImageData
     img_stale: bool
 
@@ -45,11 +49,15 @@ class Display(DisplayBase, Window):
         self.voyager2 = pyglet.resource.image("vsh/voyager2.jpg", atlas=False)
         Texture.default_min_filter = Texture.default_mag_filter = gl.GL_NEAREST
 
-        self.idata = bytearray(self.BLACK * self.I2C_WIDTH * self.I2C_HEIGHT)
         self.power = False
+        self.all_on = False
+        self.reversed = False
+        self.start_line = 0
+        self.start_column = 0
         self.y_flipped = False
         self.x_flipped = False
 
+        self.idata = bytearray(self.BLACK * self.I2C_WIDTH * self.I2C_HEIGHT)
         self.img = ImageData(self.I2C_WIDTH, self.I2C_HEIGHT, "RGBA", bytes(self.idata))
         self.img_stale = False
 
@@ -59,12 +67,17 @@ class Display(DisplayBase, Window):
         self._draw_top()
         self._draw_oled()
 
-    TOP_COLS: List[List[Tuple[str, Callable[[Self], bool]]]] = [
+    TOP_COLS: List[List[Tuple[str, Callable[[Self], bool | str]]]] = [
         [
             ("power on", lambda d: d.power),
         ],
-        [],
-        [],
+        [
+            ("all on", lambda d: d.all_on),
+            ("reversed", lambda d: d.reversed),
+        ],
+        [
+            ("start", lambda d: f"{d.start_line:02x}/{d.start_column:02x}"),
+        ],
         [
             ("y flipped", lambda d: d.y_flipped),
             ("x flipped", lambda d: d.x_flipped),
@@ -77,18 +90,26 @@ class Display(DisplayBase, Window):
         for col in self.TOP_COLS:
             top = self.WINDOW_HEIGHT - self.PADDING
             for name, lamb in col:
-                val: bool = lamb(self)
-                self.render_text(
-                    name,
-                    self.WHITE,
-                    x=left + self.CHECKBOX_SIZE + self.CHECKBOX_TEXT_GAP,
-                    y=top,
-                    anchor_y="center",
-                    bold=val,
-                )
-                (self.checked if val else self.unchecked).blit(
-                    left, top - self.CHECKBOX_DOWN
-                )
+                x = left + self.CHECKBOX_SIZE + self.CHECKBOX_TEXT_GAP
+
+                val: bool | str = lamb(self)
+                if isinstance(val, bool):
+                    self.render_text(
+                        name, self.WHITE, x=x, y=top, anchor_y="center", bold=val
+                    ).draw()
+                    (self.checked if val else self.unchecked).blit(
+                        left, top - self.CHECKBOX_DOWN
+                    )
+                else:
+                    label = self.render_text(
+                        f"{name}: <b>{val}</b>",
+                        self.WHITE,
+                        x=x,
+                        y=top,
+                        anchor_y="center",
+                    )
+                    label.draw()
+
                 top -= self.TOP_ROW_HEIGHT
 
             left += self.TOP_COL_WIDTH
@@ -144,17 +165,15 @@ class Display(DisplayBase, Window):
             self.power = False
         # TODO: clk div?
         # TODO: multiplex?
-        # TODO: display offset/start line/seg remap?
+        # TODO: display start_line/start line/seg remap?
         # TODO: contrast?
         # TODO: vcom deselect?
         # TODO: non-inverted?
         elif msg == [0, 0xAF]:
             self.power = True
 
-    def on_key_press(self, symbol, modifiers):
-        if symbol == key.ESCAPE and not (
-            modifiers & ~(key.MOD_NUMLOCK | key.MOD_CAPSLOCK | key.MOD_SCROLLLOCK)
-        ):
+    def on_key_press(self, symbol, _modifiers):
+        if symbol == key.ESCAPE:
             self.dispatch_event("on_close")
             return
 

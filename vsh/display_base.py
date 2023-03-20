@@ -2,7 +2,7 @@ from typing import Literal, List, Tuple
 
 import pyglet
 from pyglet.image import ImageData
-from pyglet.text import Label
+from pyglet.text import HTMLLabel
 
 
 class DisplayBase:
@@ -45,7 +45,7 @@ class DisplayBase:
 
     ###
 
-    __texts: dict[Tuple[str, bool], Label]
+    __texts: dict[Tuple[str, bool], HTMLLabel]
 
     ###
 
@@ -123,14 +123,16 @@ class DisplayBase:
         anchor_x: Literal["left", "center", "right"] = "left",
         anchor_y: Literal["bottom", "baseline", "center", "top"] = "baseline",
         bold: bool = False,
-    ) -> Label:
+    ) -> HTMLLabel:
+        if bold:
+            text = f"<b>{text}</b>"
+        text = f"<font face='IBM 3161' real_size='8'>{text}</font>"
+
         key = (text, bold)
+
         if key not in self.__texts:
-            self.__texts[key] = Label(
+            self.__texts[key] = HTMLLabel(
                 text,
-                bold=bold,
-                font_name="IBM 3161",
-                font_size=8,
                 dpi=144,
                 anchor_x=anchor_x,
                 anchor_y=anchor_y,
@@ -146,5 +148,4 @@ class DisplayBase:
             t.anchor_x = anchor_x
         if t.anchor_y != anchor_y:
             t.anchor_y = anchor_y
-        t.draw()
         return t
