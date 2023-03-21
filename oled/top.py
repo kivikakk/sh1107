@@ -1,12 +1,13 @@
 from typing import Optional, cast
 
-from amaranth import Elaboratable, Module, Record, Signal, Mux, Memory
-from amaranth.build import Platform, ResourceError
+from amaranth import Mux  # pyright: reportUnknownVariableType=false
+from amaranth import Elaboratable, Memory, Module, Record, Signal
+from amaranth.build import Platform
 from amaranth_boards.icebreaker import ICEBreakerPlatform
 from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
 
-from minor import Button
 from i2c import I2C, Speed
+from minor import ButtonWithHold
 from .command import Command
 
 with Command.writer() as w:
@@ -53,6 +54,7 @@ class Top(Elaboratable):
         m.submodules.i2c = self.i2c = i2c = I2C(speed=self.speed)
 
         switch: Signal
+        program: Optional[Signal] = None
 
         match platform:
             case ICEBreakerPlatform():
@@ -72,21 +74,20 @@ class Top(Elaboratable):
                 m.d.comb += led_busy.eq(i2c.o_busy)
                 m.d.comb += led_ack.eq(i2c.o_ack)
 
-                button = cast(Signal, platform.request("button").i)
+                switch = cast(Signal, platform.request("button").i)
                 program = cast(Signal, platform.request("program").o)
-                switch = Signal()
 
-                print(button)
-                print(program)
-                # Press and hold to reprogram.
-                m.d.comb += program.eq(button)
             case _:
                 switch = Signal()
 
         was_turned_on = Signal()
 
-        m.submodules.button = self.button = button = Button()
+        m.submodules.button = self.button = button = ButtonWithHold()
         m.d.comb += button.i_switch.eq(switch)
+
+        if program is not None:
+            with m.If(button.o_up & button.o_held):
+                m.d.sync += program.eq(1)
 
         with m.FSM():
             with m.State("IDLE"):

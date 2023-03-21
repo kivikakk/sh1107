@@ -1,10 +1,10 @@
 from argparse import Namespace
-from typing import Literal, List, Tuple, Callable, Self
+from typing import Callable, List, Literal, Self, Tuple
 
 import pyglet
 from pyglet import gl
-from pyglet.image import Texture, ImageData
-from pyglet.window import key, Window
+from pyglet.image import ImageData, Texture
+from pyglet.window import Window, key
 
 from .display_base import DisplayBase
 

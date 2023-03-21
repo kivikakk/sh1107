@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 PYTHON="${PYTHON:-python}"
+BOARDS=( icebreaker orangecrab )
 SPEEDS=( 100000 400000 1000000 )
 
 if ! type asdf &>/dev/null; then
@@ -11,8 +12,10 @@ set -exuo pipefail
 
 "$PYTHON" -m unittest discover
 
-for speed in "${SPEEDS[@]}"; do
-	"$PYTHON" driver.py build -s "$speed"
+for board in "${BOARDS[@]}"; do
+	for speed in "${SPEEDS[@]}"; do
+		"$PYTHON" driver.py build "$board" -s "$speed"
+	done
 done
 
 (

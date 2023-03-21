@@ -1,10 +1,10 @@
-from typing import Optional, cast
+from typing import Optional
 
 from amaranth import Elaboratable, Module, Signal
 from amaranth.build import Platform
-from ..config import SIM_CLOCK
 
 from .debounce import Debounce
+from .timer import Timer
 
 __all__ = ["Button", "ButtonWithHold"]
 
@@ -70,30 +70,17 @@ class ButtonWithHold(Button):
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = super().elaborate(platform)
 
-        # TODO(Ari): refactor this/Debounce's timer into something common.
-        freq = (
-            cast(int, platform.default_clk_frequency)
-            if platform
-            else int(1 / SIM_CLOCK)
-        )
-        counter_max = int(freq * self.hold_time)
-        counter = Signal(range(counter_max))
+        m.submodules.timer = timer = Timer(time=self.hold_time)
 
-        FULL_HOLD = counter == counter_max - 1
+        holding = Signal()
+        with m.If(self.o_down):
+            m.d.sync += holding.eq(1)
+            m.d.sync += self.o_held.eq(0)
+        with m.If(self.o_up):
+            m.d.sync += holding.eq(0)
 
-        with m.FSM():
-            with m.State("WAIT"):
-                with m.If(self.o_down):
-                    m.d.sync += counter.eq(0)
-                    m.d.sync += self.o_held.eq(0)
-                    m.next = "HOLD"
-            with m.State("HOLD"):
-                with m.If(self.o_up):
-                    m.next = "WAIT"
-                with m.Elif(FULL_HOLD):
-                    m.d.sync += self.o_held.eq(1)
-                    m.next = "WAIT"
-                with m.Else():
-                    m.d.sync += counter.eq(counter + 1)
+        m.d.comb += timer.i.eq(holding)
+        with m.If(timer.o):
+            m.d.sync += self.o_held.eq(1)
 
         return m

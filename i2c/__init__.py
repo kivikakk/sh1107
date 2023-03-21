@@ -1,13 +1,14 @@
-from typing import Optional, List, Final, cast
+from typing import Final, List, Optional, cast
 
-from amaranth import Elaboratable, Signal, Module
-from amaranth.build.res import ResourceError
-from amaranth.lib.io import Pin
-from amaranth.build import Platform, Attrs
+from amaranth import Elaboratable, Module, Signal
+from amaranth.build import Attrs, Platform
 from amaranth.lib.fifo import SyncFIFO
+from amaranth.lib.io import Pin
 from amaranth_boards.icebreaker import ICEBreakerPlatform
 from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
-from amaranth_boards.resources import I2CResource
+from amaranth_boards.resources import (
+    I2CResource,  # pyright: reportUnknownVariableType=false
+)
 
 from config import SIM_CLOCK
 

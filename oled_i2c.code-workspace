@@ -40,7 +40,8 @@
 			"reportUnknownMemberType": "none",
 			"reportInconsistentConstructor": "none",
 			"reportMissingTypeStubs": "none",
-			"reportUnknownVariableType": "information"
+			"reportUnknownVariableType": "information",
+			"reportUnusedImport": "none",
 		},
 		// testing
 		"python.testing.unittestEnabled": true,
