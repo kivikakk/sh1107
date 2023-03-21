@@ -1,9 +1,46 @@
-from typing import Optional, Final
+from typing import Optional, Final, cast
 
 from amaranth import Elaboratable, Module, Signal
 from amaranth.build import Platform
 
 from config import SIM_CLOCK
+
+
+__all__ = ["Debounce"]
+
+
+class Timer(Elaboratable):
+    time: float
+
+    i: Signal
+    o: Signal
+
+    def __init__(self, *, time: float):
+        self.time = time
+
+    def elaborate(self, platform: Optional[Platform]) -> Module:
+        m = Module()
+
+        freq = (
+            cast(int, platform.default_clk_frequency)
+            if platform
+            else int(1 / SIM_CLOCK)
+        )
+        max = int(freq * self.time)
+        counter = Signal(range(max))
+
+        FULL_COUNT = counter == max - 1
+
+        with m.If(self.i):
+            with m.If(FULL_COUNT):
+                m.d.sync += self.o.eq(1)
+            with m.Else():
+                m.d.sync += counter.eq(counter + 1)
+        with m.Else():
+            m.d.sync += self.o.eq(0)
+            m.d.sync += counter.eq(0)
+
+        return m
 
 
 class Debounce(Elaboratable):
@@ -12,9 +49,6 @@ class Debounce(Elaboratable):
     i: Signal
     o: Signal
 
-    __clk_counter_max: int
-    __clk_counter: Signal
-
     def __init__(self):
         self.i = Signal()
         self.o = Signal()
@@ -22,18 +56,10 @@ class Debounce(Elaboratable):
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
 
-        freq = platform.default_clk_frequency if platform else int(1 / SIM_CLOCK)
-        self.__clk_counter_max = int(freq * self.HOLD_TIME)
-        self.__clk_counter = Signal(range(self.__clk_counter_max))
+        m.submodules.timer = timer = Timer(time=self.HOLD_TIME)
 
-        FULL_CLOCK = self.__clk_counter == self.__clk_counter_max - 1
-
-        with m.If(self.i == self.o):
-            m.d.sync += self.__clk_counter.eq(0)
-        with m.Elif(FULL_CLOCK):
+        m.d.comb += timer.i.eq(self.i != self.o)
+        with m.If(timer.o):
             m.d.sync += self.o.eq(self.i)
-            m.d.sync += self.__clk_counter.eq(0)
-        with m.Else():
-            m.d.sync += self.__clk_counter.eq(self.__clk_counter + 1)
 
         return m

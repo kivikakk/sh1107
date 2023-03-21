@@ -1,7 +1,9 @@
 from typing import Optional, cast
 
-from amaranth import Elaboratable, Module, Signal, Mux, Memory
-from amaranth.build import Platform
+from amaranth import Elaboratable, Module, Record, Signal, Mux, Memory
+from amaranth.build import Platform, ResourceError
+from amaranth_boards.icebreaker import ICEBreakerPlatform
+from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
 
 from minor import Button
 from i2c import I2C, Speed
@@ -50,15 +52,36 @@ class Top(Elaboratable):
 
         m.submodules.i2c = self.i2c = i2c = I2C(speed=self.speed)
 
-        if platform:
-            led_busy = cast(Signal, platform.request("led", 0))
-            led_ack = cast(Signal, platform.request("led", 1))
-            m.d.comb += led_busy.eq(i2c.o_busy)
-            m.d.comb += led_ack.eq(i2c.o_ack)
+        switch: Signal
 
-            switch = platform.request("button")
-        else:
-            switch = Signal()
+        match platform:
+            case ICEBreakerPlatform():
+                led_busy = cast(Signal, platform.request("led", 0).o)
+                led_ack = cast(Signal, platform.request("led", 1).o)
+
+                m.d.comb += led_busy.eq(i2c.o_busy)
+                m.d.comb += led_ack.eq(i2c.o_ack)
+
+                switch = cast(Signal, platform.request("button").i)
+
+            case OrangeCrabR0_2_85FPlatform():
+                rgb = platform.request("rgb_led")
+                led_busy = cast(Signal, cast(Record, rgb.r).o)
+                led_ack = cast(Signal, cast(Record, rgb.g).o)
+
+                m.d.comb += led_busy.eq(i2c.o_busy)
+                m.d.comb += led_ack.eq(i2c.o_ack)
+
+                button = cast(Signal, platform.request("button").i)
+                program = cast(Signal, platform.request("program").o)
+                switch = Signal()
+
+                print(button)
+                print(program)
+                # Press and hold to reprogram.
+                m.d.comb += program.eq(button)
+            case _:
+                switch = Signal()
 
         was_turned_on = Signal()
 

@@ -4,11 +4,14 @@ import importlib.util
 import re
 import sys
 import subprocess
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 from pathlib import Path
+from typing import Dict, Optional, Type
 
+from amaranth.build import Platform
 from amaranth.back import rtlil
 from amaranth.hdl import Fragment
+from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
 from amaranth_boards.icebreaker import ICEBreakerPlatform
 
 from sim import BENCHES
@@ -16,13 +19,18 @@ from i2c import Speed
 from formal import formal as prep_formal
 from oled import Top
 
+BOARDS: Dict[str, Type[Platform]] = {
+    "icebreaker": ICEBreakerPlatform,
+    "orangecrab": OrangeCrabR0_2_85FPlatform,
+}
 
-def _outfile(dir, ext):
+
+def _outfile(dir: str, ext: str):
     base = Path(sys.argv[0])
     return str(base.parent / dir / f"oled_i2c{ext}")
 
 
-def sim(args):
+def sim(args: Namespace):
     _, sim, traces = BENCHES[args.bench](speed=Speed(args.speed))
 
     gtkw_file = _outfile("build", ".gtkw") if args.gtkw else None
@@ -55,7 +63,13 @@ def formal(_):
     subprocess.run(f"sby --prefix build/oled_i2c -f {sby_file}", shell=True)
 
 
-def _print_file_between(path, start, end, *, prefix=None):
+def _print_file_between(
+    path: str,
+    start: re.Pattern[str],
+    end: re.Pattern[str],
+    *,
+    prefix: Optional[str] = None,
+):
     with open(path, "r") as f:
         for line in f:
             if start.match(line):
@@ -72,8 +86,8 @@ def _print_file_between(path, start, end, *, prefix=None):
             print(line)
 
 
-def build(args):
-    ICEBreakerPlatform().build(
+def build(args: Namespace):
+    BOARDS[args.board]().build(
         Top(speed=Speed(args.speed)),
         do_program=args.program,
         debug_verilog=args.verilog,
@@ -89,7 +103,7 @@ def build(args):
     _print_file_between("build/top.tim", heading, next_heading, prefix="Info: ")
 
 
-def vsh(args):
+def vsh(args: Namespace):
     from vsh import run
 
     run(args)
@@ -136,6 +150,11 @@ def main():
     )
     build_parser.set_defaults(func=build)
     build_parser.add_argument(
+        "board",
+        choices=BOARDS.keys(),
+        help="which board to build for",
+    )
+    build_parser.add_argument(
         "-s",
         "--speed",
         choices=[str(s) for s in Speed.VALID_SPEEDS],
@@ -146,7 +165,7 @@ def main():
         "-p",
         "--program",
         action="store_true",
-        help="program the design onto the iCEBreaker",
+        help="program the design onto the board",
     )
     build_parser.add_argument(
         "-v",

@@ -1,3 +1,4 @@
+from typing import List, Tuple
 import unittest
 
 from . import sh1107
@@ -57,7 +58,9 @@ class TestSH1107Command(unittest.TestCase):
         (0xC0, sh1107.ControlByte(True, "Data")),
     ]
 
-    COMPOSE_PAIRS = [
+    COMPOSE_PAIRS: List[
+        Tuple[List[sh1107.SH1107Command | sh1107.DataBytes], List[int]]
+    ] = [
         (
             [
                 sh1107.SetDisplayClockFrequency(7, "Neg5"),

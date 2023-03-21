@@ -6,6 +6,8 @@ from amaranth.build import Platform
 from minor import Button
 from i2c import I2C, Speed
 
+__all__ = ["Top"]
+
 
 class Top(Elaboratable):
     speed: Speed
@@ -54,6 +56,3 @@ class Top(Elaboratable):
                 m.next = "IDLE"
 
         return m
-
-
-__all__ = ["Top"]

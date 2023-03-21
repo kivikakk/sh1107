@@ -3,8 +3,10 @@ from typing import Literal, cast
 from amaranth import Signal
 from amaranth.sim import Delay, Settle
 
-from config import SIM_CLOCK
+from config import SIM_CLOCK, SimGenerator
 from .start_top import Top
+
+__all__ = ["VirtualI2C"]
 
 
 class VirtualI2C:
@@ -15,19 +17,21 @@ class VirtualI2C:
         self.dut = dut
         self.tick = 0.1 / dut.speed.hz
 
-    def start(self):
+    def start(self) -> SimGenerator:
         # Strobed.  I2C start condition.
         assert not (yield self.dut.i2c.i_stb)
-        assert (yield self.dut.i2c._scl.o)
-        assert not (yield self.dut.i2c._sda.o)
+        assert (yield self.dut.i2c.scl_o)
+        assert not (yield self.dut.i2c.sda_o)
         yield Delay(5 * self.tick)
         yield Settle()
 
         # I2C clock starts.
-        assert not (yield self.dut.i2c._scl.o)
-        assert not (yield self.dut.i2c._sda.o)
+        assert not (yield self.dut.i2c.scl_o)
+        assert not (yield self.dut.i2c.sda_o)
 
-    def send(self, byte: int, *, next: int | Literal["STOP"] | None = None):
+    def send(
+        self, byte: int, *, next: int | Literal["STOP"] | None = None
+    ) -> SimGenerator:
         for bit in range(8):
             yield Delay(SIM_CLOCK * 2)
             yield Settle()
@@ -41,60 +45,57 @@ class VirtualI2C:
             yield Settle()
             if bit == 0 and isinstance(next, int):
                 assert not (yield self.dut.i2c.fifo.w_en)
-            assert (yield self.dut.i2c._scl.o)
+            assert (yield self.dut.i2c.scl_o)
             if byte & (1 << (7 - bit)):  # MSB
-                assert (yield self.dut.i2c._sda.o)
+                assert (yield self.dut.i2c.sda_o)
             else:
-                assert not (yield self.dut.i2c._sda.o)
+                assert not (yield self.dut.i2c.sda_o)
             yield Delay(5 * self.tick)
             yield Settle()
 
-            assert not (yield self.dut.i2c._scl.o)
+            assert not (yield self.dut.i2c.scl_o)
 
-    def ack(self, *, ack: bool = True):
+    def ack(self, *, ack: bool = True) -> SimGenerator:
         # Master releases SDA; we ACK by driving SDA low.
-        assert (yield self.dut.i2c._sda.oe)
+        assert (yield self.dut.i2c.sda_oe)
         yield Delay(self.tick)
         if ack:
-            yield cast(Signal, self.dut.i2c._sda.i).eq(0)
+            yield cast(Signal, self.dut.i2c.sda.i).eq(0)
         yield Delay(3 * self.tick)
         yield Settle()
-        assert not (yield self.dut.i2c._sda.oe)
+        assert not (yield self.dut.i2c.sda_oe)
         yield Delay(self.tick)
 
         yield Delay(4 * self.tick)
         yield Settle()
-        assert (yield self.dut.i2c._sda.oe)
+        assert (yield self.dut.i2c.sda_oe)
         if ack:
-            yield cast(Signal, self.dut.i2c._sda.i).eq(1)
+            yield cast(Signal, self.dut.i2c.sda.i).eq(1)
         yield Delay(self.tick)
 
-    def nack(self):
+    def nack(self) -> SimGenerator:
         yield from self.ack(ack=False)
 
-    def stop(self):
+    def stop(self) -> SimGenerator:
         # While SCL is low, bring SDA low.
-        last_sda = yield self.dut.i2c._sda.o
+        last_sda = yield self.dut.i2c.sda_o
         yield Delay(self.tick)
-        assert not (yield self.dut.i2c._scl.o)
-        assert (yield self.dut.i2c._sda.o) == last_sda
+        assert not (yield self.dut.i2c.scl_o)
+        assert (yield self.dut.i2c.sda_o) == last_sda
         yield Delay(3 * self.tick)
         yield Settle()
-        assert not (yield self.dut.i2c._scl.o)
-        assert not (yield self.dut.i2c._sda.o)
+        assert not (yield self.dut.i2c.scl_o)
+        assert not (yield self.dut.i2c.sda_o)
         yield Delay(self.tick)
         yield Settle()
 
         # Then when SCL is high, bring SDA high.
-        assert (yield self.dut.i2c._scl.o)
-        assert not (yield self.dut.i2c._sda.o)
+        assert (yield self.dut.i2c.scl_o)
+        assert not (yield self.dut.i2c.sda_o)
         yield Delay(self.tick)
-        assert not (yield self.dut.i2c._sda.o)
+        assert not (yield self.dut.i2c.sda_o)
         yield Delay(3 * self.tick)
         yield Settle()
-        assert (yield self.dut.i2c._sda.o)
+        assert (yield self.dut.i2c.sda_o)
         yield Delay(self.tick)
         yield Settle()
-
-
-__all__ = ["VirtualI2C"]

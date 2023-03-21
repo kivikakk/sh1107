@@ -3,11 +3,14 @@ from typing import List, Tuple, Optional
 from amaranth import Signal
 from amaranth.sim import Simulator, Delay, Settle
 
-from config import SIM_CLOCK
+from config import SIM_CLOCK, SimGenerator
 from i2c import I2C, Speed
 from minor import Button
 from .virtual_i2c import VirtualI2C
 from .start_top import Top
+
+
+__all__ = ["prep_start"]
 
 
 class Bench:
@@ -20,11 +23,11 @@ class Bench:
         self.iv = VirtualI2C(dut)
         self.i2c = dut.i2c
 
-    def __call__(self):
+    def __call__(self) -> SimGenerator:
         yield from self.bench_complete()
         yield from self.bench_nacks()
 
-    def bench_complete(self, *, nack_after: Optional[int] = None):
+    def bench_complete(self, *, nack_after: Optional[int] = None) -> SimGenerator:
         # Force the button push, we don't need to test it here.
         yield self.button.o_up.eq(1)
         yield Delay(SIM_CLOCK)
@@ -46,8 +49,8 @@ class Bench:
         assert (yield self.i2c.fifo.r_rdy)
         assert (yield self.i2c.fifo.r_level) == 1
 
-        assert (yield self.i2c._scl.o)
-        assert (yield self.i2c._sda.o)
+        assert (yield self.i2c.scl_o)
+        assert (yield self.i2c.sda_o)
         yield Delay(SIM_CLOCK)
         yield Settle()
 
@@ -74,10 +77,10 @@ class Bench:
         for _ in range(3):
             yield Delay(SIM_CLOCK)
             yield Settle()
-            assert (yield self.i2c._scl.o)
-            assert (yield self.i2c._sda.o)
+            assert (yield self.i2c.scl_o)
+            assert (yield self.i2c.sda_o)
 
-    def bench_nacks(self):
+    def bench_nacks(self) -> SimGenerator:
         yield from self.bench_complete(nack_after=1)
         yield from self.bench_complete(nack_after=2)
         yield from self.bench_complete(nack_after=3)
@@ -108,14 +111,11 @@ def prep_start(*, speed: Speed) -> Tuple[Top, Simulator, List[Signal]]:
             dut.i2c.fifo.r_level,
             dut.i2c.o_busy,
             dut.i2c.o_ack,
-            dut.i2c._byte,
-            dut.i2c._byte_ix,
-            dut.i2c._scl_o,
-            dut.i2c._sda_oe,
-            dut.i2c._sda_o,
-            dut.i2c._sda_i,
+            dut.i2c.byte,
+            dut.i2c.byte_ix,
+            dut.i2c.scl_o,
+            dut.i2c.sda_oe,
+            dut.i2c.sda_o,
+            dut.i2c.sda_i,
         ],
     )
-
-
-__all__ = ["prep_start"]

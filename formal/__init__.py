@@ -24,7 +24,7 @@ def formal() -> Tuple[Module, List[Signal | Value]]:
     m.d.comb += Assume(sync_clk == ~past_clk)
     m.d.comb += Assume(~sync_rst)
 
-    m.d.comb += Cover(~dut._scl_o)
+    m.d.comb += Cover(~dut.scl_o)
 
     # past_inv = Signal()
     # m.d.sync += past_inv.eq(dut.ssa.inv)

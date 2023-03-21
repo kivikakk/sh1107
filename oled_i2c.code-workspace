@@ -3,9 +3,6 @@
 		{
 			"path": ".",
 		},
-		{
-			"path": "../../3rd",
-		},
 	],
 	"settings": {
 		// autoComplete
@@ -15,16 +12,36 @@
 			"../../3rd/amaranth-boards",
 		],
 		// analysis
-		"python.analysis.typeCheckingMode": "basic", // TODO: "strict"
+		"python.analysis.typeCheckingMode": "strict", // TODO: "strict"
 		"python.analysis.diagnosticMode": "workspace",
 		"python.analysis.autoImportCompletions": true,
 		"python.analysis.autoImportUserSymbols": true,
 		"python.analysis.importFormat": "relative",
+		"python.analysis.packageIndexDepths": [
+			{
+				"name": "amaranth",
+				"depth": 3,
+			},
+			{
+				"name": "amaranth_soc",
+				"depth": 3,
+			},
+			{
+				"name": "amaranth_boards",
+				"depth": 3,
+			}
+		],
 		"python.analysis.extraPaths": [
 			"../../3rd/amaranth",
 			"../../3rd/amaranth-soc",
 			"../../3rd/amaranth-boards",
 		],
+		"python.analysis.diagnosticSeverityOverrides": {
+			"reportUnknownMemberType": "none",
+			"reportInconsistentConstructor": "none",
+			"reportMissingTypeStubs": "none",
+			"reportUnknownVariableType": "information"
+		},
 		// testing
 		"python.testing.unittestEnabled": true,
 		"python.testing.autoTestDiscoverOnSaveEnabled": true,
@@ -38,10 +55,6 @@
 		"python.linting.flake8Enabled": true,
 		"python.linting.flake8Args": [
 			"--ignore=E501,E203,W503",
-		],
-		"python.linting.ignorePatterns": [
-			// "**/site-packages/**/*.py",
-			"../../3rd/**/*",
 		],
 	}
 }

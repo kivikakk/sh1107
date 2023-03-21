@@ -1,4 +1,4 @@
-from typing import Literal, List, Tuple
+from typing import Any, Literal, List, Tuple
 
 import pyglet
 from pyglet.image import ImageData
@@ -54,7 +54,7 @@ class DisplayBase:
     unchecked: ImageData
     checked: ImageData
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
 
         self.__texts = {}

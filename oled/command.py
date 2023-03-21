@@ -6,7 +6,12 @@ from amaranth.lib.enum import IntEnum
 from .sh1107 import SH1107Command
 
 
+__all__ = ["Command"]
+
+
 class _Writer:
+    buf: List[int]
+
     def __init__(self):
         self.buf = []
 
@@ -38,6 +43,3 @@ class Command(IntEnum):
     @contextmanager
     def writer():
         yield _Writer()
-
-
-__all__ = ["Command"]

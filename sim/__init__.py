@@ -7,6 +7,9 @@ from i2c import Speed
 from .start_bench import prep_start
 
 
+__all__ = ["BENCHES"]
+
+
 class BenchCallable(Protocol):
     def __call__(self, *, speed: Speed) -> Tuple[Elaboratable, Simulator, List[Signal]]:
         ...
@@ -15,5 +18,3 @@ class BenchCallable(Protocol):
 BENCHES: Dict[str, BenchCallable] = {
     "start": prep_start,
 }
-
-__all__ = ["BENCHES"]

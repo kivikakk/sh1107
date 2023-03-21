@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional, Self
+from typing import Any, List, Optional, Self, Type, cast
 
 from amaranth.lib.enum import Enum, IntEnum
 
 
-def _enyom(enum, value):
+def _enyom(enum: Type[IntEnum], value: Enum | int | str):
     if isinstance(value, enum):
         return value
     elif isinstance(value, int):
@@ -17,18 +17,19 @@ def _enyom(enum, value):
 
 class SH1107Sequence:
     def __repr__(self) -> str:
-        def repr_v(v):
+        def repr_v(v: Any) -> str:
             if isinstance(v, int):
                 return hex(v)
             elif isinstance(v, list):
-                return f"[{', '.join(repr_v(vv) for vv in v)}]"
+                els = ", ".join(repr_v(vv) for vv in cast(List[Any], v))
+                return f"[{els}]"
             else:
                 return repr(v)
 
         ppdict = " ".join(f"{k}={repr_v(v)}" for k, v in self.__dict__.items())
         return f"<{self.__class__.__name__} {ppdict}>"
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any):
         if type(other) is not type(self):
             return NotImplemented
         return self.__dict__ == other.__dict__
@@ -77,11 +78,11 @@ class SH1107Command(SH1107Sequence, ABC):
 
     @classmethod
     def compose(cls, cmds: List[Self | DataBytes]) -> List[int]:
-        dcs = []
+        dcs: List[bool] = []
         for cmd in cmds:
             dcs.append(isinstance(cmd, DataBytes))
 
-        out = []
+        out: List[int] = []
         finished_control = False
         for i, cmd in enumerate(cmds):
             if not finished_control:

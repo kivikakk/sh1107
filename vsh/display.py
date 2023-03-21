@@ -1,3 +1,4 @@
+from argparse import Namespace
 from typing import Literal, List, Tuple, Callable, Self
 
 import pyglet
@@ -10,7 +11,10 @@ from .display_base import DisplayBase
 # from ..oled import SH1107Command
 
 
-def run(_args):
+__all__ = ["run"]
+
+
+def run(_args: Namespace):
     v = Display()
     v.set_px(0, 0, 1)
     v.set_px(10, 10, 1)
@@ -211,7 +215,7 @@ class Display(DisplayBase, Window):
         elif msg == [0, 0xAF]:
             self.power = True
 
-    def on_key_press(self, symbol, _modifiers):
+    def on_key_press(self, symbol: int, modifiers: int):
         if symbol == key.ESCAPE:
             self.dispatch_event("on_close")
             return
@@ -227,6 +231,3 @@ class Display(DisplayBase, Window):
 
     def run(self):
         pyglet.app.run()
-
-
-__all__ = ["run"]
