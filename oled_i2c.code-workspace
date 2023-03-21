@@ -49,7 +49,16 @@
 		// formatting
 		"[python]": {
 			"editor.defaultFormatter": "ms-python.python",
+			"editor.codeActionsOnSave": {
+				"source.organizeImports": true
+			},
 		},
+		"isort.args": [
+			"--profile",
+			"black",
+			"--nlb",
+			"LOCALFOLDER",
+		],
 		"python.formatting.provider": "black",
 		// linting
 		"python.linting.flake8Enabled": true,
