@@ -12,7 +12,12 @@ set -euo pipefail
 
 echo "+++ Unit tests"
 
-"$PYTHON" -m unittest discover
+(
+	trap 'buildkite-agent artifact upload build/*.vcd' ERR
+	
+	"$PYTHON" driver.py test
+)
+
 
 for board in "${BOARDS[@]}"; do
 	for speed in "${SPEEDS[@]}"; do
@@ -20,16 +25,6 @@ for board in "${BOARDS[@]}"; do
 		"$PYTHON" driver.py build "$board" -s "$speed"
 	done
 done
-
-(
-	trap 'buildkite-agent artifact upload main.vcd' ERR
-
-	for speed in "${SPEEDS[@]}"; do
-		echo "--- Simulating @ $speed"
-		"$PYTHON" driver.py sim start -Gs "$speed"
-	done
-)
-
 
 # echo "--- Formal verification"
 # "$PYTHON" driver.py formal
