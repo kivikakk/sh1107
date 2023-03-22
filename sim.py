@@ -77,7 +77,7 @@ class TestCase(unittest.TestCase):
             Path(__file__).parent / "build" / f"{cls.__name__}.{sim_test.__name__}.vcd"
         )
 
-        @override_clock(getattr(cls, "SIM_CLOCK"))
+        @override_clock(getattr(cls, "SIM_CLOCK", None))
         def wrapper(self: TestCase):
             dut = dutc(*dutc_args, **dutc_kwargs)
 

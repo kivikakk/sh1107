@@ -60,8 +60,6 @@ class Top(Elaboratable):
 
 
 class TestI2C(sim.TestCase):
-    SIM_CLOCK = 1e-6
-
     button: Button
     iv: VirtualI2C
     i2c: I2C
