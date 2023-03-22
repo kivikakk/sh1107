@@ -3,7 +3,7 @@ from typing import Optional, cast
 from amaranth import Elaboratable, Module, Signal
 from amaranth.build import Platform
 
-from config import SIM_CLOCK
+from sim_config import sim_clock
 
 __all__ = ["Timer"]
 
@@ -35,7 +35,7 @@ class Timer(Elaboratable):
         freq = (
             cast(int, platform.default_clk_frequency)
             if platform
-            else int(1 / SIM_CLOCK)
+            else int(1 // sim_clock())
         )
         max = int(freq * self.time)
         counter = Signal(range(max))

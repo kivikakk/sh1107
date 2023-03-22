@@ -10,7 +10,7 @@ from amaranth_boards.resources import (
     I2CResource,  # pyright: reportUnknownVariableType=false
 )
 
-from config import SIM_CLOCK
+from sim_config import sim_clock
 
 __all__ = ["I2C", "Speed"]
 
@@ -138,7 +138,7 @@ class I2C(Elaboratable):
         freq = (
             cast(int, platform.default_clk_frequency)
             if platform
-            else int(1 / SIM_CLOCK)
+            else int(1 / sim_clock())
         )
         self.__clk_counter_max = int(freq // (self.speed.hz * 2))
         self.__clk_counter = Signal(range(self.__clk_counter_max))

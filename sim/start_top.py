@@ -24,7 +24,7 @@ class Top(Elaboratable):
         switch = cast(Signal, platform.request("button")) if platform else Signal()
 
         m.submodules.button = self.button = button = Button()
-        m.d.comb += button.i_switch.eq(switch)
+        m.d.comb += button.i.eq(switch)
 
         with m.FSM():
             with m.State("IDLE"):

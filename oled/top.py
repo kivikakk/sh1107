@@ -83,7 +83,7 @@ class Top(Elaboratable):
         was_turned_on = Signal()
 
         m.submodules.button = self.button = button = ButtonWithHold()
-        m.d.comb += button.i_switch.eq(switch)
+        m.d.comb += button.i.eq(switch)
 
         if program is not None:
             with m.If(button.o_up & button.o_held):

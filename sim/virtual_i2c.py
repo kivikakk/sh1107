@@ -3,7 +3,7 @@ from typing import Literal, cast
 from amaranth import Signal
 from amaranth.sim import Delay, Settle
 
-from config import SIM_CLOCK, SimGenerator
+from sim_config import SimGenerator, sim_clock
 from .start_top import Top
 
 __all__ = ["VirtualI2C"]
@@ -33,7 +33,7 @@ class VirtualI2C:
         self, byte: int, *, next: int | Literal["STOP"] | None = None
     ) -> SimGenerator:
         for bit in range(8):
-            yield Delay(SIM_CLOCK * 2)
+            yield Delay(sim_clock() * 2)
             yield Settle()
             if bit == 0:
                 if isinstance(next, int):
@@ -41,7 +41,7 @@ class VirtualI2C:
                     assert (yield self.dut.i2c.fifo.w_data) == next
                 elif next == "STOP":
                     assert not (yield self.dut.i2c.fifo.w_en)
-            yield Delay(5 * self.tick - SIM_CLOCK * 2)
+            yield Delay(5 * self.tick - sim_clock() * 2)
             yield Settle()
             if bit == 0 and isinstance(next, int):
                 assert not (yield self.dut.i2c.fifo.w_en)

@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Final, Optional
 
 from amaranth import Elaboratable, Module, Signal
 from amaranth.build import Platform
@@ -17,19 +17,19 @@ class Button(Elaboratable):
     o_up strobes when the button has been released.
     """
 
-    i_switch: Signal
+    i: Signal
 
     o_down: Signal
     o_up: Signal
 
+    debounce: Debounce
     __registered: Signal
-    _debounce: Debounce
 
-    def __init__(self):
+    def __init__(self, *, in_sim: bool = False):
+        self.debounce = Debounce(in_sim=in_sim)
         self.__registered = Signal()
-        self._debounce = Debounce()
 
-        self.i_switch = Signal()
+        self.i = Signal()
 
         self.o_down = Signal()
         self.o_up = Signal()
@@ -37,13 +37,13 @@ class Button(Elaboratable):
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
 
-        m.submodules.debounce = self._debounce
+        m.submodules.debounce = self.debounce
 
-        m.d.comb += self._debounce.i.eq(self.i_switch)
-        m.d.sync += self.__registered.eq(self._debounce.o)
+        m.d.comb += self.debounce.i.eq(self.i)
+        m.d.sync += self.__registered.eq(self.debounce.o)
 
-        m.d.comb += self.o_down.eq(~self.__registered & self._debounce.o)
-        m.d.comb += self.o_up.eq(self.__registered & ~self._debounce.o)
+        m.d.comb += self.o_down.eq(~self.__registered & self.debounce.o)
+        m.d.comb += self.o_up.eq(self.__registered & ~self.debounce.o)
 
         return m
 
@@ -56,14 +56,17 @@ class ButtonWithHold(Button):
     configure hold time.
     """
 
+    DEFAULT_HOLD_TIME: Final[float] = 1.5
+    SIM_HOLD_TIME: Final[float] = 1e-2
+
     hold_time: float
 
     o_held: Signal
 
-    def __init__(self, *, hold_time: float = 1.5):
-        super().__init__()
+    def __init__(self, *, in_sim: bool = False):
+        super().__init__(in_sim=in_sim)
 
-        self.hold_time = hold_time
+        self.hold_time = self.SIM_HOLD_TIME if in_sim else self.DEFAULT_HOLD_TIME
 
         self.o_held = Signal()
 

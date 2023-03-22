@@ -1,14 +1,13 @@
-from typing import List, Tuple, Optional
+from typing import List, Optional, Tuple
 
 from amaranth import Signal
-from amaranth.sim import Simulator, Delay, Settle
+from amaranth.sim import Delay, Settle, Simulator
 
-from config import SIM_CLOCK, SimGenerator
 from i2c import I2C, Speed
 from minor import Button
-from .virtual_i2c import VirtualI2C
+from sim_config import SimGenerator, sim_clock
 from .start_top import Top
-
+from .virtual_i2c import VirtualI2C
 
 __all__ = ["prep_start"]
 
@@ -30,7 +29,7 @@ class Bench:
     def bench_complete(self, *, nack_after: Optional[int] = None) -> SimGenerator:
         # Force the button push, we don't need to test it here.
         yield self.button.o_up.eq(1)
-        yield Delay(SIM_CLOCK)
+        yield Delay(sim_clock())
         yield Settle()
         yield self.button.o_up.eq(0)
 
@@ -40,7 +39,7 @@ class Bench:
         assert (yield self.i2c.fifo.w_data) == 0xAF
         assert not (yield self.i2c.fifo.r_rdy)
         assert (yield self.i2c.fifo.r_level) == 0
-        yield Delay(SIM_CLOCK)
+        yield Delay(sim_clock())
         yield Settle()
 
         # Data is enqueued, we're strobing I2C.  I2C still high.
@@ -51,7 +50,7 @@ class Bench:
 
         assert (yield self.i2c.scl_o)
         assert (yield self.i2c.sda_o)
-        yield Delay(SIM_CLOCK)
+        yield Delay(sim_clock())
         yield Settle()
 
         yield from self.iv.start()
@@ -75,7 +74,7 @@ class Bench:
         yield from self.iv.stop()
 
         for _ in range(3):
-            yield Delay(SIM_CLOCK)
+            yield Delay(sim_clock())
             yield Settle()
             assert (yield self.i2c.scl_o)
             assert (yield self.i2c.sda_o)
@@ -90,7 +89,7 @@ def prep_start(*, speed: Speed) -> Tuple[Top, Simulator, List[Signal]]:
     dut = Top(speed=speed)
 
     sim = Simulator(dut)
-    sim.add_clock(SIM_CLOCK)
+    sim.add_clock(sim_clock())
     sim.add_sync_process(Bench(dut).__call__)
 
     return (
