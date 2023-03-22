@@ -60,7 +60,15 @@ class TestButton(SimTestCase):
         yield from self._button_down(b)
         yield Delay(b.hold_time)
         yield from self._button_up(b)
-        assert (yield b.o_held)
+        assert (yield b.o_up & b.o_held)
+        yield from self._button_up_post(b)
+
+        yield from self._button_down(b)
+        yield Delay(b.hold_time / 2)
+        assert not (yield b.o_held)
+        yield Delay(b.hold_time)
+        yield from self._button_up(b)
+        assert (yield b.o_up & b.o_held)
         yield from self._button_up_post(b)
 
 

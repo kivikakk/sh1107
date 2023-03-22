@@ -86,7 +86,7 @@ class Top(Elaboratable):
         m.d.comb += button.i.eq(switch)
 
         if program is not None:
-            with m.If(button.o_up & button.o_held):
+            with m.If(button.o_held):
                 m.d.sync += program.eq(1)
 
         with m.FSM():
