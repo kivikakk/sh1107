@@ -2,12 +2,12 @@ import unittest
 
 from amaranth.sim import Delay, Settle
 
-from sim_config import SimTestCase
+import sim
 from . import Button, ButtonWithHold
 
 
-class TestButton(SimTestCase):
-    SIM_TEST_CLOCK = 1e-6
+class TestButton(sim.TestCase):
+    SIM_CLOCK = 1e-6
 
     def _button_down(self, b: Button):
         assert not (yield b.i)

@@ -2,12 +2,12 @@ import unittest
 
 from amaranth.sim import Delay, Settle
 
-from sim_config import SimTestCase
+import sim
 from .debounce import Debounce
 
 
-class TestDebounce(SimTestCase):
-    SIM_TEST_CLOCK = 1e-6
+class TestDebounce(sim.TestCase):
+    SIM_CLOCK = 1e-6
 
     def test_sim_debounce(self, d: Debounce):
         assert not (yield d.i)

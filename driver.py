@@ -2,21 +2,21 @@
 
 import importlib.util
 import re
-import sys
 import subprocess
+import sys
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
 from typing import Dict, Optional, Type
+from unittest import TestLoader, TextTestRunner
 
-from amaranth.build import Platform
 from amaranth.back import rtlil
+from amaranth.build import Platform
 from amaranth.hdl import Fragment
-from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
 from amaranth_boards.icebreaker import ICEBreakerPlatform
+from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
 
-from sim import BENCHES
-from i2c import Speed
 from formal import formal as prep_formal
+from i2c import Speed
 from oled import Top
 
 BOARDS: Dict[str, Type[Platform]] = {
@@ -30,29 +30,16 @@ def _outfile(dir: str, ext: str):
     return str(base.parent / dir / f"oled_i2c{ext}")
 
 
-def sim(args: Namespace):
-    _, sim, traces = BENCHES[args.bench](speed=Speed(args.speed))
-
-    gtkw_file = _outfile("build", ".gtkw") if args.gtkw else None
-    sim_exc = None
-    with sim.write_vcd(_outfile("build", ".vcd"), gtkw_file=gtkw_file, traces=traces):
-        try:
-            sim.run()
-        except AssertionError as exc:
-            sim_exc = exc
-
-    if gtkw_file:
-        if sys.platform == "darwin":
-            cmd = f"open {gtkw_file}"
-        else:
-            cmd = gtkw_file
-        subprocess.run(cmd, shell=True)
-
-    if sim_exc:
-        raise sim_exc
+def test(args: Namespace):
+    top = path = Path(__file__).parent
+    if args.dir:
+        path /= args.dir
+    loader = TestLoader()
+    suite = loader.discover(str(path), top_level_dir=str(top))
+    TextTestRunner(verbosity=2).run(suite)
 
 
-def formal(_):
+def formal(args: Namespace):
     design, ports = prep_formal()
     fragment = Fragment.get(design, None)
     output = rtlil.convert(fragment, name="formal_top", ports=ports)
@@ -113,29 +100,15 @@ def main():
     parser = ArgumentParser(prog="fpgaxp.oled.main")
     subparsers = parser.add_subparsers(required=True)
 
-    sim_parser = subparsers.add_parser(
-        "sim",
-        help="simulate the design",
+    test_parser = subparsers.add_parser(
+        "test",
+        help="run the unit tests and sim tests",
     )
-    sim_parser.set_defaults(func=sim)
-    sim_parser.add_argument(
-        "bench",
-        choices=BENCHES.keys(),
-        help="which bench to run",
-    )
-    sim_parser.add_argument(
-        "-s",
-        "--speed",
-        choices=[str(s) for s in Speed.VALID_SPEEDS],
-        help="bus speed to sim at",
-        default=str(Speed.VALID_SPEEDS[0]),
-    )
-    sim_parser.add_argument(
-        "-G",
-        "--no-gtkw",
-        action="store_false",
-        dest="gtkw",
-        help="don't write and open a GTKWave file on completion",
+    test_parser.set_defaults(func=test)
+    test_parser.add_argument(
+        "dir",
+        nargs="?",
+        help="run tests from a specific subdirectory",
     )
 
     formal_parser = subparsers.add_parser(

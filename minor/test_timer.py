@@ -2,15 +2,15 @@ import unittest
 
 from amaranth.sim import Delay, Settle
 
-from sim_config import SimGenerator, SimTestCase, stc_args
+import sim
 from .timer import Timer
 
 
-class TestTimer(SimTestCase):
-    SIM_TEST_CLOCK = 1e-6
+class TestTimer(sim.TestCase):
+    SIM_CLOCK = 1e-6
 
-    @stc_args(time=1e-4)
-    def test_sim_timer(self, d: Timer) -> SimGenerator:
+    @sim.args(time=1e-4)
+    def test_sim_timer(self, d: Timer) -> sim.Generator:
         assert not (yield d.i)
         assert not (yield d.o)
 
