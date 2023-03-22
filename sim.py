@@ -87,14 +87,8 @@ class TestCase(unittest.TestCase):
                 assert in_simp.annotation is bool
                 sim_args[1]["in_sim"] = True
 
-            vcd_path = (
-                Path(__file__).parent
-                / "build"
-                / f"{cls.__name__}.{sim_test.__name__}.vcd"
-            )
-
             @override_clock(getattr(cls, "SIM_CLOCK", None))
-            def wrapper(self: TestCase, sim_args: SimArgs):
+            def wrapper(self: TestCase, target: str, sim_args: SimArgs):
                 dutc_args, dutc_kwargs = sim_args
                 dut = dutc(*dutc_args, **dutc_kwargs)
 
@@ -105,6 +99,9 @@ class TestCase(unittest.TestCase):
                 sim.add_clock(clock())
                 sim.add_sync_process(bench)
 
+                vcd_path = (
+                    Path(__file__).parent / "build" / f"{cls.__name__}.{target}.vcd"
+                )
                 sim_exc = None
                 with sim.write_vcd(str(vcd_path)):
                     try:
@@ -120,7 +117,9 @@ class TestCase(unittest.TestCase):
             setattr(
                 cls,
                 target,
-                lambda s, sa=sim_args: wrapper(cast(TestCase, s), cast(SimArgs, sa)),
+                lambda s, t=target, sa=sim_args: wrapper(
+                    cast(TestCase, s), cast(str, t), cast(SimArgs, sa)
+                ),
             )
 
 
