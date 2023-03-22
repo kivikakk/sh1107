@@ -42,6 +42,7 @@
 			"reportMissingTypeStubs": "none",
 			"reportUnknownVariableType": "information",
 			"reportUnusedImport": "none",
+			"reportUnknownLambdaType": "none"
 		},
 		// testing
 		"python.testing.unittestEnabled": true,

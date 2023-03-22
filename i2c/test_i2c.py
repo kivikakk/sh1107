@@ -65,6 +65,8 @@ class TestI2C(sim.TestCase):
     i2c: I2C
 
     @sim.args(speed=Speed(100_000))
+    @sim.args(speed=Speed(400_000))
+    @sim.args(speed=Speed(1_000_000))
     def test_sim_i2c(self, dut: Top) -> sim.Generator:
         self.button = dut.button
         self.iv = VirtualI2C(dut.i2c)

@@ -1,9 +1,10 @@
 import inspect
+import re
 import typing
 import unittest
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Callable, Iterator, List, Optional, Self
+from typing import Any, Callable, Iterator, List, Optional, Self, Tuple, cast
 
 from amaranth import Elaboratable, Record, Signal
 from amaranth.hdl.ast import Statement
@@ -39,72 +40,97 @@ Generator = typing.Generator[
     None,
 ]
 
+Args = List[Any]
+Kwargs = dict[str, Any]
+SimArgs = Tuple[Args, Kwargs]
+
 
 class TestCase(unittest.TestCase):
     def __init_subclass__(cls) -> None:
         super().__init_subclass__()
 
-        new_tests: dict[str, Callable[[Self], None]] = {}
-        for name, value in cls.__dict__.items():
+        for name, value in list(cls.__dict__.items()):
             if name.startswith("test_sim_"):
-                new_tests[name] = cls._wrap_test(value)
-
-        for name, value in new_tests.items():
-            setattr(cls, name, value)
+                cls._wrap_test(name, value)
 
     @classmethod
     def _wrap_test(
         cls,
+        name: str,
         sim_test: Callable[[Self, Elaboratable], Generator],
-    ) -> Callable[[Self], None]:
+    ) -> None:
         sig = inspect.signature(sim_test)
         assert len(sig.parameters) == 2
         dutpn = list(sig.parameters)[1]
         dutc = sig.parameters[dutpn].annotation
 
-        dutc_args: List[Any] = []
-        dutc_kwargs: dict[str, Any] = {}
-        if hasattr(sim_test, "_sim_args"):
-            dutc_args, dutc_kwargs = sim_test._sim_args
+        all_sim_args: List[SimArgs] = getattr(sim_test, "_sim_args", [([], {})])
 
-        dutc_sig = inspect.signature(dutc)
-        in_simp = dutc_sig.parameters.get("in_sim")
-        if in_simp is not None:
-            assert in_simp.annotation is bool
-            dutc_kwargs["in_sim"] = True
+        delattr(cls, name)
 
-        vcd_path = (
-            Path(__file__).parent / "build" / f"{cls.__name__}.{sim_test.__name__}.vcd"
-        )
+        pattern = re.compile(r"[\W_]+")
 
-        @override_clock(getattr(cls, "SIM_CLOCK", None))
-        def wrapper(self: TestCase):
-            dut = dutc(*dutc_args, **dutc_kwargs)
+        def sim_args_into_str(sim_args: SimArgs) -> str:
+            subbed = pattern.sub("_", "_".join(str(v) for v in sim_args))
+            return subbed.removesuffix("_").removeprefix("_")
 
-            def bench() -> Generator:
-                yield from sim_test(self, dut)
+        for sim_args in all_sim_args:
+            suffix = sim_args_into_str(sim_args)
+            if len(all_sim_args) > 1 and suffix:
+                target = f"{name}_{suffix}"
+            else:
+                target = name
 
-            sim = Simulator(dut)
-            sim.add_clock(clock())
-            sim.add_sync_process(bench)
+            dutc_sig = inspect.signature(dutc)
+            in_simp = dutc_sig.parameters.get("in_sim")
+            if in_simp is not None:
+                assert in_simp.annotation is bool
+                sim_args[1]["in_sim"] = True
 
-            sim_exc = None
-            with sim.write_vcd(str(vcd_path)):
-                try:
-                    sim.run()
-                except AssertionError as exc:
-                    sim_exc = exc
+            vcd_path = (
+                Path(__file__).parent
+                / "build"
+                / f"{cls.__name__}.{sim_test.__name__}.vcd"
+            )
 
-            if sim_exc is not None:
-                print("\nFailing VCD at: ", vcd_path)
-                raise sim_exc
+            @override_clock(getattr(cls, "SIM_CLOCK", None))
+            def wrapper(self: TestCase, sim_args: SimArgs):
+                dutc_args, dutc_kwargs = sim_args
+                dut = dutc(*dutc_args, **dutc_kwargs)
 
-        return wrapper
+                def bench() -> Generator:
+                    yield from sim_test(self, dut)
+
+                sim = Simulator(dut)
+                sim.add_clock(clock())
+                sim.add_sync_process(bench)
+
+                sim_exc = None
+                with sim.write_vcd(str(vcd_path)):
+                    try:
+                        sim.run()
+                    except AssertionError as exc:
+                        sim_exc = exc
+
+                if sim_exc is not None:
+                    print("\nFailing VCD at: ", vcd_path)
+                    raise sim_exc
+
+            assert not hasattr(cls, target)
+            setattr(
+                cls,
+                target,
+                lambda s, sa=sim_args: wrapper(cast(TestCase, s), cast(SimArgs, sa)),
+            )
 
 
 def args(*args: Any, **kwargs: Any):
     def wrapper(sim_test: Callable[..., Generator]) -> Callable[..., Generator]:
-        sim_test._sim_args = (args, kwargs)  # pyright: reportFunctionMemberAccess=none
+        if not hasattr(sim_test, "_sim_args"):
+            sim_test._sim_args = []
+        sim_test._sim_args.append(
+            (args, kwargs)
+        )  # pyright: reportFunctionMemberAccess=none
         return sim_test
 
     return wrapper
