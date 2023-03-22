@@ -36,7 +36,8 @@ def test(args: Namespace):
         path /= args.dir
     loader = TestLoader()
     suite = loader.discover(str(path), top_level_dir=str(top))
-    TextTestRunner(verbosity=2).run(suite)
+    result = TextTestRunner(verbosity=2).run(suite)
+    sys.exit(not result.wasSuccessful())
 
 
 def formal(args: Namespace):
