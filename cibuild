@@ -10,6 +10,8 @@ fi
 
 set -exuo pipefail
 
+echo "+++ Unit tests"
+
 "$PYTHON" -m unittest discover
 
 for board in "${BOARDS[@]}"; do
@@ -32,6 +34,4 @@ done
 # echo "--- Formal verification"
 # "$PYTHON" driver.py formal
 
-echo "+++"
-
-echo "All passed."
+echo "+++ All passed."
