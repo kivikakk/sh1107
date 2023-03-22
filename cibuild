@@ -14,6 +14,7 @@ set -exuo pipefail
 
 for board in "${BOARDS[@]}"; do
 	for speed in "${SPEEDS[@]}"; do
+		echo "--- Building $board @ $speed"
 		"$PYTHON" driver.py build "$board" -s "$speed"
 	done
 done
@@ -22,8 +23,15 @@ done
 	trap 'buildkite-agent artifact upload main.vcd' ERR
 
 	for speed in "${SPEEDS[@]}"; do
+		echo "--- Simulating @ $speed"
 		"$PYTHON" driver.py sim start -Gs "$speed"
 	done
 )
 
+
+# echo "--- Formal verification"
 # "$PYTHON" driver.py formal
+
+echo "+++"
+
+echo "All passed."
