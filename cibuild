@@ -8,7 +8,7 @@ if ! type asdf &>/dev/null; then
 	source ~/.asdf/asdf.sh
 fi
 
-set -exuo pipefail
+set -euo pipefail
 
 echo "+++ Unit tests"
 
