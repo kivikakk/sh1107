@@ -13,8 +13,8 @@ class Button(Elaboratable):
     """
     A simple debounced button.
 
-    o_down strobes when the button starts to be pressed.
-    o_up strobes when the button has been released.
+    o_down strobes when the button is registered as pressed down.
+    o_up strobes when the button is registered as released.
     """
 
     i: Signal
@@ -63,10 +63,12 @@ class ButtonWithHold(Button):
 
     o_held: Signal
 
-    def __init__(self, *, in_sim: bool = False):
+    def __init__(self, *, hold_time: Optional[float] = None, in_sim: bool = False):
         super().__init__(in_sim=in_sim)
 
-        self.hold_time = self.SIM_HOLD_TIME if in_sim else self.DEFAULT_HOLD_TIME
+        self.hold_time = hold_time or (
+            self.SIM_HOLD_TIME if in_sim else self.DEFAULT_HOLD_TIME
+        )
 
         self.o_held = Signal()
 
