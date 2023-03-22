@@ -1,9 +1,9 @@
-from typing import Optional, cast
+from typing import Optional
 
 from amaranth import Elaboratable, Module, Signal
 from amaranth.build import Platform
 
-import sim
+from .counter import Counter
 
 __all__ = ["Timer"]
 
@@ -32,23 +32,13 @@ class Timer(Elaboratable):
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
 
-        freq = (
-            cast(int, platform.default_clk_frequency)
-            if platform
-            else int(1 // sim.clock())
-        )
-        max = int(freq * self.time)
-        counter = Signal(range(max))
+        m.submodules.c = c = Counter(time=self.time)
+        m.d.comb += c.en.eq(self.i)
 
-        FULL_COUNT = counter == max - 1
-
-        with m.If(self.i):
-            with m.If(FULL_COUNT):
-                m.d.sync += self.o.eq(1)
-            with m.Else():
-                m.d.sync += counter.eq(counter + 1)
-        with m.Else():
+        with m.If(~self.i):
             m.d.sync += self.o.eq(0)
-            m.d.sync += counter.eq(0)
+
+        with m.If(c.o_full):
+            m.d.sync += self.o.eq(1)
 
         return m

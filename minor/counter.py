@@ -48,15 +48,8 @@ class Counter(Elaboratable):
             assertion_msg = f"cannot clock at {self.hz}Hz with {freq}Hz clock"
         else:
             raise AssertionError
-        clk_counter = Signal(range(clk_counter_max))
 
-        with m.If(self.en):
-            with m.If(clk_counter < clk_counter_max - 1):
-                m.d.sync += clk_counter.eq(clk_counter + 1)
-            with m.Else():
-                m.d.sync += clk_counter.eq(0)
-        with m.Else():
-            m.d.sync += clk_counter.eq(0)
+        clk_counter = Signal(range(clk_counter_max))
 
         half_clock_tgt = int(clk_counter_max // 2)
         full_clock_tgt = clk_counter_max - 1
@@ -66,5 +59,10 @@ class Counter(Elaboratable):
 
         m.d.comb += self.o_half.eq(clk_counter == half_clock_tgt)
         m.d.comb += self.o_full.eq(clk_counter == full_clock_tgt)
+
+        with m.If(self.en & ~self.o_full):
+            m.d.sync += clk_counter.eq(clk_counter + 1)
+        with m.Else():
+            m.d.sync += clk_counter.eq(0)
 
         return m
