@@ -2,32 +2,35 @@ from argparse import Namespace
 from typing import Callable, List, Literal, Self, Tuple
 
 import pyglet
+from amaranth.sim import Simulator
 from pyglet import gl
 from pyglet.image import ImageData, Texture
 from pyglet.window import Window, key
 
+from oled import Top
+from .connector import Connector
 from .display_base import DisplayBase
-
-# from ..oled import SH1107Command
-
 
 __all__ = ["run"]
 
 
-def run(_args: Namespace):
-    v = Display()
-    v.set_px(0, 0, 1)
-    v.set_px(10, 10, 1)
-    v.set_px(11, 10, 1)
-    v.set_px(12, 10, 1)
-    v.set_px(13, 10, 1)
-    v.set_px(125, 125, 1)
-    v.set_px(126, 126, 1)
-    v.set_px(127, 127, 1)
+def run(args: Namespace):
+    top = Top()
+    simulator = Simulator(top)
+
+    v = Display(top, simulator)
+
+    simulator.add_clock(1 / 12e6)
+    simulator.add_sync_process(v.connector.sim_process)
+
     v.run()
 
 
 class Display(DisplayBase, Window):
+    top: Top
+    simulator: Simulator
+    press_button: bool
+
     voyager2: Texture
 
     power: bool
@@ -52,12 +55,16 @@ class Display(DisplayBase, Window):
     img: ImageData
     img_stale: bool
 
-    def __init__(self):
+    def __init__(self, top: Top, simulator: Simulator):
         super().__init__(
             width=self.WINDOW_WIDTH,
             height=self.WINDOW_HEIGHT,
             caption="SH1107 OLED I²C",
         )
+
+        self.top = top
+        self.simulator = simulator
+        self.connector = Connector(top)
 
         Texture.default_min_filter = Texture.default_mag_filter = gl.GL_LINEAR
         self.voyager2 = pyglet.resource.image("vsh/voyager2.jpg", atlas=False)
@@ -85,7 +92,14 @@ class Display(DisplayBase, Window):
         self.img = ImageData(self.I2C_WIDTH, self.I2C_HEIGHT, "RGBA", bytes(self.idata))
         self.img_stale = False
 
+    def run(self):
+        pyglet.app.run()
+
     def on_draw(self):
+        # TODO(ari): range(?)
+        for _ in range(100):
+            self.simulator.advance()
+
         self.voyager2.blit(0, 0, width=self.WINDOW_WIDTH, height=self.WINDOW_HEIGHT)
         self._draw_top()
         self._draw_oled()
@@ -221,13 +235,4 @@ class Display(DisplayBase, Window):
             return
 
         if symbol == key.RETURN:
-            # TODO: Send the button push
-            self.power = not self.power
-
-        if symbol == key.PAGEUP:
-            self.segment_remap = not self.segment_remap
-        if symbol == key.PAGEDOWN:
-            self.com_scan_reversed = not self.com_scan_reversed
-
-    def run(self):
-        pyglet.app.run()
+            self.connector.press_button = True
