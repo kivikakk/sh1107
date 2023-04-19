@@ -73,11 +73,11 @@ class OLED(Elaboratable):
     offset: Signal
     remain: Signal
     offlens_rd: ReadPort
+    rom_rd: ReadPort
 
     class Command(IntEnum):
         # these correspond to offsets in OFFLENS.
         # TODO(ari): less hacky
-        NONE = 0
         INIT = 1
         DISPLAY = 2
         DISPLAY2 = 3
@@ -97,10 +97,8 @@ class OLED(Elaboratable):
         self.i_stb = Signal()
         self.o_result = Signal(OLED.Result)
 
-        # self.offset = Signal(range(len(ROM)))
-        # self.remain = Signal(range(len(ROM)))
-        self.offset = Signal(8)
-        self.remain = Signal(8)
+        self.offset = Signal(range(len(ROM)))
+        self.remain = Signal(range(len(ROM)))
 
         # TODO(ari): auto determine width for offlens? does it just truncate if too small?
         self.rom = Memory(width=8, depth=len(ROM), init=ROM)
@@ -111,7 +109,9 @@ class OLED(Elaboratable):
 
         m.submodules.i2c = self.i2c
 
-        m.submodules.rom_rd = rom_rd = self.rom.read_port(transparent=False)
+        m.submodules.rom_rd = self.rom_rd = rom_rd = self.rom.read_port(
+            transparent=False
+        )
         m.submodules.offlens_rd = self.offlens_rd = offlens_rd = self.offlens.read_port(
             transparent=False
         )
@@ -132,16 +132,13 @@ class OLED(Elaboratable):
                     m.next = "READ_OFF_WAIT"
 
             with m.State("READ_OFF_WAIT"):
+                m.d.sync += offlens_rd.addr.eq(
+                    cmd * 2 + 1
+                )  # XXX(ari): can probably just add 1 to self
                 m.next = "READ_OFF"
 
             with m.State("READ_OFF"):
                 m.d.sync += self.offset.eq(offlens_rd.data)
-                m.d.sync += offlens_rd.addr.eq(
-                    cmd * 2 + 1
-                )  # XXX(ari): can probably just add 1 to self
-                m.next = "READ_LEN_WAIT"
-
-            with m.State("READ_LEN_WAIT"):
                 m.next = "READ_LEN"
 
             with m.State("READ_LEN"):
@@ -163,8 +160,10 @@ class OLED(Elaboratable):
                     m.next = "WAIT_CMD"
                 with m.Elif(self.i2c.fifo.w_rdy):
                     m.d.sync += rom_rd.addr.eq(self.offset)
-                    m.d.sync += rom_rd.en.eq(1)
-                    m.next = "SEND_ENQUEUE"
+                    m.next = "SEND_ENQUEUE_WAIT"
+
+            with m.State("SEND_ENQUEUE_WAIT"):
+                m.next = "SEND_ENQUEUE"
 
             with m.State("SEND_ENQUEUE"):
                 m.d.sync += self.i2c.i_addr.eq(0x3C)
@@ -174,8 +173,6 @@ class OLED(Elaboratable):
 
                 m.d.sync += self.offset.eq(self.offset + 1)
                 m.d.sync += self.remain.eq(self.remain - 1)
-
-                m.d.sync += rom_rd.en.eq(0)
 
                 m.next = "SEND_READY"
 

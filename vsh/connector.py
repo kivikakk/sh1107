@@ -40,6 +40,8 @@ class Connector:
         last_offset = 0
         last_offlens_rd_addr = 0
         last_offlens_rd_data = 0
+        last_rom_rd_addr = 0
+        last_rom_rd_data = 0
 
         while True:
             if self.press_button:
@@ -91,5 +93,15 @@ class Connector:
             if offlens_rd_data != last_offlens_rd_data:
                 print("offlens_rd_data: ", " -> ", offlens_rd_data)
                 last_offlens_rd_data = offlens_rd_data
+
+            rom_rd_addr = cast(int, (yield self.top.oled.rom_rd.addr))
+            if rom_rd_addr != last_rom_rd_addr:
+                print("rom_rd_addr: ", " -> ", rom_rd_addr)
+                last_rom_rd_addr = rom_rd_addr
+
+            rom_rd_data = cast(int, (yield self.top.oled.rom_rd.data))
+            if rom_rd_data != last_rom_rd_data:
+                print("rom_rd_data: ", " -> ", rom_rd_data)
+                last_rom_rd_data = rom_rd_data
 
             yield
