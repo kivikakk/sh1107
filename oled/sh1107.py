@@ -1,12 +1,13 @@
 from abc import ABC, abstractmethod
+from enum import Enum
 from typing import Any, List, Optional, Self, Type, cast
 
-from amaranth.lib.enum import Enum, IntEnum
+from amaranth.lib.enum import IntEnum
 
 __all__ = ["Base", "Cmd", "DataBytes", "ControlByte"]
 
 
-def _enyom(enum: Type[IntEnum], value: Enum | int | str):
+def _enyom(enum: Type[IntEnum], value: Enum | int | str) -> Any:
     if isinstance(value, enum):
         return value
     elif isinstance(value, int):
@@ -20,7 +21,9 @@ def _enyom(enum: Type[IntEnum], value: Enum | int | str):
 class SH1107Sequence:
     def __repr__(self) -> str:
         def repr_v(v: Any) -> str:
-            if isinstance(v, int):
+            if isinstance(v, Enum):
+                return v.name
+            elif isinstance(v, int):
                 return hex(v)
             elif isinstance(v, list):
                 els = ", ".join(repr_v(vv) for vv in cast(List[Any], v))
@@ -104,7 +107,7 @@ class Cmd:
         return out
 
     @staticmethod
-    def parse(msg: List[int]) -> Optional[List[Base | DataBytes]]:
+    def parse(msg: List[int]) -> List[Base | DataBytes]:
         class State(Enum):
             Control = 1
             ControlPartialCommand = 2
@@ -201,6 +204,8 @@ class Cmd:
             Page = 0b0  # Column address increments (POR)
             Column = 0b1  # Page address increments
 
+        mode: Mode
+
         def __init__(self, mode: Mode | int | str):
             self.mode = _enyom(self.Mode, mode)
 
@@ -232,6 +237,8 @@ class Cmd:
         class Adc(IntEnum):
             Normal = 0b0  # POR
             Flipped = 0b1  # (Vertically)
+
+        adc: Adc
 
         def __init__(self, adc: Adc | int | str):
             self.adc = _enyom(self.Adc, adc)
@@ -353,6 +360,8 @@ class Cmd:
             Forwards = 0b0  # POR
             Backwards = 0b1
 
+        direction: Direction
+
         def __init__(self, direction: Direction | str | int):
             self.direction = _enyom(self.Direction, direction)
 
@@ -384,6 +393,8 @@ class Cmd:
             Pos40 = 0b1101
             Pos45 = 0b1110
             Pos50 = 0b1111
+
+        freq: Freq
 
         def __init__(self, ratio: int, freq: Freq | str | int):
             assert 1 <= ratio <= 16

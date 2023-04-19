@@ -1,5 +1,5 @@
 from argparse import Namespace
-from typing import Callable, List, Literal, Self, Tuple
+from typing import Callable, Literal, Self, Tuple
 
 import pyglet
 from amaranth.sim import Simulator
@@ -8,6 +8,7 @@ from pyglet.image import ImageData, Texture
 from pyglet.window import Window, key
 
 from oled import Top
+from oled.sh1107 import Base, Cmd, DataBytes
 from .connector import Connector
 from .display_base import DisplayBase
 
@@ -64,7 +65,7 @@ class Display(DisplayBase, Window):
 
         self.top = top
         self.simulator = simulator
-        self.connector = Connector(top)
+        self.connector = Connector(top, self.process_i2c)
 
         Texture.default_min_filter = Texture.default_mag_filter = gl.GL_LINEAR
         self.voyager2 = pyglet.resource.image("vsh/voyager2.jpg", atlas=False)
@@ -95,16 +96,16 @@ class Display(DisplayBase, Window):
     def run(self):
         pyglet.app.run()
 
-    def on_draw(self):
+    def on_draw(self):  # pyright: reportIncompatibleMethodOverride=none
         # TODO(ari): range(?)
-        for _ in range(100):
+        for _ in range(1000):
             self.simulator.advance()
 
         self.voyager2.blit(0, 0, width=self.WINDOW_WIDTH, height=self.WINDOW_HEIGHT)
         self._draw_top()
         self._draw_oled()
 
-    TOP_COLS: List[List[Tuple[str, Callable[[Self], bool | str]]]] = [
+    TOP_COLS: list[list[Tuple[str, Callable[[Self], bool | str]]]] = [
         [
             ("power on", lambda d: d.power),
             ("dclk", lambda d: f"{d.dclk_freq}% {d.dclk_ratio}x"),
@@ -217,17 +218,80 @@ class Display(DisplayBase, Window):
         self.idata[off : off + 4] = self.WHITE if val else self.BLACK
         self.img_stale = True
 
-    def i2c_msg(self, msg: List[int]):
-        if msg == [0, 0xAE]:
-            self.power = False
-        # TODO: clk div?
-        # TODO: multiplex?
-        # TODO: display start_line/start line/seg remap?
-        # TODO: contrast?
-        # TODO: vcom deselect?
-        # TODO: non-inverted?
-        elif msg == [0, 0xAF]:
-            self.power = True
+    def process_i2c(self, msg: list[Base | DataBytes]):
+        for c in msg:
+            match c:
+                case Cmd.SetLowerColumnAddress(lower=lower):
+                    raise NotImplementedError
+
+                case Cmd.SetHigherColumnAddress(higher=higher):
+                    raise NotImplementedError
+
+                case Cmd.SetMemoryAddressingMode(mode=mode):
+                    raise NotImplementedError
+
+                case Cmd.SetContrastControlRegister(level=level):
+                    raise NotImplementedError
+
+                case Cmd.SetSegmentRemap(adc=adc):
+                    raise NotImplementedError
+
+                case Cmd.SetMultiplexRatio(ratio=ratio):
+                    raise NotImplementedError
+
+                case Cmd.SetEntireDisplayOn(on=on):
+                    raise NotImplementedError
+
+                case Cmd.SetDisplayReverse(reverse=reverse):
+                    raise NotImplementedError
+
+                case Cmd.SetDisplayOffset(offset=offset):
+                    raise NotImplementedError
+
+                case Cmd.SetDCDC(on=on):
+                    raise NotImplementedError
+
+                case Cmd.DisplayOn(on=on):
+                    self.power = on
+
+                case Cmd.SetPageAddress(page=page):
+                    raise NotImplementedError
+
+                case Cmd.SetCommonOutputScanDirection(direction=direction):
+                    self.com_scan_reversed = (
+                        direction
+                        == Cmd.SetCommonOutputScanDirection.Direction.Backwards
+                    )
+
+                case Cmd.SetDisplayClockFrequency(ratio=ratio, freq=freq):
+                    self.dclk_freq = freq
+                    self.dclk_ratio = ratio
+
+                case Cmd.SetPreDischargePeriod(
+                    precharge=precharge, discharge=discharge
+                ):
+                    raise NotImplementedError
+
+                case Cmd.SetVCOMDeselectLevel(level=level):
+                    raise NotImplementedError
+
+                case Cmd.SetDisplayStartColumn(column=column):
+                    raise NotImplementedError
+
+                case Cmd.ReadModifyWrite():
+                    raise NotImplementedError
+
+                case Cmd.End():
+                    raise NotImplementedError
+
+                case Cmd.Nop():
+                    pass
+
+                case DataBytes():
+                    pass
+
+                case Base():
+                    assert False
 
     def on_key_press(self, symbol: int, modifiers: int):
         if symbol == key.ESCAPE:

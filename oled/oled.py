@@ -57,9 +57,6 @@ for s in (INIT_SEQUENCE, DISPLAY_SEQUENCE, DISPLAY2_SEQUENCE, POWEROFF_SEQUENCE)
     OFFLENS.extend([len(ROM), len(s)])
     ROM.extend(s)
 
-print("OFFLENS: ", OFFLENS)
-print("ROM: ", ROM)
-
 
 class OLED(Elaboratable):
     speed: Speed
@@ -102,7 +99,7 @@ class OLED(Elaboratable):
 
         # TODO(ari): auto determine width for offlens? does it just truncate if too small?
         self.rom = Memory(width=8, depth=len(ROM), init=ROM)
-        self.offlens = Memory(width=8, depth=len(OFFLENS), init=OFFLENS)
+        self.offlens = Memory(width=16, depth=len(OFFLENS), init=OFFLENS)
 
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
