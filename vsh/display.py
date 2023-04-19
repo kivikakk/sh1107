@@ -23,10 +23,11 @@ def run(args: Namespace):
 
     v = Display(top, simulator)
 
-    # 1Mbps on a 6MHz system clock gets us the sweet spot
-    # where the I2C clock (2MHz) is at a 1:3 ratio with the
-    # system: rest, half, full.
-    simulator.add_clock(1 / 6e6)
+    # 1Mbps on a 4MHz system clock gets us the sweet spot
+    # where the I2C clock (2MHz) is at a 1:2 ratio with the
+    # system clock.  This means every tick is either "half"
+    # or "full".
+    simulator.add_clock(1 / 4e6)
     simulator.add_sync_process(v.connector.sim_process)
 
     if args.vcd:
