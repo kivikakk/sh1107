@@ -78,31 +78,33 @@ class Top(Elaboratable):
             case _:
                 raise NotImplementedError
 
+        push_and_ready = button_up & (self.oled.o_result != OLED.Result.BUSY)
+
         with m.FSM():
             with m.State("POWEROFF"):
                 m.d.sync += self.oled.i_stb.eq(0)
-                with m.If(button_up):
+                with m.If(push_and_ready):
                     m.d.sync += self.o_last_cmd.eq(OLED.Command.INIT)
                     m.d.sync += self.oled.i_cmd.eq(OLED.Command.INIT)
                     m.d.sync += self.oled.i_stb.eq(1)
                     m.next = "INIT"
             with m.State("INIT"):
                 m.d.sync += self.oled.i_stb.eq(0)
-                with m.If(button_up):
+                with m.If(push_and_ready):
                     m.d.sync += self.o_last_cmd.eq(OLED.Command.DISPLAY)
                     m.d.sync += self.oled.i_cmd.eq(OLED.Command.DISPLAY)
                     m.d.sync += self.oled.i_stb.eq(1)
                     m.next = "DISPLAY1"
             with m.State("DISPLAY1"):
                 m.d.sync += self.oled.i_stb.eq(0)
-                with m.If(button_up):
+                with m.If(push_and_ready):
                     m.d.sync += self.o_last_cmd.eq(OLED.Command.DISPLAY2)
                     m.d.sync += self.oled.i_cmd.eq(OLED.Command.DISPLAY2)
                     m.d.sync += self.oled.i_stb.eq(1)
                     m.next = "DISPLAY2"
             with m.State("DISPLAY2"):
                 m.d.sync += self.oled.i_stb.eq(0)
-                with m.If(button_up):
+                with m.If(push_and_ready):
                     m.d.sync += self.o_last_cmd.eq(OLED.Command.POWEROFF)
                     m.d.sync += self.oled.i_cmd.eq(OLED.Command.POWEROFF)
                     m.d.sync += self.oled.i_stb.eq(1)
