@@ -4,9 +4,10 @@ from typing import Callable, Literal, Self, Tuple
 import pyglet
 from amaranth.sim import Simulator
 from pyglet import gl
-from pyglet.image import ImageData, Texture
+from pyglet.image import ImageData
 from pyglet.window import Window, key
 
+from i2c import Speed
 from oled import Top
 from oled.sh1107 import Base, Cmd, DataBytes
 from .connector import Connector
@@ -16,12 +17,15 @@ __all__ = ["run"]
 
 
 def run(args: Namespace):
-    top = Top()
+    top = Top(speed=Speed(1_000_000))
     simulator = Simulator(top)
 
     v = Display(top, simulator)
 
-    simulator.add_clock(1 / 12e6)
+    # 1Mbps on a 6MHz system clock gets us the sweet spot
+    # where the I2C clock (2MHz) is at a 1:3 ratio with the
+    # system: rest, half, full.
+    simulator.add_clock(1 / 6e6)
     simulator.add_sync_process(v.connector.sim_process)
 
     v.run()
@@ -32,11 +36,9 @@ class Display(DisplayBase, Window):
     simulator: Simulator
     press_button: bool
 
-    voyager2: Texture
-
     power: bool
-    dcdc: bool
-    dclk_freq: int  # NE
+    dcdc: bool  # NE
+    dclk_freq: Cmd.SetDisplayClockFrequency.Freq  # NE
     dclk_ratio: int  # NE
     precharge_period: int  # NE
     discharge_period: int  # NE
@@ -48,7 +50,7 @@ class Display(DisplayBase, Window):
     start_column: int  # TODO
     page_address: int
     column_address: int
-    addressing_mode: Literal[0, 1]
+    addressing_mode: Cmd.SetMemoryAddressingMode.Mode
     multiplex: int  # XXX
     segment_remap: bool
     com_scan_reversed: bool
@@ -68,13 +70,9 @@ class Display(DisplayBase, Window):
         self.simulator = simulator
         self.connector = Connector(top, self.process_i2c)
 
-        Texture.default_min_filter = Texture.default_mag_filter = gl.GL_LINEAR
-        self.voyager2 = pyglet.resource.image("vsh/voyager2.jpg", atlas=False)
-        Texture.default_min_filter = Texture.default_mag_filter = gl.GL_NEAREST
-
         self.power = False
         self.dcdc = True
-        self.dclk_freq = 0
+        self.dclk_freq = Cmd.SetDisplayClockFrequency.Freq.Zero
         self.dclk_ratio = 1
         self.precharge_period = 2
         self.discharge_period = 2
@@ -86,7 +84,7 @@ class Display(DisplayBase, Window):
         self.start_column = 0
         self.page_address = 0
         self.column_address = 0
-        self.addressing_mode = 0
+        self.addressing_mode = Cmd.SetMemoryAddressingMode.Mode.Page
         self.multiplex = 128
         self.segment_remap = False
         self.com_scan_reversed = False
@@ -110,7 +108,7 @@ class Display(DisplayBase, Window):
     TOP_COLS: list[list[Tuple[str, Callable[[Self], bool | str]]]] = [
         [
             ("power on", lambda d: d.power),
-            ("dcdc on", lambda d: d.dcdc),
+            ("dc/dc on", lambda d: d.dcdc),
             ("dclk", lambda d: f"{d.dclk_freq}% {d.dclk_ratio}x"),
             ("pre/dis", lambda d: f"{d.precharge_period}/{d.discharge_period}"),
             ("vcom desel", lambda d: f"{d.vcom_desel:02x}"),
@@ -231,9 +229,7 @@ class Display(DisplayBase, Window):
                     self.column_address = (self.column_address & 0x0F) | (higher << 4)
 
                 case Cmd.SetMemoryAddressingMode(mode=mode):
-                    self.addressing_mode = (
-                        0 if mode == Cmd.SetMemoryAddressingMode.Mode.Page else 1
-                    )
+                    self.addressing_mode = mode
 
                 case Cmd.SetContrastControlRegister(level=level):
                     self.contrast = level
@@ -269,7 +265,7 @@ class Display(DisplayBase, Window):
                     )
 
                 case Cmd.SetDisplayClockFrequency(ratio=ratio, freq=freq):
-                    self.dclk_freq = int(freq)
+                    self.dclk_freq = freq
                     self.dclk_ratio = ratio
 
                 case Cmd.SetPreDischargePeriod(
@@ -294,22 +290,29 @@ class Display(DisplayBase, Window):
                     pass
 
                 case DataBytes(data=data):
+                    page_count = self.I2C_HEIGHT // 8
                     for b in data:
                         for i in range(7, -1, -1):
                             self.set_px(
                                 self.column_address,
-                                self.page_address * 8 + i,  # TODO
+                                self.page_address * 8 + i,
                                 1 if ((b >> i) & 0x01) == 0x01 else 0,
                             )
-                        # TODO: unhard-code 128s and 8s
-                        if self.addressing_mode == 0:
-                            self.column_address = (self.column_address + 1) % 128
+                        if (
+                            self.addressing_mode
+                            == Cmd.SetMemoryAddressingMode.Mode.Page
+                        ):
+                            self.column_address = (
+                                self.column_address + 1
+                            ) % self.I2C_WIDTH
                             if self.column_address == 0:
-                                self.page_address = (self.page_address + 1) % 8
+                                self.page_address = (self.page_address + 1) % page_count
                         else:
-                            self.page_address = (self.page_address + 1) % 8
+                            self.page_address = (self.page_address + 1) % page_count
                             if self.page_address == 0:
-                                self.column_address = (self.column_address + 1) % 128
+                                self.column_address = (
+                                    self.column_address + 1
+                                ) % self.I2C_WIDTH
 
                 case Base():
                     assert False

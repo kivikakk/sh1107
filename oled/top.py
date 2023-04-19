@@ -14,13 +14,15 @@ __all__ = ["Top"]
 
 class Top(Elaboratable):
     oled: OLED
+    speed: Speed
 
     o_last_cmd: Signal
 
     sim_switch: Signal
 
-    def __init__(self):
-        self.oled = OLED(speed=Speed(100_000))
+    def __init__(self, *, speed: Speed = Speed(400_000)):
+        self.oled = OLED(speed=speed)
+        self.speed = speed
 
         self.o_last_cmd = Signal(OLED.Command)
 

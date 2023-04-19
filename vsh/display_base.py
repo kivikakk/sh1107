@@ -1,11 +1,14 @@
-from typing import Any, Literal, List, Tuple
+from typing import Any, List, Literal, Tuple
 
 import pyglet
-from pyglet.image import ImageData
+from pyglet import gl
+from pyglet.image import ImageData, Texture
 from pyglet.text import HTMLLabel
 
 
 class DisplayBase:
+    voyager2: Texture
+
     I2C_WIDTH = 128
     I2C_HEIGHT = 128
     DISPLAY_SCALE = 4
@@ -56,6 +59,10 @@ class DisplayBase:
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
+
+        Texture.default_min_filter = Texture.default_mag_filter = gl.GL_LINEAR
+        self.voyager2 = pyglet.resource.image("vsh/voyager2.jpg", atlas=False)
+        Texture.default_min_filter = Texture.default_mag_filter = gl.GL_NEAREST
 
         self.__texts = {}
 
