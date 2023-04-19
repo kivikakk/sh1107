@@ -1,4 +1,5 @@
 from argparse import Namespace
+from pathlib import Path
 from typing import Callable, Literal, Self, Tuple
 
 import pyglet
@@ -28,7 +29,12 @@ def run(args: Namespace):
     simulator.add_clock(1 / 6e6)
     simulator.add_sync_process(v.connector.sim_process)
 
-    v.run()
+    if args.vcd:
+        vcd_path = Path(__file__).parent.parent / "build" / "vsh.vcd"
+        with simulator.write_vcd(str(vcd_path)):
+            v.run()
+    else:
+        v.run()
 
 
 class Display(DisplayBase, Window):

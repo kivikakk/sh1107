@@ -154,6 +154,12 @@ def main():
             help="run the Virtual SH1107",
         )
         vsh_parser.set_defaults(func=vsh)
+        vsh_parser.add_argument(
+            "-v",
+            "--vcd",
+            action="store_true",
+            help="output a VCD file",
+        )
 
     args = parser.parse_args()
     args.func(args)

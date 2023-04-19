@@ -4,18 +4,7 @@ import typing
 import unittest
 from contextlib import contextmanager
 from pathlib import Path
-from typing import (
-    Any,
-    Callable,
-    Generic,
-    Iterator,
-    List,
-    Optional,
-    Self,
-    Tuple,
-    TypeVar,
-    cast,
-)
+from typing import Any, Callable, Iterator, List, Optional, Self, Tuple, cast
 
 from amaranth import Elaboratable, Record, Signal
 from amaranth.hdl.ast import Statement
