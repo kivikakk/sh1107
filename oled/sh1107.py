@@ -394,6 +394,41 @@ class Cmd:
             Pos45 = 0b1110
             Pos50 = 0b1111
 
+            def __int__(self) -> int:
+                match self:
+                    case self.Neg25:
+                        return -25
+                    case self.Neg20:
+                        return -20
+                    case self.Neg15:
+                        return -15
+                    case self.Neg10:
+                        return -10
+                    case self.Neg5:
+                        return -5
+                    case self.Zero:
+                        return 0
+                    case self.Pos5:
+                        return 5
+                    case self.Pos10:
+                        return 10
+                    case self.Pos15:
+                        return 15
+                    case self.Pos20:
+                        return 20
+                    case self.Pos25:
+                        return 25
+                    case self.Pos30:
+                        return 30
+                    case self.Pos35:
+                        return 35
+                    case self.Pos40:
+                        return 40
+                    case self.Pos45:
+                        return 45
+                    case self.Pos50:
+                        return 50
+
         freq: Freq
 
         def __init__(self, ratio: int, freq: Freq | str | int):

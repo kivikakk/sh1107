@@ -35,6 +35,7 @@ class Display(DisplayBase, Window):
     voyager2: Texture
 
     power: bool
+    dcdc: bool
     dclk_freq: int  # NE
     dclk_ratio: int  # NE
     precharge_period: int  # NE
@@ -45,9 +46,9 @@ class Display(DisplayBase, Window):
     contrast: int  # TODO
     start_line: int  # TODO
     start_column: int  # TODO
-    page_address: int  # NOP
-    column_address: int  # NOP
-    addressing_mode: Literal[0, 1]  # NOP
+    page_address: int
+    column_address: int
+    addressing_mode: Literal[0, 1]
     multiplex: int  # XXX
     segment_remap: bool
     com_scan_reversed: bool
@@ -72,6 +73,7 @@ class Display(DisplayBase, Window):
         Texture.default_min_filter = Texture.default_mag_filter = gl.GL_NEAREST
 
         self.power = False
+        self.dcdc = True
         self.dclk_freq = 0
         self.dclk_ratio = 1
         self.precharge_period = 2
@@ -108,6 +110,7 @@ class Display(DisplayBase, Window):
     TOP_COLS: list[list[Tuple[str, Callable[[Self], bool | str]]]] = [
         [
             ("power on", lambda d: d.power),
+            ("dcdc on", lambda d: d.dcdc),
             ("dclk", lambda d: f"{d.dclk_freq}% {d.dclk_ratio}x"),
             ("pre/dis", lambda d: f"{d.precharge_period}/{d.discharge_period}"),
             ("vcom desel", lambda d: f"{d.vcom_desel:02x}"),
@@ -222,40 +225,42 @@ class Display(DisplayBase, Window):
         for c in msg:
             match c:
                 case Cmd.SetLowerColumnAddress(lower=lower):
-                    raise NotImplementedError
+                    self.column_address = (self.column_address & 0xF0) | lower
 
                 case Cmd.SetHigherColumnAddress(higher=higher):
-                    raise NotImplementedError
+                    self.column_address = (self.column_address & 0x0F) | (higher << 4)
 
                 case Cmd.SetMemoryAddressingMode(mode=mode):
-                    raise NotImplementedError
+                    self.addressing_mode = (
+                        0 if mode == Cmd.SetMemoryAddressingMode.Mode.Page else 1
+                    )
 
                 case Cmd.SetContrastControlRegister(level=level):
-                    raise NotImplementedError
+                    self.contrast = level
 
                 case Cmd.SetSegmentRemap(adc=adc):
-                    raise NotImplementedError
+                    self.segment_remap = adc == Cmd.SetSegmentRemap.Adc.Flipped
 
                 case Cmd.SetMultiplexRatio(ratio=ratio):
-                    raise NotImplementedError
+                    self.multiplex = ratio
 
                 case Cmd.SetEntireDisplayOn(on=on):
-                    raise NotImplementedError
+                    self.all_on = on
 
                 case Cmd.SetDisplayReverse(reverse=reverse):
-                    raise NotImplementedError
+                    self.reversed = reverse
 
                 case Cmd.SetDisplayOffset(offset=offset):
-                    raise NotImplementedError
+                    self.start_line = offset
 
                 case Cmd.SetDCDC(on=on):
-                    raise NotImplementedError
+                    self.dcdc = on
 
                 case Cmd.DisplayOn(on=on):
                     self.power = on
 
                 case Cmd.SetPageAddress(page=page):
-                    raise NotImplementedError
+                    self.page_address = page
 
                 case Cmd.SetCommonOutputScanDirection(direction=direction):
                     self.com_scan_reversed = (
@@ -264,19 +269,20 @@ class Display(DisplayBase, Window):
                     )
 
                 case Cmd.SetDisplayClockFrequency(ratio=ratio, freq=freq):
-                    self.dclk_freq = freq
+                    self.dclk_freq = int(freq)
                     self.dclk_ratio = ratio
 
                 case Cmd.SetPreDischargePeriod(
                     precharge=precharge, discharge=discharge
                 ):
-                    raise NotImplementedError
+                    self.precharge_period = precharge
+                    self.discharge_period = discharge
 
                 case Cmd.SetVCOMDeselectLevel(level=level):
-                    raise NotImplementedError
+                    self.vcom_desel = level
 
                 case Cmd.SetDisplayStartColumn(column=column):
-                    raise NotImplementedError
+                    self.start_column = column
 
                 case Cmd.ReadModifyWrite():
                     raise NotImplementedError
@@ -287,8 +293,23 @@ class Display(DisplayBase, Window):
                 case Cmd.Nop():
                     pass
 
-                case DataBytes():
-                    pass
+                case DataBytes(data=data):
+                    for b in data:
+                        for i in range(7, -1, -1):
+                            self.set_px(
+                                self.column_address,
+                                self.page_address * 8 + i,  # TODO
+                                1 if ((b >> i) & 0x01) == 0x01 else 0,
+                            )
+                        # TODO: unhard-code 128s and 8s
+                        if self.addressing_mode == 0:
+                            self.column_address = (self.column_address + 1) % 128
+                            if self.column_address == 0:
+                                self.page_address = (self.page_address + 1) % 8
+                        else:
+                            self.page_address = (self.page_address + 1) % 8
+                            if self.page_address == 0:
+                                self.column_address = (self.column_address + 1) % 128
 
                 case Base():
                     assert False
