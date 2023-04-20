@@ -8,10 +8,10 @@ class TestSH1107Command(unittest.TestCase):
     PAIRS = [
         ([0x07], Cmd.SetLowerColumnAddress(0x7)),
         ([0x13], Cmd.SetHigherColumnAddress(0x3)),
-        ([0x18], None),
+        ([0x18], False),
         ([0x20], Cmd.SetMemoryAddressingMode("Page")),
         ([0x21], Cmd.SetMemoryAddressingMode("Column")),
-        ([0x81], None),
+        ([0x81], True),
         ([0x81, 0x7F], Cmd.SetContrastControlRegister(0x7F)),
         ([0x81, 0x00], Cmd.SetContrastControlRegister(0x00)),
         ([0xA0], Cmd.SetSegmentRemap("Normal")),
@@ -231,7 +231,7 @@ class TestSH1107Command(unittest.TestCase):
             [0x80],
             "Cmd",
             False,
-            "M",  # TODO: 0x80 invalid start of command byte, will never match = unrecov
+            "U",
         ),
         (
             [0x00],
@@ -321,7 +321,7 @@ class TestSH1107Command(unittest.TestCase):
 
     def test_to_bytes(self):
         for data, value, *maybe in self.PAIRS:
-            if value is None:
+            if value in (False, True):
                 continue
             if len(maybe) == 1:
                 data = maybe[0]
@@ -350,11 +350,8 @@ class TestSH1107Command(unittest.TestCase):
         # (input, output, leftover, end state, end continuation, fish ok/more needed/unrecoverable)
 
         for bytes, cmds, leftover, state, continuation, fmu in self.PARSE_PARTIAL:
-            print(bytes, cmds, leftover, state, continuation, fmu)
             parser = Cmd.Parser()
             result = parser.feed(bytes)
-            print(result)
-            print()
             self.assertEqual(result, cmds)
             self.assertEqual(parser.bytes, leftover)
             match state:

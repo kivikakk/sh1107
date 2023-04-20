@@ -69,13 +69,19 @@ class DataBytes(SH1107Sequence):
 
 
 class Base(SH1107Sequence, ABC):
+    """
+    Return parsed sequence, True if cmd is prefix of this(/any) sequence, False if no
+    match at all.
+    """
+
     @classmethod
     @abstractmethod
-    def parse_one(cls, cmd: list[int]) -> Optional[Self]:
+    def parse_one(cls, cmd: list[int]) -> Self | bool:
         for subclass in cls.__subclasses__():
             result = subclass.parse_one(cmd)
-            if result is not None:
+            if result is not False:
                 return result
+        return False
 
     @abstractmethod
     def to_bytes(self) -> list[int]:
@@ -141,7 +147,10 @@ class Cmd:
                         case ParseState.Command:
                             partial.append(b)
                             px = Base.parse_one(partial)
-                            if px is None:
+                            if px is False:
+                                self.unrecoverable = True
+                                return cmds
+                            elif px is True:
                                 if self.continuation:
                                     self.state = ParseState.Control
                                 else:
@@ -204,9 +213,9 @@ class Cmd:
             self.lower = lower
 
         @classmethod
-        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
+        def parse_one(cls, cmd: list[int]) -> Self | bool:
             if len(cmd) != 1 or not (0 <= cmd[0] <= 0x0F):
-                return None
+                return False
             return cls(cmd[0])
 
         def to_bytes(self) -> list[int]:
@@ -219,9 +228,9 @@ class Cmd:
             self.higher = higher
 
         @classmethod
-        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
+        def parse_one(cls, cmd: list[int]) -> Self | bool:
             if len(cmd) != 1 or not (0x10 <= cmd[0] <= 0x17):
-                return None
+                return False
             return cls(cmd[0] & ~0x10)
 
         def to_bytes(self) -> list[int]:
@@ -238,9 +247,9 @@ class Cmd:
             self.mode = _enyom(self.Mode, mode)
 
         @classmethod
-        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
+        def parse_one(cls, cmd: list[int]) -> Self | bool:
             if len(cmd) != 1 or not (0x20 <= cmd[0] <= 0x21):
-                return None
+                return False
             return cls(cls.Mode(cmd[0] & ~0x20))
 
         def to_bytes(self) -> list[int]:
@@ -253,9 +262,11 @@ class Cmd:
             self.level = level
 
         @classmethod
-        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
-            if len(cmd) != 2 or cmd[0] != 0x81:
-                return None
+        def parse_one(cls, cmd: list[int]) -> Self | bool:
+            if cmd[0] != 0x81 or len(cmd) > 2:
+                return False
+            elif len(cmd) < 2:
+                return True
             return cls(cmd[1])
 
         def to_bytes(self) -> list[int]:
@@ -272,9 +283,9 @@ class Cmd:
             self.adc = _enyom(self.Adc, adc)
 
         @classmethod
-        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
+        def parse_one(cls, cmd: list[int]) -> Self | bool:
             if len(cmd) != 1 or not (0xA0 <= cmd[0] <= 0xA1):
-                return None
+                return False
             return cls(cls.Adc(cmd[0] & ~0xA0))
 
         def to_bytes(self) -> list[int]:
@@ -289,9 +300,11 @@ class Cmd:
             self.ratio = ratio
 
         @classmethod
-        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
-            if len(cmd) != 2 or cmd[0] != 0xA8:
-                return None
+        def parse_one(cls, cmd: list[int]) -> Self | bool:
+            if cmd[0] != 0xA8 or len(cmd) > 2:
+                return False
+            elif len(cmd) < 2:
+                return True
             return cls((cmd[1] & 0x7F) + 1)
 
         def to_bytes(self) -> list[int]:
@@ -303,9 +316,9 @@ class Cmd:
             self.on = on
 
         @classmethod
-        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
+        def parse_one(cls, cmd: list[int]) -> Self | bool:
             if len(cmd) != 1 or not (0xA4 <= cmd[0] <= 0xA5):
-                return None
+                return False
             return cls(cmd[0] == 0xA5)
 
         def to_bytes(self) -> list[int]:
@@ -317,9 +330,9 @@ class Cmd:
             self.reverse = reverse
 
         @classmethod
-        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
+        def parse_one(cls, cmd: list[int]) -> Self | bool:
             if len(cmd) != 1 or not (0xA6 <= cmd[0] <= 0xA7):
-                return None
+                return False
             return cls(cmd[0] == 0xA7)
 
         def to_bytes(self) -> list[int]:
@@ -332,9 +345,11 @@ class Cmd:
             self.offset = offset
 
         @classmethod
-        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
-            if len(cmd) != 2 or cmd[0] != 0xD3:
-                return None
+        def parse_one(cls, cmd: list[int]) -> Self | bool:
+            if cmd[0] != 0xD3 or len(cmd) > 2:
+                return False
+            elif len(cmd) < 2:
+                return True
             return cls(cmd[1] & 0x7F)
 
         def to_bytes(self) -> list[int]:
@@ -346,9 +361,11 @@ class Cmd:
             self.on = on
 
         @classmethod
-        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
-            if len(cmd) != 2 or cmd[0] != 0xAD:
-                return None
+        def parse_one(cls, cmd: list[int]) -> Self | bool:
+            if cmd[0] != 0xAD or len(cmd) > 2:
+                return False
+            elif len(cmd) < 2:
+                return True
             return cls(cmd[1] == 0x8B)
 
         def to_bytes(self) -> list[int]:
@@ -360,9 +377,9 @@ class Cmd:
             self.on = on
 
         @classmethod
-        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
+        def parse_one(cls, cmd: list[int]) -> Self | bool:
             if len(cmd) != 1 or not (0xAE <= cmd[0] <= 0xAF):
-                return None
+                return False
             return cls(cmd[0] == 0xAF)
 
         def to_bytes(self) -> list[int]:
@@ -375,9 +392,9 @@ class Cmd:
             self.page = page
 
         @classmethod
-        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
+        def parse_one(cls, cmd: list[int]) -> Self | bool:
             if len(cmd) != 1 or not (0xB0 <= cmd[0] <= 0xBF):
-                return None
+                return False
             return cls(cmd[0] & ~0xB0)
 
         def to_bytes(self) -> list[int]:
@@ -394,9 +411,9 @@ class Cmd:
             self.direction = _enyom(self.Direction, direction)
 
         @classmethod
-        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
+        def parse_one(cls, cmd: list[int]) -> Self | bool:
             if len(cmd) != 1 or not (0xC0 <= cmd[0] <= 0xCF):
-                return None
+                return False
             return cls(cls.Direction((cmd[0] & 8) == 8))
 
         def to_bytes(self) -> list[int]:
@@ -465,9 +482,11 @@ class Cmd:
             self.freq = _enyom(self.Freq, freq)
 
         @classmethod
-        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
-            if len(cmd) != 2 or cmd[0] != 0xD5:
-                return None
+        def parse_one(cls, cmd: list[int]) -> Self | bool:
+            if cmd[0] != 0xD5 or len(cmd) > 2:
+                return False
+            elif len(cmd) < 2:
+                return True
             return cls((cmd[1] & 0xF) + 1, cls.Freq(cmd[1] >> 4))
 
         def to_bytes(self) -> list[int]:
@@ -482,9 +501,11 @@ class Cmd:
             self.discharge = discharge
 
         @classmethod
-        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
-            if len(cmd) != 2 or cmd[0] != 0xD9:
-                return None
+        def parse_one(cls, cmd: list[int]) -> Self | bool:
+            if cmd[0] != 0xD9 or len(cmd) > 2:
+                return False
+            elif len(cmd) < 2:
+                return True
             return cls(cmd[1] & 0xF, cmd[1] >> 4)
 
         def to_bytes(self) -> list[int]:
@@ -501,9 +522,11 @@ class Cmd:
             self.level = level
 
         @classmethod
-        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
-            if len(cmd) != 2 or cmd[0] != 0xDB:
-                return None
+        def parse_one(cls, cmd: list[int]) -> Self | bool:
+            if cmd[0] != 0xDB or len(cmd) > 2:
+                return False
+            elif len(cmd) < 2:
+                return True
             return cls(cmd[1])
 
         def to_bytes(self) -> list[int]:
@@ -516,9 +539,11 @@ class Cmd:
             self.column = column
 
         @classmethod
-        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
-            if len(cmd) != 2 or cmd[0] != 0xDC:
-                return None
+        def parse_one(cls, cmd: list[int]) -> Self | bool:
+            if cmd[0] != 0xDC or len(cmd) > 2:
+                return False
+            elif len(cmd) < 2:
+                return True
             return cls(cmd[1] & 0x7F)
 
         def to_bytes(self) -> list[int]:
@@ -528,9 +553,9 @@ class Cmd:
         # Must be paired with End command.  End causes
         # column/page address to return to where it was before RMW.
         @classmethod
-        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
+        def parse_one(cls, cmd: list[int]) -> Self | bool:
             if len(cmd) != 1 or cmd[0] != 0xE0:
-                return None
+                return False
             return cls()
 
         def to_bytes(self) -> list[int]:
@@ -538,9 +563,9 @@ class Cmd:
 
     class End(Base):
         @classmethod
-        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
+        def parse_one(cls, cmd: list[int]) -> Self | bool:
             if len(cmd) != 1 or cmd[0] != 0xEE:
-                return None
+                return False
             return cls()
 
         def to_bytes(self) -> list[int]:
@@ -548,9 +573,9 @@ class Cmd:
 
     class Nop(Base):
         @classmethod
-        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
+        def parse_one(cls, cmd: list[int]) -> Self | bool:
             if len(cmd) != 1 or cmd[0] != 0xE3:
-                return None
+                return False
             return cls()
 
         def to_bytes(self) -> list[int]:
