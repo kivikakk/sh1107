@@ -1,4 +1,4 @@
-from typing import Final, List, Optional, cast
+from typing import Final, Optional, cast
 
 from amaranth import Elaboratable, Module, Signal
 from amaranth.build import Attrs, Platform
@@ -18,11 +18,11 @@ __all__ = ["I2C", "Speed"]
 class Speed:
     hz: int
 
-    VALID_SPEEDS: Final[List[int]] = [
+    VALID_SPEEDS: Final[list[int]] = [
         100_000,
         400_000,
         1_000_000,
-        3_400_000,
+        # 3_400_000,  XXX(Mia): NYI
     ]
 
     def __init__(self, hz: int | str):

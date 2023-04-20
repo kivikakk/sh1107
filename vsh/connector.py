@@ -246,6 +246,8 @@ class Connector:
                         bytes.append(byte)
                         yield i2c.sda_i.eq(0)
 
+                        Cmd.parse(bytes)
+
                 case ByteReceiver.Result.RELEASE_SDA:
                     yield i2c.sda_i.eq(1)
 

@@ -1,7 +1,7 @@
 import unittest
-from typing import List, Tuple
+from typing import Literal, Tuple
 
-from .sh1107 import Base, Cmd, ControlByte, DataBytes
+from .sh1107 import Base, Cmd, ControlByte, DataBytes, ParseState
 
 
 class TestSH1107Command(unittest.TestCase):
@@ -11,6 +11,7 @@ class TestSH1107Command(unittest.TestCase):
         ([0x18], None),
         ([0x20], Cmd.SetMemoryAddressingMode("Page")),
         ([0x21], Cmd.SetMemoryAddressingMode("Column")),
+        ([0x81], None),
         ([0x81, 0x7F], Cmd.SetContrastControlRegister(0x7F)),
         ([0x81, 0x00], Cmd.SetContrastControlRegister(0x00)),
         ([0xA0], Cmd.SetSegmentRemap("Normal")),
@@ -58,7 +59,7 @@ class TestSH1107Command(unittest.TestCase):
         (0xC0, ControlByte(True, "Data")),
     ]
 
-    COMPOSE_PAIRS: List[Tuple[List[Base | DataBytes], List[int]]] = [
+    COMPOSE_PAIRS: list[Tuple[list[Base | DataBytes], list[int]]] = [
         (
             [
                 Cmd.SetDisplayClockFrequency(7, "Neg5"),
@@ -122,6 +123,198 @@ class TestSH1107Command(unittest.TestCase):
         ),
     ]
 
+    PARSE_PARTIAL: list[
+        Tuple[
+            list[int],
+            list[Base | DataBytes],
+            list[int],
+            Literal["Ctrl", "Cmd", "Data"],
+            bool,
+            Literal["F", "M", "U"],
+        ]
+    ] = [
+        # 0x80 0xD5 0x80 0x46 0x00 0xAF:
+        # Co/C SetDisplayClockFrequency Co/C 7, Neg5 !Co/C DisplayOn True
+        #
+        # (input, output, leftover, end state, end continuation, fish ok/more needed/unrecoverable)
+        #
+        ([0x80], [], [0x80], "Cmd", True, "M"),
+        ([0x80, 0xD5], [], [0x80, 0xD5], "Ctrl", True, "M"),
+        ([0x80, 0xD5, 0x80], [], [0x80, 0xD5, 0x80], "Cmd", True, "M"),
+        (
+            [0x80, 0xD5, 0x80, 0x46],
+            [Cmd.SetDisplayClockFrequency(7, "Neg5")],
+            [],
+            "Ctrl",
+            True,
+            "M",
+        ),
+        (
+            [0x80, 0xD5, 0x80, 0x46, 0x00],
+            [Cmd.SetDisplayClockFrequency(7, "Neg5")],
+            [0x00],
+            "Cmd",
+            False,
+            "M",
+        ),
+        (
+            [0x80, 0xD5, 0x80, 0x46, 0x00, 0xAF],
+            [Cmd.SetDisplayClockFrequency(7, "Neg5"), Cmd.DisplayOn(True)],
+            [],
+            "Cmd",
+            False,
+            "F",
+        ),
+        (
+            [0x80, 0xD5, 0x80, 0x46, 0x00, 0xAF, 0xAE],
+            [
+                Cmd.SetDisplayClockFrequency(7, "Neg5"),
+                Cmd.DisplayOn(True),
+                Cmd.DisplayOn(False),
+            ],
+            [],
+            "Cmd",
+            False,
+            "F",
+        ),
+        (
+            [0x80, 0xAF, 0x80, 0xD5],
+            [Cmd.DisplayOn(True)],
+            [0x80, 0xD5],
+            "Ctrl",
+            True,
+            "M",
+        ),
+        (
+            [0x80, 0xAF, 0x80, 0xD5, 0x80],
+            [Cmd.DisplayOn(True)],
+            [0x80, 0xD5, 0x80],
+            "Cmd",
+            True,
+            "M",
+        ),
+        (
+            [0x80, 0xAF, 0x80, 0xD5, 0x00],
+            [Cmd.DisplayOn(True)],
+            [0x80, 0xD5, 0x00],
+            "Cmd",
+            False,
+            "M",
+        ),
+        (
+            [0x80, 0xAF, 0x00],
+            [Cmd.DisplayOn(True)],
+            [0x00],
+            "Cmd",
+            False,
+            "M",
+        ),
+        (
+            [0x80, 0xAF, 0x00, 0xD5],
+            [Cmd.DisplayOn(True)],
+            [0x00, 0xD5],
+            "Cmd",
+            False,
+            "M",
+        ),
+        (
+            [0x80, 0xAF, 0x00, 0xD5, 0x46],
+            [Cmd.DisplayOn(True), Cmd.SetDisplayClockFrequency(7, "Neg5")],
+            [],
+            "Cmd",
+            False,
+            "F",
+        ),
+        (
+            [0x00, 0xAF, 0x80],
+            [Cmd.DisplayOn(True)],
+            [0x80],
+            "Cmd",
+            False,
+            "M",  # TODO: 0x80 invalid start of command byte, will never match = unrecov
+        ),
+        (
+            [0x00],
+            [],
+            [0x00],
+            "Cmd",
+            False,
+            "M",  # empty section invalid
+        ),
+        (
+            [0x00, 0xAF],
+            [Cmd.DisplayOn(True)],
+            [],
+            "Cmd",
+            False,
+            "F",
+        ),
+        (
+            [0x80, 0xAF],
+            [Cmd.DisplayOn(True)],
+            [],
+            "Ctrl",
+            True,
+            "M",
+        ),
+        (
+            [0x40],
+            [],
+            [0x40],
+            "Data",
+            False,
+            "M",  # empty section invalid
+        ),
+        (
+            [0x40, 0xAA],
+            [DataBytes([0xAA])],
+            [],
+            "Data",
+            False,
+            "F",
+        ),
+        (
+            [0x40],
+            [],
+            [0x40],
+            "Data",
+            False,
+            "M",
+        ),
+        (
+            [0x40, 0xAA, 0x40],
+            [DataBytes([0xAA, 0x40])],
+            [],
+            "Data",
+            False,
+            "F",
+        ),
+        (
+            [0x40, 0xAA, 0x40, 0xAA],
+            [DataBytes([0xAA, 0x40, 0xAA])],
+            [],
+            "Data",
+            False,
+            "F",
+        ),
+        (
+            [0xC0],
+            [],
+            [0xC0],
+            "Data",
+            True,
+            "M",
+        ),
+        (
+            [0xC0, 0xAA],
+            [DataBytes([0xAA])],
+            [],
+            "Ctrl",
+            True,
+            "M",
+        ),
+    ]
+
     def test_parse_one(self):
         for data, value, *_ in self.PAIRS:
             self.assertEqual(Base.parse_one(data), value)
@@ -145,7 +338,46 @@ class TestSH1107Command(unittest.TestCase):
 
     def test_parse(self):
         for cmds, bytes in self.COMPOSE_PAIRS:
-            self.assertEqual(Cmd.parse(bytes), cmds)
+            self.assertParseComplete(bytes, cmds)
+
+    def assertParseComplete(self, bytes: list[int], cmds: list[Base | DataBytes]):
+        parser = Cmd.Parser()
+        result = parser.feed(bytes)
+        self.assertEqual(result, cmds)
+        self.assertTrue(parser.valid_finish)  # implies not unrecoverable
+
+    def test_parse_partial(self):
+        # (input, output, leftover, end state, end continuation, fish ok/more needed/unrecoverable)
+
+        for bytes, cmds, leftover, state, continuation, fmu in self.PARSE_PARTIAL:
+            print(bytes, cmds, leftover, state, continuation, fmu)
+            parser = Cmd.Parser()
+            result = parser.feed(bytes)
+            print(result)
+            print()
+            self.assertEqual(result, cmds)
+            self.assertEqual(parser.bytes, leftover)
+            match state:
+                case "Ctrl":
+                    self.assertIn(
+                        parser.state,
+                        [ParseState.Control, ParseState.ControlPartialCommand],
+                    )
+                case "Cmd":
+                    self.assertEqual(parser.state, ParseState.Command)
+                case "Data":
+                    self.assertEqual(parser.state, ParseState.Data)
+            self.assertEqual(parser.continuation, continuation)
+            match fmu:
+                case "F":
+                    self.assertTrue(parser.valid_finish)
+                    self.assertFalse(parser.unrecoverable)
+                case "M":
+                    self.assertFalse(parser.valid_finish)
+                    self.assertFalse(parser.unrecoverable)
+                case "U":
+                    self.assertFalse(parser.valid_finish)
+                    self.assertTrue(parser.unrecoverable)
 
 
 if __name__ == "__main__":

@@ -1,14 +1,14 @@
-from typing import Tuple, List
+from typing import Tuple
 
-from amaranth import Module, Signal, Value, ClockSignal, ResetSignal
+from amaranth import ClockSignal, Module, ResetSignal, Signal, Value
 
 # from amaranth.asserts import Assert, Cover, Assume, Initial
-from amaranth.asserts import Cover, Assume
+from amaranth.asserts import Assume, Cover
 
 from i2c import I2C, Speed
 
 
-def formal() -> Tuple[Module, List[Signal | Value]]:
+def formal() -> Tuple[Module, list[Signal | Value]]:
     # XXX(Ari): Next time we work on this, please note some changes I've made
     # to main.sby, specifically around the "techmap" call.
     # See https://github.com/amaranth-lang/amaranth/issues/526.

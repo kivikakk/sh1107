@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Any, List, Optional, Self, Type, cast
+from typing import Any, Optional, Self, Type, cast
 
 from amaranth.lib.enum import IntEnum
 
@@ -26,7 +26,7 @@ class SH1107Sequence:
             elif isinstance(v, int):
                 return hex(v)
             elif isinstance(v, list):
-                els = ", ".join(repr_v(vv) for vv in cast(List[Any], v))
+                els = ", ".join(repr_v(vv) for vv in cast(list[Any], v))
                 return f"[{els}]"
             else:
                 return repr(v)
@@ -61,35 +61,144 @@ class ControlByte(SH1107Sequence):
 
 
 class DataBytes(SH1107Sequence):
-    def __init__(self, data: List[int]):
+    def __init__(self, data: list[int]):
         self.data = data
 
-    def to_bytes(self) -> List[int]:
+    def to_bytes(self) -> list[int]:
         return self.data
 
 
 class Base(SH1107Sequence, ABC):
     @classmethod
     @abstractmethod
-    def parse_one(cls, cmd: List[int]) -> Optional[Self]:
+    def parse_one(cls, cmd: list[int]) -> Optional[Self]:
         for subclass in cls.__subclasses__():
             result = subclass.parse_one(cmd)
             if result is not None:
                 return result
 
     @abstractmethod
-    def to_bytes(self) -> List[int]:
+    def to_bytes(self) -> list[int]:
         ...
 
 
+class ParseState(Enum):
+    Control = 1
+    ControlPartialCommand = 2
+    Command = 3
+    Data = 4
+
+
 class Cmd:
+    class Parser:
+        valid_finish: bool  # this may be inferrable based on state+continuation
+        unrecoverable: bool  # exclusive with valid_finish
+
+        state: ParseState
+        continuation: bool
+
+        # TODO: join Control and ControlPartialCommand
+
+        bytes: list[int]
+
+        def __init__(self):
+            self.valid_finish = False
+            self.unrecoverable = False
+
+            self.state = ParseState.Control
+            self.continuation = True
+
+            self.bytes = []
+
+        def feed(self, bytes_in: list[int]) -> list[Base | DataBytes]:
+            assert not self.unrecoverable
+
+            self.bytes.extend(bytes_in)
+
+            partial: list[int] = []
+            cmds: list[Base | DataBytes] = []
+            consume = 0
+
+            try:
+                for ix, b in enumerate(self.bytes):
+                    self.valid_finish = False
+                    match self.state:
+                        case ParseState.Control:
+                            cb = ControlByte.parse_one(b)
+                            if cb is None:
+                                self.unrecoverable = True
+                                return cmds
+                            self.continuation = cb.continuation
+                            self.state = (
+                                ParseState.Command
+                                if cb.dc == DC.Command
+                                else ParseState.Data
+                            )
+                            partial = []
+
+                        case ParseState.ControlPartialCommand:
+                            # we should get another control byte for command
+                            cb = ControlByte.parse_one(b)
+                            if cb is not None and cb.dc == DC.Command:
+                                self.state = ParseState.Command
+                                self.continuation = cb.continuation
+                            else:
+                                # didn't get expected control byte
+                                self.unrecoverable = True
+                                return cmds
+
+                        case ParseState.Command:
+                            partial.append(b)
+                            px = Base.parse_one(partial)
+                            if px is None:
+                                if self.continuation:
+                                    self.state = ParseState.ControlPartialCommand
+                                else:
+                                    # stay in Command state
+                                    pass
+                            else:
+                                consume = ix + 1
+                                partial = []
+                                cmds.append(px)
+                                if self.continuation:
+                                    self.state = ParseState.Control
+                                else:
+                                    # stay in Command state
+                                    self.valid_finish = True
+
+                        case ParseState.Data:
+                            partial.append(b)
+                            # TODO: stop the batching
+                            if self.continuation:
+                                self.state = ParseState.Control
+                                if cmds and isinstance(cmds[-1], DataBytes):
+                                    cmds[-1].data.extend(partial)
+                                else:
+                                    cmds.append(DataBytes(partial))
+                                consume = ix + 1
+                                partial = []
+                            else:
+                                self.valid_finish = True
+
+                if self.state == ParseState.Data:
+                    if cmds and isinstance(cmds[-1], DataBytes):
+                        cmds[-1].data.extend(partial)
+                    else:
+                        cmds.append(DataBytes(partial))
+                    self.valid_finish = not self.continuation
+
+                return cmds
+
+            finally:
+                self.bytes = self.bytes[consume:]
+
     @staticmethod
-    def compose(cmds: List[Base | DataBytes]) -> List[int]:
-        dcs: List[bool] = []
+    def compose(cmds: list[Base | DataBytes]) -> list[int]:
+        dcs: list[bool] = []
         for cmd in cmds:
             dcs.append(isinstance(cmd, DataBytes))
 
-        out: List[int] = []
+        out: list[int] = []
         finished_control = False
         for i, cmd in enumerate(cmds):
             if not finished_control:
@@ -106,69 +215,6 @@ class Cmd:
 
         return out
 
-    @staticmethod
-    def parse(msg: List[int]) -> List[Base | DataBytes]:
-        class State(Enum):
-            Control = 1
-            ControlPartialCommand = 2
-            Command = 3
-            Data = 4
-
-        continuation = True
-        state: State = State.Control
-        partial: List[int] = []
-
-        out: List[Base | DataBytes] = []
-        for b in msg:
-            match state:
-                case State.Control | State.ControlPartialCommand:
-                    cb = ControlByte.parse_one(b)
-                    assert cb is not None
-                    continuation = cb.continuation
-                    if state == State.ControlPartialCommand:
-                        assert cb.dc == DC.Command, "received data in partial command"
-                        state = State.Command
-                    else:
-                        state = State.Command if cb.dc == DC.Command else State.Data
-                        partial = []
-
-                case State.Command:
-                    partial.append(b)
-                    px = Base.parse_one(partial)
-                    if px is not None:
-                        partial = []
-                        out.append(px)
-                        if continuation:
-                            state = State.Control
-                    elif continuation:
-                        state = State.ControlPartialCommand
-
-                case State.Data:
-                    partial.append(b)
-                    if continuation:
-                        state = State.Control
-                        if isinstance(out[-1], DataBytes):
-                            out[-1].data.extend(partial)
-                        else:
-                            out.append(DataBytes(partial))
-                        partial = []
-
-        match state:
-            case State.Control:
-                raise ValueError("Message ended in control state")
-            case State.ControlPartialCommand:
-                raise ValueError("Message ended in control state with partial command")
-            case State.Command:
-                assert not partial, "Message ended with partial command"
-            case State.Data:
-                assert not continuation, "Message ended in data state"
-                if isinstance(out[-1], DataBytes):
-                    out[-1].data.extend(partial)
-                else:
-                    out.append(DataBytes(partial))
-
-        return out
-
     class SetLowerColumnAddress(Base):
         # POR is 0x0
         def __init__(self, lower: int):
@@ -176,12 +222,12 @@ class Cmd:
             self.lower = lower
 
         @classmethod
-        def parse_one(cls, cmd: List[int]) -> Optional[Self]:
+        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
             if len(cmd) != 1 or not (0 <= cmd[0] <= 0x0F):
                 return None
             return cls(cmd[0])
 
-        def to_bytes(self) -> List[int]:
+        def to_bytes(self) -> list[int]:
             return [self.lower]
 
     class SetHigherColumnAddress(Base):
@@ -191,12 +237,12 @@ class Cmd:
             self.higher = higher
 
         @classmethod
-        def parse_one(cls, cmd: List[int]) -> Optional[Self]:
+        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
             if len(cmd) != 1 or not (0x10 <= cmd[0] <= 0x17):
                 return None
             return cls(cmd[0] & ~0x10)
 
-        def to_bytes(self) -> List[int]:
+        def to_bytes(self) -> list[int]:
             return [0x10 | self.higher]
 
     class SetMemoryAddressingMode(Base):
@@ -210,12 +256,12 @@ class Cmd:
             self.mode = _enyom(self.Mode, mode)
 
         @classmethod
-        def parse_one(cls, cmd: List[int]) -> Optional[Self]:
+        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
             if len(cmd) != 1 or not (0x20 <= cmd[0] <= 0x21):
                 return None
             return cls(cls.Mode(cmd[0] & ~0x20))
 
-        def to_bytes(self) -> List[int]:
+        def to_bytes(self) -> list[int]:
             return [0x20 | self.mode]
 
     class SetContrastControlRegister(Base):
@@ -225,12 +271,12 @@ class Cmd:
             self.level = level
 
         @classmethod
-        def parse_one(cls, cmd: List[int]) -> Optional[Self]:
+        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
             if len(cmd) != 2 or cmd[0] != 0x81:
                 return None
             return cls(cmd[1])
 
-        def to_bytes(self) -> List[int]:
+        def to_bytes(self) -> list[int]:
             return [0x81, self.level]
 
     class SetSegmentRemap(Base):
@@ -244,12 +290,12 @@ class Cmd:
             self.adc = _enyom(self.Adc, adc)
 
         @classmethod
-        def parse_one(cls, cmd: List[int]) -> Optional[Self]:
+        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
             if len(cmd) != 1 or not (0xA0 <= cmd[0] <= 0xA1):
                 return None
             return cls(cls.Adc(cmd[0] & ~0xA0))
 
-        def to_bytes(self) -> List[int]:
+        def to_bytes(self) -> list[int]:
             return [0xA0 | self.adc]
 
     # NOTE(AEC): I really don't quite understand what this does and
@@ -261,12 +307,12 @@ class Cmd:
             self.ratio = ratio
 
         @classmethod
-        def parse_one(cls, cmd: List[int]) -> Optional[Self]:
+        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
             if len(cmd) != 2 or cmd[0] != 0xA8:
                 return None
             return cls((cmd[1] & 0x7F) + 1)
 
-        def to_bytes(self) -> List[int]:
+        def to_bytes(self) -> list[int]:
             return [0xA8, self.ratio - 1]
 
     class SetEntireDisplayOn(Base):
@@ -275,12 +321,12 @@ class Cmd:
             self.on = on
 
         @classmethod
-        def parse_one(cls, cmd: List[int]) -> Optional[Self]:
+        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
             if len(cmd) != 1 or not (0xA4 <= cmd[0] <= 0xA5):
                 return None
             return cls(cmd[0] == 0xA5)
 
-        def to_bytes(self) -> List[int]:
+        def to_bytes(self) -> list[int]:
             return [0xA4 | self.on]
 
     class SetDisplayReverse(Base):
@@ -289,12 +335,12 @@ class Cmd:
             self.reverse = reverse
 
         @classmethod
-        def parse_one(cls, cmd: List[int]) -> Optional[Self]:
+        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
             if len(cmd) != 1 or not (0xA6 <= cmd[0] <= 0xA7):
                 return None
             return cls(cmd[0] == 0xA7)
 
-        def to_bytes(self) -> List[int]:
+        def to_bytes(self) -> list[int]:
             return [0xA6 | self.reverse]
 
     class SetDisplayOffset(Base):
@@ -304,12 +350,12 @@ class Cmd:
             self.offset = offset
 
         @classmethod
-        def parse_one(cls, cmd: List[int]) -> Optional[Self]:
+        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
             if len(cmd) != 2 or cmd[0] != 0xD3:
                 return None
             return cls(cmd[1] & 0x7F)
 
-        def to_bytes(self) -> List[int]:
+        def to_bytes(self) -> list[int]:
             return [0xD3, self.offset]
 
     class SetDCDC(Base):
@@ -318,12 +364,12 @@ class Cmd:
             self.on = on
 
         @classmethod
-        def parse_one(cls, cmd: List[int]) -> Optional[Self]:
+        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
             if len(cmd) != 2 or cmd[0] != 0xAD:
                 return None
             return cls(cmd[1] == 0x8B)
 
-        def to_bytes(self) -> List[int]:
+        def to_bytes(self) -> list[int]:
             return [0xAD, 0x8A | self.on]
 
     class DisplayOn(Base):
@@ -332,12 +378,12 @@ class Cmd:
             self.on = on
 
         @classmethod
-        def parse_one(cls, cmd: List[int]) -> Optional[Self]:
+        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
             if len(cmd) != 1 or not (0xAE <= cmd[0] <= 0xAF):
                 return None
             return cls(cmd[0] == 0xAF)
 
-        def to_bytes(self) -> List[int]:
+        def to_bytes(self) -> list[int]:
             return [0xAE | self.on]
 
     class SetPageAddress(Base):
@@ -347,12 +393,12 @@ class Cmd:
             self.page = page
 
         @classmethod
-        def parse_one(cls, cmd: List[int]) -> Optional[Self]:
+        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
             if len(cmd) != 1 or not (0xB0 <= cmd[0] <= 0xBF):
                 return None
             return cls(cmd[0] & ~0xB0)
 
-        def to_bytes(self) -> List[int]:
+        def to_bytes(self) -> list[int]:
             return [0xB0 | self.page]
 
     class SetCommonOutputScanDirection(Base):
@@ -366,12 +412,12 @@ class Cmd:
             self.direction = _enyom(self.Direction, direction)
 
         @classmethod
-        def parse_one(cls, cmd: List[int]) -> Optional[Self]:
+        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
             if len(cmd) != 1 or not (0xC0 <= cmd[0] <= 0xCF):
                 return None
             return cls(cls.Direction((cmd[0] & 8) == 8))
 
-        def to_bytes(self) -> List[int]:
+        def to_bytes(self) -> list[int]:
             return [0xC0 | (self.direction << 3)]
 
     class SetDisplayClockFrequency(Base):
@@ -437,12 +483,12 @@ class Cmd:
             self.freq = _enyom(self.Freq, freq)
 
         @classmethod
-        def parse_one(cls, cmd: List[int]) -> Optional[Self]:
+        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
             if len(cmd) != 2 or cmd[0] != 0xD5:
                 return None
             return cls((cmd[1] & 0xF) + 1, cls.Freq(cmd[1] >> 4))
 
-        def to_bytes(self) -> List[int]:
+        def to_bytes(self) -> list[int]:
             return [0xD5, (self.freq << 4) | (self.ratio - 1)]
 
     class SetPreDischargePeriod(Base):
@@ -454,12 +500,12 @@ class Cmd:
             self.discharge = discharge
 
         @classmethod
-        def parse_one(cls, cmd: List[int]) -> Optional[Self]:
+        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
             if len(cmd) != 2 or cmd[0] != 0xD9:
                 return None
             return cls(cmd[1] & 0xF, cmd[1] >> 4)
 
-        def to_bytes(self) -> List[int]:
+        def to_bytes(self) -> list[int]:
             return [0xD9, (self.discharge << 4) | self.precharge]
 
     class SetVCOMDeselectLevel(Base):
@@ -473,12 +519,12 @@ class Cmd:
             self.level = level
 
         @classmethod
-        def parse_one(cls, cmd: List[int]) -> Optional[Self]:
+        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
             if len(cmd) != 2 or cmd[0] != 0xDB:
                 return None
             return cls(cmd[1])
 
-        def to_bytes(self) -> List[int]:
+        def to_bytes(self) -> list[int]:
             return [0xDB, self.level]
 
     class SetDisplayStartColumn(Base):
@@ -488,42 +534,42 @@ class Cmd:
             self.column = column
 
         @classmethod
-        def parse_one(cls, cmd: List[int]) -> Optional[Self]:
+        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
             if len(cmd) != 2 or cmd[0] != 0xDC:
                 return None
             return cls(cmd[1] & 0x7F)
 
-        def to_bytes(self) -> List[int]:
+        def to_bytes(self) -> list[int]:
             return [0xDC, self.column]
 
     class ReadModifyWrite(Base):
         # Must be paired with End command.  End causes
         # column/page address to return to where it was before RMW.
         @classmethod
-        def parse_one(cls, cmd: List[int]) -> Optional[Self]:
+        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
             if len(cmd) != 1 or cmd[0] != 0xE0:
                 return None
             return cls()
 
-        def to_bytes(self) -> List[int]:
+        def to_bytes(self) -> list[int]:
             return [0xE0]
 
     class End(Base):
         @classmethod
-        def parse_one(cls, cmd: List[int]) -> Optional[Self]:
+        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
             if len(cmd) != 1 or cmd[0] != 0xEE:
                 return None
             return cls()
 
-        def to_bytes(self) -> List[int]:
+        def to_bytes(self) -> list[int]:
             return [0xEE]
 
     class Nop(Base):
         @classmethod
-        def parse_one(cls, cmd: List[int]) -> Optional[Self]:
+        def parse_one(cls, cmd: list[int]) -> Optional[Self]:
             if len(cmd) != 1 or cmd[0] != 0xE3:
                 return None
             return cls()
 
-        def to_bytes(self) -> List[int]:
+        def to_bytes(self) -> list[int]:
             return [0xE3]

@@ -1,4 +1,4 @@
-from typing import Any, List, Literal, Tuple
+from typing import Any, Literal, Tuple
 
 import pyglet
 from pyglet import gl
@@ -123,7 +123,7 @@ class DisplayBase:
     def render_text(
         self,
         text: str,
-        color: List[int],
+        color: list[int],
         *,
         x: int,
         y: int,

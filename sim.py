@@ -4,7 +4,7 @@ import typing
 import unittest
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Callable, Iterator, List, Optional, Self, Tuple, cast
+from typing import Any, Callable, Iterator, Optional, Self, Tuple, cast
 
 from amaranth import Elaboratable, Record, Signal
 from amaranth.hdl.ast import Statement
@@ -40,7 +40,7 @@ Generator = typing.Generator[
     None,
 ]
 
-Args = List[Any]
+Args = list[Any]
 Kwargs = dict[str, Any]
 SimArgs = Tuple[Args, Kwargs]
 
@@ -64,7 +64,7 @@ class TestCase(unittest.TestCase):
         dutpn = list(sig.parameters)[1]
         dutc = sig.parameters[dutpn].annotation
 
-        all_sim_args: List[SimArgs] = getattr(sim_test, "_sim_args", [([], {})])
+        all_sim_args: list[SimArgs] = getattr(sim_test, "_sim_args", [([], {})])
 
         delattr(cls, name)
 
