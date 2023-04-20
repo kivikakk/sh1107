@@ -84,9 +84,8 @@ class Base(SH1107Sequence, ABC):
 
 class ParseState(Enum):
     Control = 1
-    ControlPartialCommand = 2
-    Command = 3
-    Data = 4
+    Command = 2
+    Data = 3
 
 
 class Cmd:
@@ -96,8 +95,6 @@ class Cmd:
 
         state: ParseState
         continuation: bool
-
-        # TODO: join Control and ControlPartialCommand
 
         bytes: list[int]
 
@@ -129,30 +126,24 @@ class Cmd:
                                 self.unrecoverable = True
                                 return cmds
                             self.continuation = cb.continuation
+
+                            if partial and cb.dc != DC.Command:
+                                # partial command followed by data
+                                self.unrecoverable = True
+                                return cmds
+
                             self.state = (
                                 ParseState.Command
                                 if cb.dc == DC.Command
                                 else ParseState.Data
                             )
-                            partial = []
-
-                        case ParseState.ControlPartialCommand:
-                            # we should get another control byte for command
-                            cb = ControlByte.parse_one(b)
-                            if cb is not None and cb.dc == DC.Command:
-                                self.state = ParseState.Command
-                                self.continuation = cb.continuation
-                            else:
-                                # didn't get expected control byte
-                                self.unrecoverable = True
-                                return cmds
 
                         case ParseState.Command:
                             partial.append(b)
                             px = Base.parse_one(partial)
                             if px is None:
                                 if self.continuation:
-                                    self.state = ParseState.ControlPartialCommand
+                                    self.state = ParseState.Control
                                 else:
                                     # stay in Command state
                                     pass
@@ -167,25 +158,16 @@ class Cmd:
                                     self.valid_finish = True
 
                         case ParseState.Data:
-                            partial.append(b)
-                            # TODO: stop the batching
+                            if cmds and isinstance(cmds[-1], DataBytes):
+                                cmds[-1].data.append(b)
+                            else:
+                                cmds.append(DataBytes([b]))
                             if self.continuation:
                                 self.state = ParseState.Control
-                                if cmds and isinstance(cmds[-1], DataBytes):
-                                    cmds[-1].data.extend(partial)
-                                else:
-                                    cmds.append(DataBytes(partial))
                                 consume = ix + 1
-                                partial = []
                             else:
                                 self.valid_finish = True
-
-                if self.state == ParseState.Data:
-                    if cmds and isinstance(cmds[-1], DataBytes):
-                        cmds[-1].data.extend(partial)
-                    else:
-                        cmds.append(DataBytes(partial))
-                    self.valid_finish = not self.continuation
+                                consume = ix + 1
 
                 return cmds
 

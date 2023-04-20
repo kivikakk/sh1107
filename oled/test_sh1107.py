@@ -359,10 +359,7 @@ class TestSH1107Command(unittest.TestCase):
             self.assertEqual(parser.bytes, leftover)
             match state:
                 case "Ctrl":
-                    self.assertIn(
-                        parser.state,
-                        [ParseState.Control, ParseState.ControlPartialCommand],
-                    )
+                    self.assertEqual(parser.state, ParseState.Control)
                 case "Cmd":
                     self.assertEqual(parser.state, ParseState.Command)
                 case "Data":
