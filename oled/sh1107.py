@@ -103,6 +103,7 @@ class Cmd:
         continuation: bool
 
         bytes: list[int]
+        partial_cmd: list[int]
 
         def __init__(self):
             self.valid_finish = False
@@ -112,76 +113,67 @@ class Cmd:
             self.continuation = True
 
             self.bytes = []
+            self.partial_cmd = []
 
         def feed(self, bytes_in: list[int]) -> list[Base | DataBytes]:
             assert not self.unrecoverable
 
             self.bytes.extend(bytes_in)
 
-            partial: list[int] = []
             cmds: list[Base | DataBytes] = []
-            consume = 0
 
-            try:
-                for ix, b in enumerate(self.bytes):
-                    self.valid_finish = False
-                    match self.state:
-                        case ParseState.Control:
-                            cb = ControlByte.parse_one(b)
-                            if cb is None:
-                                self.unrecoverable = True
-                                return cmds
-                            self.continuation = cb.continuation
+            while self.bytes:
+                b = self.bytes[0]
+                self.valid_finish = False
+                match self.state:
+                    case ParseState.Control:
+                        cb = ControlByte.parse_one(b)
+                        if cb is None:
+                            self.unrecoverable = True
+                            return cmds
+                        self.continuation = cb.continuation
 
-                            if partial and cb.dc != DC.Command:
-                                # partial command followed by data
-                                self.unrecoverable = True
-                                return cmds
+                        if self.partial_cmd and cb.dc != DC.Command:
+                            # partial command followed by data
+                            self.unrecoverable = True
+                            return cmds
 
-                            self.state = (
-                                ParseState.Command
-                                if cb.dc == DC.Command
-                                else ParseState.Data
-                            )
+                        self.state = (
+                            ParseState.Command
+                            if cb.dc == DC.Command
+                            else ParseState.Data
+                        )
 
-                        case ParseState.Command:
-                            partial.append(b)
-                            px = Base.parse_one(partial)
-                            if px is False:
-                                self.unrecoverable = True
-                                return cmds
-                            elif px is True:
-                                if self.continuation:
-                                    self.state = ParseState.Control
-                                else:
-                                    # stay in Command state
-                                    pass
-                            else:
-                                consume = ix + 1
-                                partial = []
-                                cmds.append(px)
-                                if self.continuation:
-                                    self.state = ParseState.Control
-                                else:
-                                    # stay in Command state
-                                    self.valid_finish = True
+                    case ParseState.Command:
+                        self.partial_cmd.append(b)
+                        px = Base.parse_one(self.partial_cmd)
+                        if px is False:
+                            self.unrecoverable = True
+                            return cmds
 
-                        case ParseState.Data:
-                            if cmds and isinstance(cmds[-1], DataBytes):
-                                cmds[-1].data.append(b)
-                            else:
-                                cmds.append(DataBytes([b]))
-                            if self.continuation:
-                                self.state = ParseState.Control
-                                consume = ix + 1
-                            else:
-                                self.valid_finish = True
-                                consume = ix + 1
+                        if px is not True:
+                            self.partial_cmd = []
+                            cmds.append(px)
 
-                return cmds
+                        if self.continuation:
+                            self.state = ParseState.Control
+                        else:
+                            self.valid_finish = px is not True
 
-            finally:
-                self.bytes = self.bytes[consume:]
+                    case ParseState.Data:
+                        if cmds and isinstance(cmds[-1], DataBytes):
+                            cmds[-1].data.append(b)
+                        else:
+                            cmds.append(DataBytes([b]))
+
+                        if self.continuation:
+                            self.state = ParseState.Control
+                        else:
+                            self.valid_finish = True
+
+                self.bytes = self.bytes[1:]
+
+            return cmds
 
     @staticmethod
     def compose(cmds: list[Base | DataBytes]) -> list[int]:

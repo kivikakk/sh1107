@@ -1,3 +1,4 @@
+import random
 from typing import Optional
 
 from amaranth import Elaboratable, Memory, Module, Signal
@@ -23,6 +24,10 @@ INIT_SEQUENCE = Cmd.compose(
         Cmd.SetVCOMDeselectLevel(0x40),
         Cmd.SetDisplayReverse(False),
         Cmd.DisplayOn(True),
+        Cmd.SetPageAddress(0),
+        Cmd.SetLowerColumnAddress(0),
+        Cmd.SetHigherColumnAddress(0),
+        DataBytes([random.randint(0x00, 0x100) for _ in range(128 * 128 // 8)]),
     ]
 )
 
@@ -31,16 +36,15 @@ DISPLAY_SEQUENCE = Cmd.compose(
         Cmd.SetPageAddress(0),
         Cmd.SetLowerColumnAddress(0),
         Cmd.SetHigherColumnAddress(0),
-        DataBytes([0xFF, 0x77, 0xFF, 0x77]),
+        Cmd.SetSegmentRemap("Flipped"),
+        DataBytes([random.randint(0x00, 0x100) for _ in range(128 * 64 // 8)]),
     ]
 )
 
 DISPLAY2_SEQUENCE = Cmd.compose(
     [
-        Cmd.SetPageAddress(0),
-        Cmd.SetLowerColumnAddress(0),
-        Cmd.SetHigherColumnAddress(0),
-        DataBytes([0x77, 0xFF, 0x77, 0xFF]),
+        Cmd.SetCommonOutputScanDirection("Backwards"),
+        DataBytes([random.randint(0x00, 0xFF) for _ in range(128 * 64 // 8)]),
     ]
 )
 
@@ -97,7 +101,9 @@ class OLED(Elaboratable):
         self.offset = Signal(range(len(ROM)))
         self.remain = Signal(range(len(ROM)))
 
-        # TODO(ari): auto determine width for offlens? does it just truncate if too small?
+        # TODO(Mia): Given this is read-only, we may want to use Array.  I see
+        # this using ICESTORM_RAM. TODO(ari): auto determine width for offlens?
+        # does it just truncate if too small?
         self.rom = Memory(width=8, depth=len(ROM), init=ROM)
         self.offlens = Memory(width=16, depth=len(OFFLENS), init=OFFLENS)
 

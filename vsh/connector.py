@@ -197,7 +197,7 @@ class Connector:
         i2c = self.top.oled.i2c
 
         byte_receiver = ByteReceiver()
-        bytes: Optional[list[int]] = None
+        addressed_parser: Optional[Cmd.Parser] = None
 
         while True:
             if self.press_button:
@@ -232,34 +232,39 @@ class Connector:
                 case ByteReceiver.Result.ACK_NACK:
                     # we are being asked to ACK if appropriate
                     byte = byte_receiver.byte
-                    if bytes is None:
+                    if addressed_parser is None:
                         # check if we're being addressed
                         addr, rw = byte >> 1, byte & 1
                         if addr == self.addr and rw == 0:
                             yield i2c.sda_i.eq(0)
-                            bytes = []
+                            addressed_parser = Cmd.Parser()
                         elif addr == self.addr and rw == 1:
                             print("NYI: read")
                         else:
                             pass
                     else:
-                        bytes.append(byte)
+                        cmds = addressed_parser.feed([byte])
+                        if addressed_parser.unrecoverable:
+                            print(
+                                "command parser noped out, resetting with: ",
+                                addressed_parser.bytes,
+                            )
+                            addressed_parser = None
+                        self.process_cb(cmds)
                         yield i2c.sda_i.eq(0)
-
-                        Cmd.parse(bytes)
 
                 case ByteReceiver.Result.RELEASE_SDA:
                     yield i2c.sda_i.eq(1)
 
                 case ByteReceiver.Result.ERROR:
                     yield i2c.sda_i.eq(1)
-                    print("got error, resetting with: ", bytes)
-                    bytes = None
+                    print("got error, resetting")
+                    addressed_parser = None
 
                 case ByteReceiver.Result.FISH:
-                    assert bytes
-                    self.process_cb(Cmd.parse(bytes))
-                    bytes = None
+                    if not addressed_parser or not addressed_parser.valid_finish:
+                        print("command parser fish without valid_finish")
+                    addressed_parser = None
 
             self.track(DEBUG, "state", byte_receiver.state, ByteReceiver.State)
 
