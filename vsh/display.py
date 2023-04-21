@@ -312,14 +312,8 @@ class Display(DisplayBase, Window):
                             self.column_address = (
                                 self.column_address + 1
                             ) % self.I2C_WIDTH
-                            if self.column_address == 0:
-                                self.page_address = (self.page_address + 1) % page_count
                         else:
                             self.page_address = (self.page_address + 1) % page_count
-                            if self.page_address == 0:
-                                self.column_address = (
-                                    self.column_address + 1
-                                ) % self.I2C_WIDTH
 
                 case Base():
                     assert False
