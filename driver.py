@@ -17,7 +17,7 @@ from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
 
 from formal import formal as prep_formal
 from i2c import Speed
-from oled import OLED
+from oled import Top
 
 BOARDS: Dict[str, Type[Platform]] = {
     "icebreaker": ICEBreakerPlatform,
@@ -76,7 +76,7 @@ def _print_file_between(
 
 def build(args: Namespace):
     BOARDS[args.board]().build(
-        OLED(speed=Speed(args.speed)),
+        Top(speed=Speed(args.speed)),
         do_program=args.program,
         debug_verilog=args.verilog,
     )

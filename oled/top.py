@@ -1,6 +1,6 @@
 from typing import Optional, cast
 
-from amaranth import Elaboratable, Module, Record, Signal
+from amaranth import Cat, Elaboratable, Module, Record, Signal
 from amaranth.build import Platform
 from amaranth_boards.icebreaker import ICEBreakerPlatform
 from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
@@ -48,6 +48,12 @@ class Top(Elaboratable):
                 m.submodules.button = self.button = button = Button()
                 m.d.comb += button.i.eq(switch)
                 button_up = button.o_up
+
+                platform.add_resources(platform.break_off_pmod)
+                led_l = platform.request("led_g", 1)
+                led_m = platform.request("led_r", 1)
+                led_r = platform.request("led_g", 2)
+                m.d.comb += Cat(led_l, led_m, led_r).eq(self.o_last_cmd)
 
             case OrangeCrabR0_2_85FPlatform():
                 rgb = platform.request("rgb_led")
