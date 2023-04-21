@@ -17,7 +17,7 @@ from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
 
 from formal import formal as prep_formal
 from i2c import Speed
-from oled import Top
+from oled import Top, ROM
 
 BOARDS: Dict[str, Type[Platform]] = {
     "icebreaker": ICEBreakerPlatform,
@@ -48,7 +48,8 @@ def formal(args: Namespace):
         f.write(output)
 
     sby_file = _outfile("formal", ".sby")
-    subprocess.run(f"sby --prefix build/oled_i2c -f {sby_file}", shell=True)
+    # XXX: spaces in directory names
+    subprocess.run(f"sby --prefix build/oled_i2c -f {sby_file}", shell=True, check=True)
 
 
 def _print_file_between(
@@ -89,6 +90,16 @@ def build(args: Namespace):
     heading = re.compile(r"^Info: Device utilisation:$", flags=re.MULTILINE)
     next_heading = re.compile(r"^Info: Placed ", flags=re.MULTILINE)
     _print_file_between("build/top.tim", heading, next_heading, prefix="Info: ")
+
+
+def rom(args: Namespace):
+    path = Path(__file__).parent / "rom.bin"
+    with open(path, "wb") as f:
+        f.write(ROM)
+
+    if args.program:
+        # XXX: spaces in directory names
+        subprocess.run(f"iceprog -o 0x800000 {path}", shell=True, check=True)
 
 
 def vsh(args: Namespace):
@@ -150,7 +161,7 @@ def main():
 
     rom_parser = subparsers.add_parser(
         "rom",
-        help="build the ROM image, and optionally program in",
+        help="build the ROM image, and optionally program it",
     )
     rom_parser.set_defaults(func=rom)
     rom_parser.add_argument(

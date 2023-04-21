@@ -1,4 +1,3 @@
-import random
 from typing import Optional
 
 from amaranth import Elaboratable, Memory, Module, Signal
@@ -7,57 +6,8 @@ from amaranth.hdl.mem import ReadPort
 from amaranth.lib.enum import IntEnum
 
 from i2c import I2C, Speed
-from .sh1107 import Base, Cmd, DataBytes
 
 __all__ = ["OLED"]
-
-random.seed("xyzabc")
-
-init: list[Base | DataBytes] = [
-    Cmd.DisplayOn(False),
-    Cmd.SetDisplayClockFrequency(1, "Pos15"),
-    Cmd.SetDisplayOffset(0),
-    Cmd.SetDisplayStartColumn(0),
-    Cmd.SetDCDC(True),
-    Cmd.SetSegmentRemap("Normal"),
-    Cmd.SetCommonOutputScanDirection("Forwards"),
-    Cmd.SetContrastControlRegister(0x80),
-    Cmd.SetPreDischargePeriod(2, 2),
-    Cmd.SetVCOMDeselectLevel(0x40),
-    Cmd.SetDisplayReverse(False),
-    Cmd.DisplayOn(True),
-    Cmd.SetMemoryAddressingMode("Page"),
-    Cmd.SetLowerColumnAddress(0),
-    Cmd.SetHigherColumnAddress(0),
-]
-for p in range(0x10):
-    init += [
-        Cmd.SetPageAddress(p),
-        DataBytes([(x + p * 8) % 0x100 for x in range(0x80)]),
-    ]
-INIT_SEQUENCE = Cmd.compose(init)
-
-disp: list[Base | DataBytes] = []
-for p in range(0x04):
-    disp += [
-        Cmd.SetPageAddress(p),
-        DataBytes([(x * 2 + p * 8) % 0x100 for x in range(0x80)]),
-    ]
-DISPLAY_SEQUENCE = Cmd.compose(disp)
-
-disp2: list[Base | DataBytes] = [
-    Cmd.SetSegmentRemap("Flipped"),
-] + disp
-DISPLAY2_SEQUENCE = Cmd.compose(disp2)
-
-POWEROFF_SEQUENCE = Cmd.compose([Cmd.DisplayOn(False)])
-
-ROM = []
-OFFLENS = [0, 0]
-
-for s in (INIT_SEQUENCE, DISPLAY_SEQUENCE, DISPLAY2_SEQUENCE, POWEROFF_SEQUENCE):
-    OFFLENS.extend([len(ROM), len(s)])
-    ROM.extend(s)
 
 
 class OLED(Elaboratable):
@@ -99,11 +49,11 @@ class OLED(Elaboratable):
         self.offset = Signal(range(len(ROM)))
         self.remain = Signal(range(len(ROM)))
 
-        # TODO(Mia): Given this is read-only, we may want to use Array.  I see
-        # this using ICESTORM_RAM. TODO(ari): auto determine width for offlens?
-        # does it just truncate if too small?
-        self.rom = Memory(width=8, depth=len(ROM), init=ROM)
-        self.offlens = Memory(width=16, depth=len(OFFLENS), init=OFFLENS)
+        # # TODO(Mia): Given this is read-only, we may want to use Array.  I see
+        # # this using ICESTORM_RAM. TODO(ari): auto determine width for offlens?
+        # # does it just truncate if too small?
+        # self.rom = Memory(width=8, depth=len(ROM), init=ROM)
+        # self.offlens = Memory(width=16, depth=len(OFFLENS), init=OFFLENS)
 
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
