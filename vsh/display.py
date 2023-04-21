@@ -196,22 +196,14 @@ class Display(DisplayBase, Window):
                 y=(
                     self.PADDING
                     + self.BORDER_WIDTH
-                    + (
-                        0
-                        if self.segment_remap
-                        else self.I2C_HEIGHT * self.DISPLAY_SCALE
-                    )
+                    + self.I2C_HEIGHT * self.DISPLAY_SCALE
                 ),
                 width=(
                     self.I2C_WIDTH
                     * self.DISPLAY_SCALE
                     * (-1 if self.com_scan_reversed else 1)
                 ),
-                height=(
-                    self.I2C_HEIGHT
-                    * self.DISPLAY_SCALE
-                    * (1 if self.segment_remap else -1)
-                ),
+                height=(self.I2C_HEIGHT * self.DISPLAY_SCALE * (-1)),
             )
         else:
             self.off_border.blit(

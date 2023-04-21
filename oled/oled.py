@@ -37,24 +37,17 @@ for p in range(0x10):
     ]
 INIT_SEQUENCE = Cmd.compose(init)
 
-disp: list[Base | DataBytes] = [
-    Cmd.SetSegmentRemap("Flipped"),
-]
-for p in range(0x08):
+disp: list[Base | DataBytes] = []
+for p in range(0x04):
     disp += [
         Cmd.SetPageAddress(p),
-        DataBytes([random.randint(0x00, 0x100) for _ in range(0x80)]),
+        DataBytes([(x * 2 + p * 8) % 0x100 for x in range(0x80)]),
     ]
 DISPLAY_SEQUENCE = Cmd.compose(disp)
 
 disp2: list[Base | DataBytes] = [
-    Cmd.SetCommonOutputScanDirection("Backwards"),
-]
-for p in range(0x08, 0x10):
-    disp2 += [
-        Cmd.SetPageAddress(p),
-        DataBytes([random.randint(0x00, 0x100) for _ in range(0x80)]),
-    ]
+    Cmd.SetSegmentRemap("Flipped"),
+] + disp
 DISPLAY2_SEQUENCE = Cmd.compose(disp2)
 
 POWEROFF_SEQUENCE = Cmd.compose([Cmd.DisplayOn(False)])
