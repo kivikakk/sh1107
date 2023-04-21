@@ -7,52 +7,56 @@ from amaranth.hdl.mem import ReadPort
 from amaranth.lib.enum import IntEnum
 
 from i2c import I2C, Speed
-from .sh1107 import Cmd, DataBytes
+from .sh1107 import Base, Cmd, DataBytes
 
 __all__ = ["OLED"]
 
-INIT_SEQUENCE = Cmd.compose(
-    [
-        Cmd.DisplayOn(False),
-        Cmd.SetDisplayClockFrequency(1, "Pos15"),
-        Cmd.SetDisplayOffset(0),
-        Cmd.SetDisplayStartColumn(0),
-        Cmd.SetDCDC(True),
-        Cmd.SetSegmentRemap("Normal"),
-        Cmd.SetContrastControlRegister(0x80),
-        Cmd.SetPreDischargePeriod(2, 2),
-        Cmd.SetVCOMDeselectLevel(0x40),
-        Cmd.SetDisplayReverse(False),
-        Cmd.DisplayOn(True),
-        Cmd.SetPageAddress(0),
-        Cmd.SetLowerColumnAddress(0),
-        Cmd.SetHigherColumnAddress(0),
-        DataBytes([random.randint(0x00, 0x100) for _ in range(128 * 128 // 8)]),
-    ]
-)
+random.seed("xyzabc")
 
-DISPLAY_SEQUENCE = Cmd.compose(
-    [
-        Cmd.SetPageAddress(0),
-        Cmd.SetLowerColumnAddress(0),
-        Cmd.SetHigherColumnAddress(0),
-        Cmd.SetSegmentRemap("Flipped"),
-        DataBytes([random.randint(0x00, 0x100) for _ in range(128 * 64 // 8)]),
+init: list[Base | DataBytes] = [
+    Cmd.DisplayOn(False),
+    Cmd.SetDisplayClockFrequency(1, "Pos15"),
+    Cmd.SetDisplayOffset(0),
+    Cmd.SetDisplayStartColumn(0),
+    Cmd.SetDCDC(True),
+    Cmd.SetSegmentRemap("Normal"),
+    Cmd.SetContrastControlRegister(0x80),
+    Cmd.SetPreDischargePeriod(2, 2),
+    Cmd.SetVCOMDeselectLevel(0x40),
+    Cmd.SetDisplayReverse(False),
+    Cmd.DisplayOn(True),
+    Cmd.SetMemoryAddressingMode("Page"),
+    Cmd.SetLowerColumnAddress(0),
+    Cmd.SetHigherColumnAddress(0),
+]
+for p in range(16):
+    init += [
+        Cmd.SetPageAddress(p),
+        DataBytes([random.randint(0x00, 0x100) for _ in range(128)]),
     ]
-)
+INIT_SEQUENCE = Cmd.compose(init)
 
-DISPLAY2_SEQUENCE = Cmd.compose(
-    [
-        Cmd.SetCommonOutputScanDirection("Backwards"),
-        DataBytes([random.randint(0x00, 0xFF) for _ in range(128 * 64 // 8)]),
+disp: list[Base | DataBytes] = [
+    Cmd.SetSegmentRemap("Flipped"),
+]
+for p in range(8):
+    disp += [
+        Cmd.SetPageAddress(p),
+        DataBytes([random.randint(0x00, 0x100) for _ in range(128)]),
     ]
-)
+DISPLAY_SEQUENCE = Cmd.compose(disp)
 
-POWEROFF_SEQUENCE = Cmd.compose(
-    [
-        Cmd.DisplayOn(False),
+disp2: list[Base | DataBytes] = [
+    Cmd.SetSegmentRemap("Flipped"),
+]
+for p in range(8, 16):
+    disp2 += [
+        Cmd.SetPageAddress(p),
+        DataBytes([random.randint(0x00, 0x100) for _ in range(128)]),
     ]
-)
+DISPLAY2_SEQUENCE = Cmd.compose(disp2)
+
+POWEROFF_SEQUENCE = Cmd.compose([Cmd.DisplayOn(False)])
 
 ROM = []
 OFFLENS = [0, 0]

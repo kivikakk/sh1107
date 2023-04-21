@@ -176,7 +176,8 @@ class Cmd:
             return cmds
 
     @staticmethod
-    def compose(cmds: list[Base | DataBytes]) -> list[int]:
+    def compose(*cmds_in: list[Base | DataBytes]) -> list[int]:
+        cmds = [i for sl in cmds_in for i in sl]
         dcs: list[bool] = []
         for cmd in cmds:
             dcs.append(isinstance(cmd, DataBytes))
