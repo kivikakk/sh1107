@@ -148,6 +148,18 @@ def main():
         help="output debug Verilog",
     )
 
+    rom_parser = subparsers.add_parser(
+        "rom",
+        help="build the ROM image, and optionally program in",
+    )
+    rom_parser.set_defaults(func=rom)
+    rom_parser.add_argument(
+        "-p",
+        "--program",
+        action="store_true",
+        help="program the ROM onto the board",
+    )
+
     if importlib.util.find_spec("pyglet") is not None:
         vsh_parser = subparsers.add_parser(
             "vsh",
