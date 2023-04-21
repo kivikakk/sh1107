@@ -20,6 +20,7 @@ init: list[Base | DataBytes] = [
     Cmd.SetDisplayStartColumn(0),
     Cmd.SetDCDC(True),
     Cmd.SetSegmentRemap("Normal"),
+    Cmd.SetCommonOutputScanDirection("Forwards"),
     Cmd.SetContrastControlRegister(0x80),
     Cmd.SetPreDischargePeriod(2, 2),
     Cmd.SetVCOMDeselectLevel(0x40),
@@ -29,30 +30,30 @@ init: list[Base | DataBytes] = [
     Cmd.SetLowerColumnAddress(0),
     Cmd.SetHigherColumnAddress(0),
 ]
-for p in range(16):
+for p in range(0x10):
     init += [
         Cmd.SetPageAddress(p),
-        DataBytes([random.randint(0x00, 0x100) for _ in range(128)]),
+        DataBytes([(x + p * 8) % 0x100 for x in range(0x80)]),
     ]
 INIT_SEQUENCE = Cmd.compose(init)
 
 disp: list[Base | DataBytes] = [
     Cmd.SetSegmentRemap("Flipped"),
 ]
-for p in range(8):
+for p in range(0x08):
     disp += [
         Cmd.SetPageAddress(p),
-        DataBytes([random.randint(0x00, 0x100) for _ in range(128)]),
+        DataBytes([random.randint(0x00, 0x100) for _ in range(0x80)]),
     ]
 DISPLAY_SEQUENCE = Cmd.compose(disp)
 
 disp2: list[Base | DataBytes] = [
-    Cmd.SetSegmentRemap("Flipped"),
+    Cmd.SetCommonOutputScanDirection("Backwards"),
 ]
-for p in range(8, 16):
+for p in range(0x08, 0x10):
     disp2 += [
         Cmd.SetPageAddress(p),
-        DataBytes([random.randint(0x00, 0x100) for _ in range(128)]),
+        DataBytes([random.randint(0x00, 0x100) for _ in range(0x80)]),
     ]
 DISPLAY2_SEQUENCE = Cmd.compose(disp2)
 

@@ -116,7 +116,7 @@ class Display(DisplayBase, Window):
         [
             ("power on", lambda d: d.power),
             ("dc/dc on", lambda d: d.dcdc),
-            ("dclk", lambda d: f"{d.dclk_freq}% {d.dclk_ratio}x"),
+            ("dclk", lambda d: f"{int(d.dclk_freq)}% {d.dclk_ratio}x"),
             ("pre/dis", lambda d: f"{d.precharge_period}/{d.discharge_period}"),
             ("vcom desel", lambda d: f"{d.vcom_desel:02x}"),
         ],
