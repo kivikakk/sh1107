@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Any, Optional, Self, Type, cast
+from typing import Any, Final, Optional, Self, Type, cast
 
 from amaranth.lib.enum import IntEnum
 
-__all__ = ["Base", "Cmd", "DataBytes", "ControlByte"]
+__all__ = ["Base", "Cmd", "DataBytes", "ControlByte", "SequenceBreak"]
 
 
 def _enyom(enum: Type[IntEnum], value: Enum | int | str) -> Any:
@@ -66,6 +66,11 @@ class DataBytes(SH1107Sequence):
 
     def to_bytes(self) -> list[int]:
         return self.data
+
+
+# Only used internally by us; not SH1107.
+class SequenceBreak:
+    BYTE: Final[int] = 0xF0
 
 
 class Base(SH1107Sequence, ABC):
@@ -176,26 +181,39 @@ class Cmd:
             return cmds
 
     @staticmethod
-    def compose(*cmds_in: list[Base | DataBytes]) -> list[int]:
-        cmds = [i for sl in cmds_in for i in sl]
+    def compose(*cmds_in: list[Base | DataBytes | SequenceBreak]) -> list[int]:
+        groups: list[tuple[list[Base | DataBytes], list[bool]]] = []
+
+        group: list[Base | DataBytes] = []
         dcs: list[bool] = []
-        for cmd in cmds:
-            dcs.append(isinstance(cmd, DataBytes))
+        for cmd in (i for sl in cmds_in for i in sl):
+            if isinstance(cmd, SequenceBreak):
+                groups.append((group, dcs))
+                group, dcs = [], []
+            else:
+                group.append(cmd)
+                dcs.append(isinstance(cmd, DataBytes))
+        if group:
+            groups.append((group, dcs))
 
         out: list[int] = []
-        finished_control = False
-        for i, cmd in enumerate(cmds):
-            if not finished_control:
-                if all(dc == dcs[i] for dc in dcs[i:]):
-                    finished_control = True
-                    out.append(ControlByte(False, DC(dcs[i])).to_byte())
+        for cmds, dcs in groups:
+            if out:
+                out.append(SequenceBreak.BYTE)
 
-            if not finished_control:
-                for byte in cmd.to_bytes():
-                    out.append(ControlByte(True, DC(dcs[i])).to_byte())
-                    out.append(byte)
-            else:
-                out.extend(cmd.to_bytes())
+            finished_control = False
+            for i, cmd in enumerate(cmds):
+                if not finished_control:
+                    if all(dc == dcs[i] for dc in dcs[i:]):
+                        finished_control = True
+                        out.append(ControlByte(False, DC(dcs[i])).to_byte())
+
+                if not finished_control:
+                    for byte in cmd.to_bytes():
+                        out.append(ControlByte(True, DC(dcs[i])).to_byte())
+                        out.append(byte)
+                else:
+                    out.extend(cmd.to_bytes())
 
         return out
 

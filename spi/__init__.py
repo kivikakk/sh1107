@@ -5,7 +5,8 @@ from amaranth.build import Platform
 from amaranth_boards.icebreaker import ICEBreakerPlatform
 from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
 
-from common import Button
+from common import Button, Hz
+from oled import OLED
 from vendor.amlib.amlib.io.spi import SPIControllerInterface
 
 __all__ = ["SPITestTop"]
@@ -16,11 +17,13 @@ class SPITestTop(Elaboratable):
 
     def __init__(self):
         self.spi_flash = SPIControllerInterface(divisor=12)  # ?
+        self.oled = OLED(speed=Hz(400_000))
 
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
 
         m.submodules.spi_flash = self.spi_flash
+        m.submodules.oled = self.oled
 
         match platform:
             case ICEBreakerPlatform() | OrangeCrabR0_2_85FPlatform():
@@ -37,6 +40,12 @@ class SPITestTop(Elaboratable):
 
         with m.FSM():
             with m.State("INIT"):
+                m.d.sync += self.oled.i_cmd.eq(OLED.Command.INIT)
+                m.d.sync += self.oled.i_stb.eq(1)
+                m.next = "WAIT"
+
+            with m.State("WAIT"):
+                m.d.sync += self.oled.i_stb.eq(0)
                 with m.If(button.o_up):
                     m.next = "START"
 
@@ -48,5 +57,8 @@ class SPITestTop(Elaboratable):
             with m.State("UNSTB"):
                 m.d.sync += self.spi_flash.start_transfer.eq(0)
                 m.next = "READ"
+
+            with m.State("READ"):
+                pass
 
         return m

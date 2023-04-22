@@ -8,6 +8,7 @@ from amaranth.lib.enum import IntEnum
 from common import Hz
 from i2c import I2C
 from .rom import ROM
+from .sh1107 import SequenceBreak
 
 __all__ = ["OLED"]
 
@@ -127,15 +128,17 @@ class OLED(Elaboratable):
                 m.next = "SEND_ENQUEUE"
 
             with m.State("SEND_ENQUEUE"):
-                m.d.sync += self.i2c.i_addr.eq(0x3C)
-                m.d.sync += self.i2c.i_rw.eq(0)
-                m.d.sync += self.i2c.fifo.w_data.eq(self.rom_rd.data)
-                m.d.sync += self.i2c.fifo.w_en.eq(1)
-
                 m.d.sync += self.offset.eq(self.offset + 1)
                 m.d.sync += self.remain.eq(self.remain - 1)
 
-                m.next = "SEND_READY"
+                with m.If(self.rom_rd.data == SequenceBreak.BYTE):
+                    m.next = "SEQUENCE_BREAK"
+                with m.Else():
+                    m.d.sync += self.i2c.i_addr.eq(0x3C)
+                    m.d.sync += self.i2c.i_rw.eq(0)
+                    m.d.sync += self.i2c.fifo.w_data.eq(self.rom_rd.data)
+                    m.d.sync += self.i2c.fifo.w_en.eq(1)
+                    m.next = "SEND_READY"
 
             with m.State("SEND_READY"):
                 m.d.sync += self.i2c.i_stb.eq(1)
@@ -152,6 +155,13 @@ class OLED(Elaboratable):
                     m.next = "SEND_PREP"
                 with m.Elif(~self.i2c.o_busy):
                     # Failed.  Nothing to write.
+                    m.d.sync += self.o_result.eq(OLED.Result.FAILURE)
+                    m.next = "WAIT_CMD"
+
+            with m.State("SEQUENCE_BREAK"):
+                with m.If(~self.i2c.o_busy & self.i2c.o_ack & self.i2c.fifo.w_rdy):
+                    m.next = "SEND_PREP"
+                with m.Elif(~self.i2c.o_busy):
                     m.d.sync += self.o_result.eq(OLED.Result.FAILURE)
                     m.next = "WAIT_CMD"
 

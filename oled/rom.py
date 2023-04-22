@@ -1,13 +1,13 @@
 import random
 import struct
 
-from .sh1107 import Base, Cmd, DataBytes
+from .sh1107 import Base, Cmd, DataBytes, SequenceBreak
 
 __all__ = ["ROM"]
 
 random.seed("xyzabc")
 
-init: list[Base | DataBytes] = [
+init: list[Base | DataBytes | SequenceBreak] = [
     Cmd.DisplayOn(False),
     Cmd.SetDisplayClockFrequency(1, "Pos15"),
     Cmd.SetDisplayOffset(0),
@@ -19,7 +19,6 @@ init: list[Base | DataBytes] = [
     Cmd.SetPreDischargePeriod(2, 2),
     Cmd.SetVCOMDeselectLevel(0x40),
     Cmd.SetDisplayReverse(False),
-    Cmd.DisplayOn(True),
     Cmd.SetMemoryAddressingMode("Page"),
     Cmd.SetLowerColumnAddress(0),
     Cmd.SetHigherColumnAddress(0),
@@ -27,18 +26,19 @@ init: list[Base | DataBytes] = [
 for p in range(0x10):
     init += [
         Cmd.SetPageAddress(p),
-        DataBytes([(x + p * 8) % 0x100 for x in range(0x80)]),
+        DataBytes([0x00 for _ in range(0x80)]),
+        SequenceBreak(),
     ]
+init += [
+    Cmd.DisplayOn(True),
+]
 INIT_SEQUENCE = Cmd.compose(init)
 
 disp: list[Base | DataBytes] = []
-for p in range(0x04):
-    # XXX repeated continuations make this extremely chatty
-    # better to separate them into separate transmissions
-    disp += [
-        Cmd.SetPageAddress(p),
-        DataBytes([(x * 2 + p * 8) % 0x100 for x in range(0x80)]),
-    ]
+disp += [
+    Cmd.SetPageAddress(0),
+    DataBytes([(x * 2) % 0x100 for x in range(0x80)]),
+]
 DISPLAY_SEQUENCE = Cmd.compose(disp)
 
 disp2: list[Base | DataBytes] = [
