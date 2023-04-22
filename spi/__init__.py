@@ -17,7 +17,7 @@ class SPITestTop(Elaboratable):
 
     def __init__(self):
         self.spi_flash = SPIControllerInterface(divisor=12)  # ?
-        self.oled = OLED(speed=Hz(400_000))
+        self.oled = OLED(speed=Hz(1_000_000))
 
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
@@ -44,8 +44,12 @@ class SPITestTop(Elaboratable):
                 m.d.sync += self.oled.i_stb.eq(1)
                 m.next = "WAIT"
 
-            with m.State("WAIT"):
+            with m.State("INIT_WAIT"):
                 m.d.sync += self.oled.i_stb.eq(0)
+                with m.If(self.oled.o_result == OLED.Result.SUCCESS):
+                    m.next = "WAIT"
+
+            with m.State("WAIT"):
                 with m.If(button.o_up):
                     m.next = "START"
 

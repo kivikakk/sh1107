@@ -163,7 +163,7 @@ def main():
         "--speed",
         choices=[str(s) for s in OLED.VALID_SPEEDS],
         help="I2C bus speed to build at",
-        default=str(OLED.VALID_SPEEDS[0]),
+        default=str(OLED.DEFAULT_SPEED),
     )
     build_parser.add_argument(
         "-p",

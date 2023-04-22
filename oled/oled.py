@@ -31,6 +31,7 @@ class OLED(Elaboratable):
         400_000,
         1_000_000,
     ]
+    DEFAULT_SPEED: Final[int] = 1_000_000
 
     speed: Hz
 
