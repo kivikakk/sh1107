@@ -25,8 +25,7 @@ init: list[list[Base | DataBytes]] = [
         Cmd.SetHigherColumnAddress(0),
     ]
 ]
-# for p in range(0x10):
-for p in range(0x1):
+for p in range(0x10):
     if p > 0:
         init.append([])
     init[-1] += [

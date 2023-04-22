@@ -10,6 +10,16 @@ from oled.sh1107 import Base, Cmd, DataBytes
 __all__ = ["Connector"]
 
 
+Level: TypeAlias = int
+SIGNALS: Level = 0
+LOW_STATES: Level = 1
+MED_STATES: Level = 2
+HIGH_STATES: Level = 3
+ERRORS: Level = 4
+
+DEBUG_LEVEL: Level = HIGH_STATES
+
+
 class Value:
     value: int
     stable: bool
@@ -33,12 +43,6 @@ class Value:
     @property
     def rising(self) -> bool:
         return bool(not self.stable and self.value)
-
-
-Level: TypeAlias = int
-DEBUG: int = 0
-INFO: int = 1
-WARN: int = 2
 
 
 class ByteReceiver:
@@ -189,7 +193,7 @@ class Connector:
 
         self._known_last_command = None
         self._pressing_button = False
-        self._track_min = INFO
+        self._track_min = DEBUG_LEVEL
         self._tracked = {}
 
     def sim_process(self) -> sim.Generator:
@@ -208,19 +212,23 @@ class Connector:
                 self._pressing_button = False
                 yield switch.eq(0)
 
-            self.track(INFO, "command", (yield self.top.o_last_cmd), OLED.Command)
+            self.track(
+                HIGH_STATES, "command", (yield self.top.o_last_cmd), OLED.Command
+            )
 
-            scl_o = self.track(DEBUG, "scl.o", (yield i2c.scl_o))
-            scl_oe = self.track(DEBUG, "scl.oe", (yield i2c.scl_oe))
-            sda_o = self.track(DEBUG, "sda.o", (yield i2c.sda_o))
-            sda_oe = self.track(DEBUG, "sda.oe", (yield i2c.sda_oe))
+            scl_o = self.track(SIGNALS, "scl.o", (yield i2c.scl_o))
+            scl_oe = self.track(SIGNALS, "scl.oe", (yield i2c.scl_oe))
+            sda_o = self.track(SIGNALS, "sda.o", (yield i2c.sda_o))
+            sda_oe = self.track(SIGNALS, "sda.oe", (yield i2c.sda_oe))
 
-            self.track(INFO, "result", (yield self.top.oled.o_result), OLED.Result)
-            self.track(DEBUG, "remain", (yield self.top.oled.remain))
-            self.track(DEBUG, "offset", (yield self.top.oled.offset))
+            self.track(
+                HIGH_STATES, "result", (yield self.top.oled.o_result), OLED.Result
+            )
+            self.track(MED_STATES, "remain", (yield self.top.oled.remain))
+            self.track(MED_STATES, "offset", (yield self.top.oled.offset))
 
-            self.track(DEBUG, "rom_rd.addr", (yield self.top.oled.rom_rd.addr))
-            self.track(DEBUG, "rom_rd.data", (yield self.top.oled.rom_rd.data))
+            self.track(MED_STATES, "rom_rd.addr", (yield self.top.oled.rom_rd.addr))
+            self.track(MED_STATES, "rom_rd.data", (yield self.top.oled.rom_rd.data))
 
             match byte_receiver.process(scl_o, scl_oe, sda_o, sda_oe):
                 case ByteReceiver.Result.PASS:
@@ -271,7 +279,7 @@ class Connector:
                         print("command parser fish without valid_finish")
                     addressed_parser = None
 
-            self.track(DEBUG, "state", byte_receiver.state, ByteReceiver.State)
+            self.track(LOW_STATES, "state", byte_receiver.state, ByteReceiver.State)
 
             yield
 
@@ -299,5 +307,7 @@ class Connector:
             stable = False
             self._tracked[name] = value
             if show and level >= self._track_min:
+                if isinstance(value, int):
+                    value = f"0x{value:04x}"
                 print(f"{name}: -> {value}")
         return Value(orig, stable)

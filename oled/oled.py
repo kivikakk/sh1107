@@ -100,6 +100,8 @@ class OLED(Elaboratable):
 
             with m.State("READ_LEN0"):
                 m.d.sync += self.remain.eq(self.rom_rd.data)
+                # Prepare our first data byte read
+                m.d.sync += self.rom_rd.addr.eq(self.offset)
                 m.next = "READ_LEN1"
 
             with m.State("READ_LEN1"):
@@ -120,15 +122,11 @@ class OLED(Elaboratable):
             # for this command.  If so, keep going.
             with m.State("SEND_PREP"):
                 with m.If(self.remain == 0):
-                    m.d.sync += self.rom_rd.addr.eq(self.offset)
+                    m.d.sync += self.rom_rd.addr.eq(self.offset + 1)
                     m.d.sync += self.offset.eq(self.offset + 1)
                     m.next = "SEQUENCE_BREAK"
                 with m.Elif(self.i2c.fifo.w_rdy):
-                    m.d.sync += self.rom_rd.addr.eq(self.offset)
-                    m.next = "SEND_ENQUEUE_WAIT"
-
-            with m.State("SEND_ENQUEUE_WAIT"):
-                m.next = "SEND_ENQUEUE"
+                    m.next = "SEND_ENQUEUE"
 
             with m.State("SEND_ENQUEUE"):
                 m.d.sync += self.offset.eq(self.offset + 1)
@@ -137,6 +135,9 @@ class OLED(Elaboratable):
                 m.d.sync += self.i2c.i_rw.eq(0)
                 m.d.sync += self.i2c.fifo.w_data.eq(self.rom_rd.data)
                 m.d.sync += self.i2c.fifo.w_en.eq(1)
+
+                # Prepare next read, whether it's data or nextlen.
+                m.d.sync += self.rom_rd.addr.eq(self.offset + 1)
                 m.next = "SEND_READY"
 
             with m.State("SEND_READY"):
@@ -158,12 +159,9 @@ class OLED(Elaboratable):
                     m.next = "WAIT_CMD"
 
             with m.State("SEQUENCE_BREAK"):
-                m.d.sync += self.rom_rd.addr.eq(self.offset)
-                m.d.sync += self.offset.eq(self.offset + 1)
-                m.next = "SEQUENCE_BREAK_LOW"
-
-            with m.State("SEQUENCE_BREAK_LOW"):
                 m.d.sync += self.remain.eq(self.rom_rd.data)
+                m.d.sync += self.rom_rd.addr.eq(self.offset + 1)
+                m.d.sync += self.offset.eq(self.offset + 1)
                 m.next = "SEQUENCE_BREAK_HIGH"
 
             with m.State("SEQUENCE_BREAK_HIGH"):
