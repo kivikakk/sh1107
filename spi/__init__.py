@@ -83,7 +83,8 @@ class SPITestTop(Elaboratable):
             with m.State("START_RESET0"):
                 m.d.sync += self.spi_flash.word_out.eq(0x66)
                 m.d.sync += self.spi_flash.start_transfer.eq(1)
-                m.next = "START_RESET0_UNSTB"
+                m.next = "START_RESET0_WAIT"
+                # m.next = "START_RESET0_UNSTB"
 
             with m.State("START_RESET0_UNSTB"):
                 m.d.sync += self.spi_flash.start_transfer.eq(0)
@@ -93,6 +94,7 @@ class SPITestTop(Elaboratable):
                 with m.If(self.spi_flash.word_complete):
                     m.d.sync += self.spi_flash.word_out.eq(0x99)
                     m.d.sync += self.spi_flash.start_transfer.eq(1)
+                    # m.next = "START_RESET1_WAIT"
                     m.next = "START_RESET1_UNSTB"
 
             with m.State("START_RESET1_UNSTB"):
@@ -109,7 +111,8 @@ class SPITestTop(Elaboratable):
                 with m.If(reset_wait == 0x100000):
                     m.d.sync += self.spi_flash.word_out.eq(0x9F)
                     m.d.sync += self.spi_flash.start_transfer.eq(1)
-                    m.next = "UNSTB"
+                    m.next = "WAITFISH"
+                    # m.next = "UNSTB"
 
             with m.State("UNSTB"):
                 m.d.sync += self.spi_flash.start_transfer.eq(0)
@@ -120,7 +123,8 @@ class SPITestTop(Elaboratable):
                     m.d.sync += disp1_pls.eq(1)
                     m.d.sync += self.spi_flash.word_out.eq(0x00)
                     m.d.sync += self.spi_flash.start_transfer.eq(1)
-                    m.next = "UNSTB2"
+                    m.next = "WAITFISH2"
+                    # m.next = "UNSTB2"
 
             with m.State("UNSTB2"):
                 m.d.sync += self.spi_flash.start_transfer.eq(0)
@@ -131,6 +135,7 @@ class SPITestTop(Elaboratable):
                     m.d.sync += disp2_pls.eq(1)
                     m.d.sync += dispword_pls.eq(1)
                     m.d.sync += word.eq(self.spi_flash.word_in)
+                    m.d.sync += self.spi_flash.start_transfer.eq(0)
                     m.next = "LOOP"
 
         with m.FSM() as fsm:
