@@ -27,6 +27,10 @@ class Top(Elaboratable):
 
         self.switch = Signal()
 
+    @property
+    def ports(self):
+        return [self.switch]
+
     def elaborate(self, platform: Optional[Platform]):
         m = Module()
 

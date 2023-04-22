@@ -68,8 +68,8 @@
 			"--ignore=E501,E203,W503",
 		],
 		"clangd.fallbackFlags": [
-			"-I${workspaceFolder}/build",
 			"-I${workspaceFolder}/../../3rd/oss-cad-suite/share/yosys/include",
-		]
+			"-I${workspaceFolder}/build",
+		],
 	}
 }

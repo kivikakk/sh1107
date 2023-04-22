@@ -128,31 +128,48 @@ def rom(args: Namespace):
 def vsh(args: Namespace):
     from vsh import run
 
-    m = _top(args.top)
-    if isinstance(m, Top):
-        design = m(speed=Hz(args.speed))
+    top = _top(args.top)
+    if isinstance(top, Top):
+        design = top(speed=Hz(args.speed))
     else:
-        design = m()
+        design = top()
 
     yosys = cast(YosysBinary, find_yosys(lambda _: True))
 
-    output = cast(str, cxxrtl.convert(design, ports=[]))
-    outfile = _outfile("build", ".cc")
-    with open(outfile, "w") as f:
+    output = cast(str, cxxrtl.convert(design, ports=design.ports))
+    cxxrtl_cc_file = _outfile("build", ".cc")
+    with open(cxxrtl_cc_file, "w") as f:
         f.write(output)
 
-    build_dir, filename = build_cxx(
-        cxx_sources={"root.cc": "#include <vsh.cc>"},
-        output_name="vsh",
-        include_dirs=[
-            _outdir("vsh"),
-            _outdir("build"),
-            yosys.data_dir() / "include",
+    cxxrtl_lib_path = _outfile("build", ".o")
+
+    args: list[str] = [
+        "zig",
+        "c++",
+        "-DCXXRTL_INCLUDE_CAPI_IMPL",
+        "-I" + str(_outdir("vsh")),
+        "-I" + str(_outdir("build")),
+        "-I" + str(cast(Path, yosys.data_dir()) / "include"),
+        "-c",
+        cxxrtl_cc_file,
+        "-o",
+        cxxrtl_lib_path,
+    ]
+    subprocess.run(args, check=True)
+
+    subprocess.run(
+        [
+            "zig",
+            "build",
+            "run",
+            f"-Dyosys_data_dir={yosys.data_dir()}",
+            f"-Dcxxrtl_lib_path={cxxrtl_lib_path}",
         ],
-        macros=[],
+        cwd=_outdir("vsh"),
+        check=True,
     )
-    library = ctypes.cdll.LoadLibrary(os.path.join(build_dir.name, filename))
-    print(library.vsh())
+    # library = ctypes.cdll.LoadLibrary(cxxrtl_lib_path)
+    # print(library.vsh())
 
     # run(elaboratable, args)
 

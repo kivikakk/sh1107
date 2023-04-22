@@ -1,2 +1,4 @@
 **/__pycache__/
+**/zig-cache/
+**/zig-out/
 rom.bin

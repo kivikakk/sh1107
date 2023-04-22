@@ -1,0 +1,12 @@
+{
+    "build_options": [
+        {
+            "name": "yosys_data_dir",
+            "value": "../../../3rd/oss-cad-suite/share/yosys/include"
+        },
+        {
+            "name": "cxxrtl_lib_path",
+            "value": "../build/oled_i2c.o"
+        }
+    ]
+}
