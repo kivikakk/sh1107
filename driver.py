@@ -126,8 +126,6 @@ def rom(args: Namespace):
 
 
 def vsh(args: Namespace):
-    from vsh import run
-
     top = _top(args.top)
     if isinstance(top, Top):
         design = top(speed=Hz(args.speed))
@@ -143,35 +141,33 @@ def vsh(args: Namespace):
 
     cxxrtl_lib_path = _outfile("build", ".o")
 
-    args: list[str] = [
-        "zig",
-        "c++",
-        "-DCXXRTL_INCLUDE_CAPI_IMPL",
-        "-I" + str(_outdir("vsh")),
-        "-I" + str(_outdir("build")),
-        "-I" + str(cast(Path, yosys.data_dir()) / "include"),
-        "-c",
-        cxxrtl_cc_file,
-        "-o",
-        cxxrtl_lib_path,
-    ]
-    subprocess.run(args, check=True)
+    subprocess.run(
+        [
+            "zig",
+            "c++",
+            "-DCXXRTL_INCLUDE_CAPI_IMPL",
+            "-I" + str(_outdir("vsh")),
+            "-I" + str(_outdir("build")),
+            "-I" + str(cast(Path, yosys.data_dir()) / "include"),
+            "-c",
+            cxxrtl_cc_file,
+            "-o",
+            cxxrtl_lib_path,
+        ],
+        check=True,
+    )
 
     subprocess.run(
         [
             "zig",
             "build",
-            "run",
+            *([] if args.build_only else ["run"]),
             f"-Dyosys_data_dir={yosys.data_dir()}",
             f"-Dcxxrtl_lib_path={cxxrtl_lib_path}",
         ],
         cwd=_outdir("vsh"),
         check=True,
     )
-    # library = ctypes.cdll.LoadLibrary(cxxrtl_lib_path)
-    # print(library.vsh())
-
-    # run(elaboratable, args)
 
 
 def main():
@@ -261,6 +257,12 @@ def main():
             "--vcd",
             action="store_true",
             help="output a VCD file",
+        )
+        vsh_parser.add_argument(
+            "-b",
+            "--build-only",
+            action="store_true",
+            help="only build the Virtual SH1107, don't run it",
         )
 
     args = parser.parse_args()
