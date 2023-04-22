@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 
-import ctypes
 import importlib.util
-import os
 import re
 import subprocess
 import sys
@@ -12,7 +10,6 @@ from typing import Dict, Optional, Type, cast
 from unittest import TestLoader, TextTestRunner
 
 from amaranth import Module
-from amaranth._toolchain.cxx import build_cxx
 from amaranth._toolchain.yosys import (
     find_yosys,  # pyright: reportUnknownVariableType=false
 )
@@ -240,30 +237,29 @@ def main():
         help="program the ROM onto the board",
     )
 
-    if importlib.util.find_spec("pyglet") is not None:
-        vsh_parser = subparsers.add_parser(
-            "vsh",
-            help="run the Virtual SH1107",
-        )
-        vsh_parser.set_defaults(func=vsh)
-        vsh_parser.add_argument(
-            "-t",
-            "--top",
-            help="which top-level module to simulate (default: oled.Top)",
-            default="oled.Top",
-        )
-        vsh_parser.add_argument(
-            "-v",
-            "--vcd",
-            action="store_true",
-            help="output a VCD file",
-        )
-        vsh_parser.add_argument(
-            "-b",
-            "--build-only",
-            action="store_true",
-            help="only build the Virtual SH1107, don't run it",
-        )
+    vsh_parser = subparsers.add_parser(
+        "vsh",
+        help="run the Virtual SH1107",
+    )
+    vsh_parser.set_defaults(func=vsh)
+    vsh_parser.add_argument(
+        "-t",
+        "--top",
+        help="which top-level module to simulate (default: oled.Top)",
+        default="oled.Top",
+    )
+    vsh_parser.add_argument(
+        "-v",
+        "--vcd",
+        action="store_true",
+        help="output a VCD file",
+    )
+    vsh_parser.add_argument(
+        "-b",
+        "--build-only",
+        action="store_true",
+        help="only build the Virtual SH1107, don't run it",
+    )
 
     args = parser.parse_args()
     args.func(args)
