@@ -1,16 +1,23 @@
 #!/usr/bin/env python
 
+import ctypes
 import importlib.util
+import os
 import re
 import subprocess
 import sys
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
-from typing import Dict, Optional, Type
+from typing import Dict, Optional, Type, cast
 from unittest import TestLoader, TextTestRunner
 
 from amaranth import Module
-from amaranth.back import rtlil
+from amaranth._toolchain.cxx import build_cxx
+from amaranth._toolchain.yosys import (
+    find_yosys,  # pyright: reportUnknownVariableType=false
+)
+from amaranth._toolchain.yosys import YosysBinary
+from amaranth.back import cxxrtl, rtlil
 from amaranth.build import Platform
 from amaranth.hdl import Fragment
 from amaranth_boards.icebreaker import ICEBreakerPlatform
@@ -31,9 +38,13 @@ def _top(name: str) -> Type[Module]:
     return getattr(importlib.import_module(mod), klass)
 
 
-def _outfile(dir: str, ext: str):
-    base = Path(sys.argv[0])
-    return str(base.parent / dir / f"oled_i2c{ext}")
+def _outdir(dir: str) -> Path:
+    base = Path(sys.argv[0]).absolute()
+    return base.parent / dir
+
+
+def _outfile(dir: str, ext: str) -> str:
+    return str(_outdir(dir) / f"oled_i2c{ext}")
 
 
 def test(args: Namespace):
@@ -119,11 +130,31 @@ def vsh(args: Namespace):
 
     m = _top(args.top)
     if isinstance(m, Top):
-        elaboratable = m(speed=Hz(args.speed))
+        design = m(speed=Hz(args.speed))
     else:
-        elaboratable = m()
+        design = m()
 
-    run(elaboratable, args)
+    yosys = cast(YosysBinary, find_yosys(lambda _: True))
+
+    output = cast(str, cxxrtl.convert(design, ports=[]))
+    outfile = _outfile("build", ".cc")
+    with open(outfile, "w") as f:
+        f.write(output)
+
+    build_dir, filename = build_cxx(
+        cxx_sources={"root.cc": "#include <vsh.cc>"},
+        output_name="vsh",
+        include_dirs=[
+            _outdir("vsh"),
+            _outdir("build"),
+            yosys.data_dir() / "include",
+        ],
+        macros=[],
+    )
+    library = ctypes.cdll.LoadLibrary(os.path.join(build_dir.name, filename))
+    print(library.vsh())
+
+    # run(elaboratable, args)
 
 
 def main():
