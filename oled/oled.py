@@ -29,7 +29,7 @@ class OLED(Elaboratable):
     VALID_SPEEDS: Final[list[int]] = [
         100_000,
         400_000,
-        1_000_000,  # TODO check on hardware
+        1_000_000,
     ]
 
     speed: Hz
