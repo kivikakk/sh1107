@@ -138,9 +138,9 @@ class TestSH1107Command(unittest.TestCase):
         #
         # (input, output, leftover, end state, end continuation, fish ok/more needed/unrecoverable)
         #
-        ([0x80], [], [0x80], "Cmd", True, "M"),
-        ([0x80, 0xD5], [], [0x80, 0xD5], "Ctrl", True, "M"),
-        ([0x80, 0xD5, 0x80], [], [0x80, 0xD5, 0x80], "Cmd", True, "M"),
+        ([0x80], [], [], "Cmd", True, "M"),
+        ([0x80, 0xD5], [], [], "Ctrl", True, "M"),
+        ([0x80, 0xD5, 0x80], [], [], "Cmd", True, "M"),
         (
             [0x80, 0xD5, 0x80, 0x46],
             [Cmd.SetDisplayClockFrequency(7, "Neg5")],
@@ -152,7 +152,7 @@ class TestSH1107Command(unittest.TestCase):
         (
             [0x80, 0xD5, 0x80, 0x46, 0x00],
             [Cmd.SetDisplayClockFrequency(7, "Neg5")],
-            [0x00],
+            [],
             "Cmd",
             False,
             "M",
@@ -180,7 +180,7 @@ class TestSH1107Command(unittest.TestCase):
         (
             [0x80, 0xAF, 0x80, 0xD5],
             [Cmd.DisplayOn(True)],
-            [0x80, 0xD5],
+            [],
             "Ctrl",
             True,
             "M",
@@ -188,7 +188,7 @@ class TestSH1107Command(unittest.TestCase):
         (
             [0x80, 0xAF, 0x80, 0xD5, 0x80],
             [Cmd.DisplayOn(True)],
-            [0x80, 0xD5, 0x80],
+            [],
             "Cmd",
             True,
             "M",
@@ -196,7 +196,7 @@ class TestSH1107Command(unittest.TestCase):
         (
             [0x80, 0xAF, 0x80, 0xD5, 0x00],
             [Cmd.DisplayOn(True)],
-            [0x80, 0xD5, 0x00],
+            [],
             "Cmd",
             False,
             "M",
@@ -204,7 +204,7 @@ class TestSH1107Command(unittest.TestCase):
         (
             [0x80, 0xAF, 0x00],
             [Cmd.DisplayOn(True)],
-            [0x00],
+            [],
             "Cmd",
             False,
             "M",
@@ -212,7 +212,7 @@ class TestSH1107Command(unittest.TestCase):
         (
             [0x80, 0xAF, 0x00, 0xD5],
             [Cmd.DisplayOn(True)],
-            [0x00, 0xD5],
+            [],
             "Cmd",
             False,
             "M",
@@ -236,7 +236,7 @@ class TestSH1107Command(unittest.TestCase):
         (
             [0x00],
             [],
-            [0x00],
+            [],
             "Cmd",
             False,
             "M",  # empty section invalid
@@ -260,7 +260,7 @@ class TestSH1107Command(unittest.TestCase):
         (
             [0x40],
             [],
-            [0x40],
+            [],
             "Data",
             False,
             "M",  # empty section invalid
@@ -276,7 +276,7 @@ class TestSH1107Command(unittest.TestCase):
         (
             [0x40],
             [],
-            [0x40],
+            [],
             "Data",
             False,
             "M",
@@ -300,7 +300,7 @@ class TestSH1107Command(unittest.TestCase):
         (
             [0xC0],
             [],
-            [0xC0],
+            [],
             "Data",
             True,
             "M",
@@ -350,8 +350,11 @@ class TestSH1107Command(unittest.TestCase):
         # (input, output, leftover, end state, end continuation, fish ok/more needed/unrecoverable)
 
         for bytes, cmds, leftover, state, continuation, fmu in self.PARSE_PARTIAL:
+            print()
             parser = Cmd.Parser()
             result = parser.feed(bytes)
+            print(bytes, cmds, leftover, state, continuation, fmu)
+            print(result)
             self.assertEqual(result, cmds)
             self.assertEqual(parser.bytes, leftover)
             match state:

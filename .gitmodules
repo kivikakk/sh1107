@@ -1,0 +1,3 @@
+[submodule "vendor/amlib"]
+	path = vendor/amlib
+	url = https://github.com/amaranth-farm/amlib
