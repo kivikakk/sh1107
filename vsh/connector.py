@@ -219,9 +219,6 @@ class Connector:
             self.track(DEBUG, "remain", (yield self.top.oled.remain))
             self.track(DEBUG, "offset", (yield self.top.oled.offset))
 
-            self.track(DEBUG, "offlens_rd.addr", (yield self.top.oled.offlens_rd.addr))
-            self.track(DEBUG, "offlens_rd.data", (yield self.top.oled.offlens_rd.data))
-
             self.track(DEBUG, "rom_rd.addr", (yield self.top.oled.rom_rd.addr))
             self.track(DEBUG, "rom_rd.data", (yield self.top.oled.rom_rd.data))
 
@@ -246,8 +243,16 @@ class Connector:
                         cmds = addressed_parser.feed([byte])
                         if addressed_parser.unrecoverable:
                             print(
-                                "command parser noped out, resetting with: ",
-                                addressed_parser.bytes,
+                                "command parser noped out, resetting with: x",
+                                "".join([f"{b:02x}" for b in addressed_parser.bytes]),
+                                " -- partial_cmd: x",
+                                "".join(
+                                    [f"{b:02x}" for b in addressed_parser.partial_cmd]
+                                ),
+                                " -- state: ",
+                                addressed_parser.state,
+                                " -- continuation: ",
+                                addressed_parser.continuation,
                             )
                             addressed_parser = None
                         self.process_cb(cmds)

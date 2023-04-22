@@ -1,35 +1,18 @@
 from typing import Final, Optional
 
-from amaranth import Elaboratable, Module, Signal
+from amaranth import Elaboratable, Memory, Module, Signal
 from amaranth.build import Platform
 from amaranth.hdl.mem import ReadPort
 from amaranth.lib.enum import IntEnum
-from amaranth_boards.icebreaker import ICEBreakerPlatform
-from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
 
 from common import Hz
 from i2c import I2C
-from vendor.amlib.amlib.io.spi import SPIControllerInterface
 from .rom import ROM
 
 __all__ = ["OLED"]
 
 
 class OLED(Elaboratable):
-    speed: Hz
-
-    i2c: I2C
-    spi_flash: SPIControllerInterface
-
-    i_cmd: Signal
-    i_stb: Signal
-    o_result: Signal
-
-    offset: Signal
-    remain: Signal
-    offlens_rd: ReadPort
-    rom_rd: ReadPort
-
     class Command(IntEnum):
         # these correspond to offsets in ROM.
         # TODO(ari): less hacky
@@ -49,12 +32,23 @@ class OLED(Elaboratable):
         1_000_000,  # TODO check on hardware
     ]
 
+    speed: Hz
+
+    i2c: I2C
+    rom_rd: ReadPort
+
+    i_cmd: Signal
+    i_stb: Signal
+    o_result: Signal
+
+    offset: Signal
+    remain: Signal
+
     def __init__(self, *, speed: Hz):
         assert speed.value in self.VALID_SPEEDS
         self.speed = speed
 
         self.i2c = I2C(speed=speed)
-        self.spi_flash = SPIControllerInterface(divisor=12)  # ?
 
         self.i_cmd = Signal(OLED.Command)
         self.i_stb = Signal()
@@ -63,18 +57,17 @@ class OLED(Elaboratable):
         self.offset = Signal(range(len(ROM)))
         self.remain = Signal(range(len(ROM)))
 
+        self.rom_rd = Memory(
+            width=8,
+            depth=len(ROM),
+            init=ROM,
+        ).read_port(transparent=False)
+
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
 
         m.submodules.i2c = self.i2c
-        m.submodules.spi_flash = self.spi_flash
-
-        match platform:
-            case ICEBreakerPlatform() | OrangeCrabR0_2_85FPlatform():
-                res = platform.request("spi_flash")
-                m.d.comb += self.spi_flash.connect_to_resource(res)
-            case _:
-                pass
+        m.submodules.rom_rd = self.rom_rd
 
         cmd = Signal.like(self.i_cmd)
 
@@ -86,23 +79,31 @@ class OLED(Elaboratable):
                     & (self.i_cmd <= max(OLED.Command))
                     & self.i2c.fifo.w_rdy
                 ):
-                    m.d.sync += offlens_rd.addr.eq(self.i_cmd * 2)
-                    m.d.sync += cmd.eq(self.i_cmd)
+                    m.d.sync += self.rom_rd.addr.eq((self.i_cmd - 1) * 4)
+                    m.d.sync += cmd.eq(self.i_cmd - 1)
                     m.d.sync += self.o_result.eq(OLED.Result.BUSY)
-                    m.next = "READ_OFF_WAIT"
+                    m.next = "READ_OFF0_WAIT"
 
-            with m.State("READ_OFF_WAIT"):
-                m.d.sync += offlens_rd.addr.eq(
-                    cmd * 2 + 1
-                )  # XXX(ari): can probably just add 1 to self
-                m.next = "READ_OFF"
+            with m.State("READ_OFF0_WAIT"):
+                m.d.sync += self.rom_rd.addr.eq(self.rom_rd.addr + 1)
+                m.next = "READ_OFF0"
 
-            with m.State("READ_OFF"):
-                m.d.sync += self.offset.eq(offlens_rd.data)
-                m.next = "READ_LEN"
+            with m.State("READ_OFF0"):
+                m.d.sync += self.rom_rd.addr.eq(self.rom_rd.addr + 1)
+                m.d.sync += self.offset.eq(self.rom_rd.data)
+                m.next = "READ_OFF1"
 
-            with m.State("READ_LEN"):
-                m.d.sync += self.remain.eq(offlens_rd.data)
+            with m.State("READ_OFF1"):
+                m.d.sync += self.rom_rd.addr.eq(self.rom_rd.addr + 1)
+                m.d.sync += self.offset.eq(self.offset | self.rom_rd.data.shift_left(8))
+                m.next = "READ_LEN0"
+
+            with m.State("READ_LEN0"):
+                m.d.sync += self.remain.eq(self.rom_rd.data)
+                m.next = "READ_LEN1"
+
+            with m.State("READ_LEN1"):
+                m.d.sync += self.remain.eq(self.remain | self.rom_rd.data.shift_left(8))
                 m.next = "SEND_PREP"
 
             # Send loop:
@@ -119,7 +120,7 @@ class OLED(Elaboratable):
                     m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
                     m.next = "WAIT_CMD"
                 with m.Elif(self.i2c.fifo.w_rdy):
-                    m.d.sync += rom_rd.addr.eq(self.offset)
+                    m.d.sync += self.rom_rd.addr.eq(self.offset)
                     m.next = "SEND_ENQUEUE_WAIT"
 
             with m.State("SEND_ENQUEUE_WAIT"):
@@ -128,7 +129,7 @@ class OLED(Elaboratable):
             with m.State("SEND_ENQUEUE"):
                 m.d.sync += self.i2c.i_addr.eq(0x3C)
                 m.d.sync += self.i2c.i_rw.eq(0)
-                m.d.sync += self.i2c.fifo.w_data.eq(rom_rd.data)
+                m.d.sync += self.i2c.fifo.w_data.eq(self.rom_rd.data)
                 m.d.sync += self.i2c.fifo.w_en.eq(1)
 
                 m.d.sync += self.offset.eq(self.offset + 1)

@@ -33,6 +33,8 @@ INIT_SEQUENCE = Cmd.compose(init)
 
 disp: list[Base | DataBytes] = []
 for p in range(0x04):
+    # XXX repeated continuations make this extremely chatty
+    # better to separate them into separate transmissions
     disp += [
         Cmd.SetPageAddress(p),
         DataBytes([(x * 2 + p * 8) % 0x100 for x in range(0x80)]),
@@ -46,15 +48,21 @@ DISPLAY2_SEQUENCE = Cmd.compose(disp2)
 
 POWEROFF_SEQUENCE = Cmd.compose([Cmd.DisplayOn(False)])
 
+NULL_SEQUENCE: list[int] = []
+
+seqs = (
+    INIT_SEQUENCE,
+    DISPLAY_SEQUENCE,
+    DISPLAY2_SEQUENCE,
+    POWEROFF_SEQUENCE,
+    NULL_SEQUENCE,
+)
+rom_offset = len(seqs) * 2 * 2
+
 rom = []
 index = b""
-
-for s in (INIT_SEQUENCE, DISPLAY_SEQUENCE, DISPLAY2_SEQUENCE, POWEROFF_SEQUENCE):
-    index += struct.pack("<HH", len(rom), len(s))
+for s in seqs:
+    index += struct.pack("<HH", rom_offset + len(rom), len(s))
     rom.extend(s)
 
-rom_offset = 0x100
-
-assert len(index) < rom_offset
-
-ROM = index + (b"\x00" * (rom_offset - len(index))) + bytes(rom)
+ROM = index + bytes(rom)
