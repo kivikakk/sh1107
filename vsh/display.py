@@ -292,9 +292,13 @@ class Display(DisplayBase, Window):
                     page_count = self.I2C_HEIGHT // 8
                     for b in data:
                         for i in range(7, -1, -1):
+                            if not self.segment_remap:
+                                pa = self.page_address * 8 + i
+                            else:
+                                pa = (page_count - self.page_address - 1) * 8 + (7 - i)
                             self.set_px(
                                 self.column_address,
-                                self.page_address * 8 + i,
+                                pa,
                                 1 if ((b >> i) & 0x01) == 0x01 else 0,
                             )
                         if (
