@@ -168,8 +168,7 @@ class OLED(Elaboratable):
             with m.State("SEQUENCE_BREAK_HIGH"):
                 remain = self.remain | cast(Cat, self.rom_rd.data.shift_left(8))
                 with m.If(remain == 0):
-                    m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
-                    m.next = "WAIT_CMD"
+                    m.next = "WAIT_I2C"
                 with m.Else():
                     m.d.sync += self.remain.eq(remain)
                     m.next = "SEQUENCE_BREAK_WAIT"
@@ -177,6 +176,14 @@ class OLED(Elaboratable):
             with m.State("SEQUENCE_BREAK_WAIT"):
                 with m.If(~self.i2c.o_busy & self.i2c.o_ack & self.i2c.fifo.w_rdy):
                     m.next = "SEND_PREP"
+                with m.Elif(~self.i2c.o_busy):
+                    m.d.sync += self.o_result.eq(OLED.Result.FAILURE)
+                    m.next = "WAIT_CMD"
+
+            with m.State("WAIT_I2C"):
+                with m.If(~self.i2c.o_busy & self.i2c.o_ack & self.i2c.fifo.w_rdy):
+                    m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
+                    m.next = "WAIT_CMD"
                 with m.Elif(~self.i2c.o_busy):
                     m.d.sync += self.o_result.eq(OLED.Result.FAILURE)
                     m.next = "WAIT_CMD"

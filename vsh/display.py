@@ -1,6 +1,6 @@
 from argparse import Namespace
 from pathlib import Path
-from typing import Callable, Literal, Optional, Self, Tuple
+from typing import Callable, Literal, Optional, Self, Tuple, cast
 
 import pyglet
 from amaranth import Elaboratable, Signal
@@ -13,6 +13,7 @@ from oled import OLED
 from oled.sh1107 import Base, Cmd, DataBytes
 from .display_base import DisplayBase
 from .oled_connector import OLEDConnector
+from .shared import track
 from .switch_connector import SwitchConnector
 
 __all__ = ["run"]
@@ -91,6 +92,18 @@ class Display(DisplayBase, Window):
         if oled is not None:
             assert isinstance(oled, OLED)
             self.oled_connector = OLEDConnector(oled, self.process_i2c)
+
+        vsh_tracks = getattr(top, "vsh_tracks", None)
+        if vsh_tracks is not None:
+
+            def tracker():
+                while True:
+                    for sig in cast(list[Signal], vsh_tracks):
+                        track(100, cast(str, sig.name), (yield sig))
+                    yield
+
+            self.simulator.add_sync_process(tracker)
+            self.vsh_tracks = vsh_tracks
 
         self.power = False
         self.dcdc = True

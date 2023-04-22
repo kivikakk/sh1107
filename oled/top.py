@@ -43,8 +43,7 @@ class Top(Elaboratable):
                 m.d.comb += led_ack.eq(self.oled.i2c.o_ack)
 
                 switch = cast(Signal, platform.request("button").i)
-
-                m.submodules.button = self.button = button = Button()
+                m.submodules.button = button = Button()
                 m.d.comb += button.i.eq(switch)
                 button_up = button.o_up
 
@@ -63,12 +62,11 @@ class Top(Elaboratable):
                 m.d.comb += led_ack.eq(self.oled.i2c.o_ack)
 
                 switch = cast(Signal, platform.request("button").i)
-                program = cast(Signal, platform.request("program").o)
-
-                m.submodules.button = self.button = button = ButtonWithHold()
+                m.submodules.button = button = ButtonWithHold()
                 m.d.comb += button.i.eq(switch)
                 button_up = button.o_up
 
+                program = cast(Signal, platform.request("program").o)
                 with m.If(button.o_held):
                     m.d.sync += program.eq(1)
 

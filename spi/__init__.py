@@ -17,10 +17,20 @@ class SPITestTop(Elaboratable):
     oled: OLED
     switch: Signal
 
+    led_top: Signal
+    led_oled: Signal
+
+    vsh_tracks: list[Signal]
+
     def __init__(self):
-        self.spi_flash = SPIControllerInterface(divisor=12)  # ?
+        self.spi_flash = SPIControllerInterface(divisor=2)  # ?
         self.oled = OLED(speed=Hz(1_000_000))
         self.switch = Signal()
+
+        self.led_top = Signal()
+        self.led_oled = Signal()
+
+        self.vsh_tracks = [self.led_top, self.led_oled]
 
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
@@ -28,22 +38,31 @@ class SPITestTop(Elaboratable):
         m.submodules.spi_flash = self.spi_flash
         m.submodules.oled = self.oled
 
+        button_up: Signal
+
         match platform:
             case ICEBreakerPlatform() | OrangeCrabR0_2_85FPlatform():
                 res = platform.request("spi_flash_1x")
                 m.d.comb += self.spi_flash.connect_to_resource(res)
 
                 switch = cast(Signal, platform.request("button").i)
-                led = cast(Signal, platform.request("led", 0).o)
-                led_top = cast(Signal, platform.request("led", 1).o)
+                m.submodules.button = button = Button()
+                m.d.comb += button.i.eq(switch)
+                button_up = button.o_up
+
+                led_top = cast(Signal, platform.request("led", 0).o)
+                led_oled = cast(Signal, platform.request("led", 1).o)
 
             case _:
                 switch = self.switch
-                led = Signal()
-                led_top = Signal()
+                buffer = Signal()
+                button_up = Signal()
 
-        m.submodules.button = self.button = button = Button()
-        m.d.comb += button.i.eq(switch)
+                m.d.sync += buffer.eq(switch)
+                m.d.comb += button_up.eq(buffer & ~switch)
+
+                led_top = self.led_top
+                led_oled = self.led_oled
 
         word = Signal(self.spi_flash.word_size)
         disp1_pls = Signal()
@@ -55,7 +74,7 @@ class SPITestTop(Elaboratable):
             m.d.comb += led_top.eq(fsm.ongoing("LOOP"))
 
             with m.State("LOOP"):
-                with m.If(button.o_up):
+                with m.If(button_up):
                     m.next = "START"
 
             with m.State("START"):
@@ -75,7 +94,7 @@ class SPITestTop(Elaboratable):
                     m.next = "LOOP"
 
         with m.FSM() as fsm:
-            m.d.comb += led.eq(fsm.ongoing("QUIET"))
+            m.d.comb += led_oled.eq(fsm.ongoing("QUIET"))
 
             with m.State("INIT"):
                 m.d.sync += self.oled.i_cmd.eq(OLED.Command.INIT)
@@ -84,6 +103,9 @@ class SPITestTop(Elaboratable):
 
             with m.State("DESTB"):
                 m.d.sync += self.oled.i_stb.eq(0)
+                m.next = "WAIT"
+
+            with m.State("WAIT"):
                 with m.If(self.oled.o_result == OLED.Result.SUCCESS):
                     m.next = "QUIET"
 
