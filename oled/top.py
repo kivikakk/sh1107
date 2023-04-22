@@ -17,7 +17,7 @@ class Top(Elaboratable):
 
     o_last_cmd: Signal
 
-    sim_switch: Signal
+    switch: Signal
 
     def __init__(self, *, speed: Hz = Hz(400_000)):
         self.oled = OLED(speed=speed)
@@ -25,7 +25,7 @@ class Top(Elaboratable):
 
         self.o_last_cmd = Signal(OLED.Command)
 
-        self.sim_switch = Signal()
+        self.switch = Signal()
 
     def elaborate(self, platform: Optional[Platform]):
         m = Module()
@@ -73,7 +73,7 @@ class Top(Elaboratable):
                     m.d.sync += program.eq(1)
 
             case None:
-                switch = self.sim_switch
+                switch = self.switch
                 buffer = Signal()
                 button_up = Signal()
 

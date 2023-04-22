@@ -117,7 +117,13 @@ def rom(args: Namespace):
 def vsh(args: Namespace):
     from vsh import run
 
-    run(args)
+    m = _top(args.top)
+    if isinstance(m, Top):
+        elaboratable = m(speed=Hz(args.speed))
+    else:
+        elaboratable = m()
+
+    run(elaboratable, args)
 
 
 def main():
@@ -196,6 +202,12 @@ def main():
             help="run the Virtual SH1107",
         )
         vsh_parser.set_defaults(func=vsh)
+        vsh_parser.add_argument(
+            "-t",
+            "--top",
+            help="which top-level module to simulate (default: oled.Top)",
+            default="oled.Top",
+        )
         vsh_parser.add_argument(
             "-v",
             "--vcd",

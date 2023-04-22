@@ -1,24 +1,24 @@
 from argparse import Namespace
 from pathlib import Path
-from typing import Callable, Literal, Self, Tuple
+from typing import Callable, Literal, Optional, Self, Tuple
 
 import pyglet
+from amaranth import Elaboratable, Signal
 from amaranth.sim import Simulator
 from pyglet import gl
 from pyglet.image import ImageData
 from pyglet.window import Window, key
 
-from common import Hz
-from oled import Top
+from oled import OLED
 from oled.sh1107 import Base, Cmd, DataBytes
-from .connector import Connector
 from .display_base import DisplayBase
+from .oled_connector import OLEDConnector
+from .switch_connector import SwitchConnector
 
 __all__ = ["run"]
 
 
-def run(args: Namespace):
-    top = Top(speed=Hz(1_000_000))
+def run(top: Elaboratable, args: Namespace):
     simulator = Simulator(top)
 
     v = Display(top, simulator)
@@ -28,7 +28,10 @@ def run(args: Namespace):
     # system clock.  This means every tick is either "half"
     # or "full".
     simulator.add_clock(1 / 4e6)
-    simulator.add_sync_process(v.connector.sim_process)
+    if v.switch_connector:
+        simulator.add_sync_process(v.switch_connector.sim_process)
+    if v.oled_connector:
+        simulator.add_sync_process(v.oled_connector.sim_process)
 
     if args.vcd:
         vcd_path = Path(__file__).parent.parent / "build" / "vsh.vcd"
@@ -39,9 +42,12 @@ def run(args: Namespace):
 
 
 class Display(DisplayBase, Window):
-    top: Top
+    top: Elaboratable
     simulator: Simulator
     press_button: bool
+
+    switch_connector: Optional[SwitchConnector]
+    oled_connector: Optional[OLEDConnector]
 
     power: bool
     dcdc: bool  # NE
@@ -66,7 +72,7 @@ class Display(DisplayBase, Window):
     img: ImageData
     img_stale: bool
 
-    def __init__(self, top: Top, simulator: Simulator):
+    def __init__(self, top: Elaboratable, simulator: Simulator):
         super().__init__(
             width=self.WINDOW_WIDTH,
             height=self.WINDOW_HEIGHT,
@@ -75,7 +81,16 @@ class Display(DisplayBase, Window):
 
         self.top = top
         self.simulator = simulator
-        self.connector = Connector(top, self.process_i2c)
+
+        switch = getattr(top, "switch", None)
+        if switch is not None:
+            assert isinstance(switch, Signal)
+            self.switch_connector = SwitchConnector(switch)
+
+        oled = getattr(top, "oled", None)
+        if oled is not None:
+            assert isinstance(oled, OLED)
+            self.oled_connector = OLEDConnector(oled, self.process_i2c)
 
         self.power = False
         self.dcdc = True
@@ -320,4 +335,5 @@ class Display(DisplayBase, Window):
             return
 
         if symbol == key.RETURN:
-            self.connector.press_button = True
+            assert self.switch_connector
+            self.switch_connector.press()
