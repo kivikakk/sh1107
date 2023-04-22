@@ -20,6 +20,10 @@ class OLED(Elaboratable):
         DISPLAY = 2
         DISPLAY2 = 3
         POWEROFF = 4
+        POS1 = 5
+        POS2 = 6
+        CHAR0 = 7
+        CHARF = 22
 
     class Result(IntEnum):
         SUCCESS = 0

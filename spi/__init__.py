@@ -23,7 +23,7 @@ class SPITestTop(Elaboratable):
     vsh_tracks: list[Signal]
 
     def __init__(self):
-        self.spi_flash = SPIControllerInterface(divisor=2)  # ?
+        self.spi_flash = SPIControllerInterface(divisor=12)  # ?
         self.oled = OLED(speed=Hz(1_000_000))
         self.switch = Signal()
 
@@ -69,27 +69,67 @@ class SPITestTop(Elaboratable):
         disp1_yes = Signal()
         disp2_pls = Signal()
         disp2_yes = Signal()
+        dispword_pls = Signal()
+
+        reset_wait = Signal(range(0x100000 + 1))
 
         with m.FSM() as fsm:
             m.d.comb += led_top.eq(fsm.ongoing("LOOP"))
 
             with m.State("LOOP"):
                 with m.If(button_up):
-                    m.next = "START"
+                    m.next = "START_RESET0"
 
-            with m.State("START"):
-                m.d.sync += self.spi_flash.word_out.eq(0x9F)
+            with m.State("START_RESET0"):
+                m.d.sync += self.spi_flash.word_out.eq(0x66)
                 m.d.sync += self.spi_flash.start_transfer.eq(1)
-                m.d.sync += disp1_pls.eq(1)
-                m.next = "UNSTB"
+                m.next = "START_RESET0_UNSTB"
+
+            with m.State("START_RESET0_UNSTB"):
+                m.d.sync += self.spi_flash.start_transfer.eq(0)
+                m.next = "START_RESET0_WAIT"
+
+            with m.State("START_RESET0_WAIT"):
+                with m.If(self.spi_flash.word_complete):
+                    m.d.sync += self.spi_flash.word_out.eq(0x99)
+                    m.d.sync += self.spi_flash.start_transfer.eq(1)
+                    m.next = "START_RESET1_UNSTB"
+
+            with m.State("START_RESET1_UNSTB"):
+                m.d.sync += self.spi_flash.start_transfer.eq(0)
+                m.next = "START_RESET1_WAIT"
+
+            with m.State("START_RESET1_WAIT"):
+                with m.If(self.spi_flash.word_complete):
+                    m.d.sync += reset_wait.eq(0)
+                    m.next = "START_RESET_FLASHWAIT"
+
+            with m.State("START_RESET_FLASHWAIT"):
+                m.d.sync += reset_wait.eq(reset_wait + 1)
+                with m.If(reset_wait == 0x100000):
+                    m.d.sync += self.spi_flash.word_out.eq(0x9F)
+                    m.d.sync += self.spi_flash.start_transfer.eq(1)
+                    m.next = "UNSTB"
 
             with m.State("UNSTB"):
                 m.d.sync += self.spi_flash.start_transfer.eq(0)
-                m.next = "READ"
+                m.next = "WAITFISH"
 
-            with m.State("READ"):
+            with m.State("WAITFISH"):
+                with m.If(self.spi_flash.word_complete):
+                    m.d.sync += disp1_pls.eq(1)
+                    m.d.sync += self.spi_flash.word_out.eq(0x00)
+                    m.d.sync += self.spi_flash.start_transfer.eq(1)
+                    m.next = "UNSTB2"
+
+            with m.State("UNSTB2"):
+                m.d.sync += self.spi_flash.start_transfer.eq(0)
+                m.next = "WAITFISH2"
+
+            with m.State("WAITFISH2"):
                 with m.If(self.spi_flash.word_complete):
                     m.d.sync += disp2_pls.eq(1)
+                    m.d.sync += dispword_pls.eq(1)
                     m.d.sync += word.eq(self.spi_flash.word_in)
                     m.next = "LOOP"
 
@@ -118,6 +158,43 @@ class SPITestTop(Elaboratable):
                 with m.Elif(disp2_pls & ~disp2_yes):
                     m.d.sync += disp2_yes.eq(1)
                     m.d.sync += self.oled.i_cmd.eq(OLED.Command.DISPLAY2)
+                    m.d.sync += self.oled.i_stb.eq(1)
+                    m.next = "DESTB"
+                with m.Elif(dispword_pls):
+                    m.d.sync += dispword_pls.eq(0)
+                    m.d.sync += self.oled.i_cmd.eq(OLED.Command.POS1)
+                    m.d.sync += self.oled.i_stb.eq(1)
+                    m.next = "POS1_DESTB"
+
+            with m.State("POS1_DESTB"):
+                m.d.sync += self.oled.i_stb.eq(0)
+                m.next = "POS1_WAIT"
+
+            with m.State("POS1_WAIT"):
+                with m.If(self.oled.o_result == OLED.Result.SUCCESS):
+                    m.d.sync += self.oled.i_cmd.eq(
+                        OLED.Command.CHAR0 + (word.shift_right(4) & 0xF)
+                    )
+                    m.d.sync += self.oled.i_stb.eq(1)
+                    m.next = "CHAR1_DESTB"
+
+            with m.State("CHAR1_DESTB"):
+                m.d.sync += self.oled.i_stb.eq(0)
+                m.next = "CHAR1_WAIT"
+
+            with m.State("CHAR1_WAIT"):
+                with m.If(self.oled.o_result == OLED.Result.SUCCESS):
+                    m.d.sync += self.oled.i_cmd.eq(OLED.Command.POS2)
+                    m.d.sync += self.oled.i_stb.eq(1)
+                    m.next = "POS2_DESTB"
+
+            with m.State("POS2_DESTB"):
+                m.d.sync += self.oled.i_stb.eq(0)
+                m.next = "POS2_WAIT"
+
+            with m.State("POS2_WAIT"):
+                with m.If(self.oled.o_result == OLED.Result.SUCCESS):
+                    m.d.sync += self.oled.i_cmd.eq(OLED.Command.CHAR0 + (word & 0xF))
                     m.d.sync += self.oled.i_stb.eq(1)
                     m.next = "DESTB"
 

@@ -1,6 +1,7 @@
 import random
 import struct
 
+from .chars import CHARS
 from .sh1107 import Base, Cmd, DataBytes
 
 __all__ = ["ROM"]
@@ -26,6 +27,7 @@ init: list[list[Base | DataBytes]] = [
     ]
 ]
 for p in range(0x10):
+    # for p in range(0x0):
     if p > 0:
         init.append([])
     init[-1] += [
@@ -54,6 +56,42 @@ DISPLAY2_SEQUENCE = [Cmd.compose(disp2)]
 
 POWEROFF_SEQUENCE = [Cmd.compose([Cmd.DisplayOn(False)])]
 
+POS1_SEQUENCE = [
+    Cmd.compose(
+        [
+            Cmd.SetPageAddress(0x3),
+            Cmd.SetHigherColumnAddress(0x0),
+            Cmd.SetLowerColumnAddress(0x8),
+        ]
+    )
+]
+
+POS2_SEQUENCE = [
+    Cmd.compose(
+        [
+            Cmd.SetPageAddress(0x3),
+            Cmd.SetHigherColumnAddress(0x1),
+            Cmd.SetLowerColumnAddress(0x0),
+        ]
+    )
+]
+
+CHAR_SEQUENCES: list[list[list[int]]] = []
+for i, c in enumerate(CHARS):
+    rows = list(li.strip() for li in c.splitlines() if li.strip())
+    assert len(rows) == 8
+    for row in rows:
+        assert len(row) == 8, f"char {i:x} has bad row"
+
+    data = []
+    for col in range(8):
+        byte = 0
+        for row in range(8):
+            byte = (byte << 1) | (1 if rows[7 - row][col] == "x" else 0)
+        data.append(byte)
+
+    CHAR_SEQUENCES.append([Cmd.compose([DataBytes(data)])])
+
 NULL_SEQUENCE: list[list[int]] = [[]]
 
 seqs = (
@@ -61,6 +99,9 @@ seqs = (
     DISPLAY_SEQUENCE,
     DISPLAY2_SEQUENCE,
     POWEROFF_SEQUENCE,
+    POS1_SEQUENCE,
+    POS2_SEQUENCE,
+    *CHAR_SEQUENCES,
     NULL_SEQUENCE,
 )
 rom_offset = len(seqs) * 2 * 2
