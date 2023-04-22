@@ -1,6 +1,6 @@
-from typing import Final, Optional
+from typing import Final, Optional, cast
 
-from amaranth import Elaboratable, Memory, Module, Signal
+from amaranth import Cat, Elaboratable, Memory, Module, Signal
 from amaranth.build import Platform
 from amaranth.hdl.mem import ReadPort
 from amaranth.lib.enum import IntEnum
@@ -8,7 +8,6 @@ from amaranth.lib.enum import IntEnum
 from common import Hz
 from i2c import I2C
 from .rom import ROM
-from .sh1107 import SequenceBreak
 
 __all__ = ["OLED"]
 
@@ -108,7 +107,7 @@ class OLED(Elaboratable):
                 m.next = "SEND_PREP"
 
             # Send loop:
-            # * If remain == 0, we're done.
+            # * If remain == 0, we're done with this transmission.
             # * Otherwise, when the I2C FIFO is ready, grab the next byte of data from the ROM.
             # * Set the I2C address + write bit, latch the data from the ROM into the FIFO, adjust pointers.
             # * Strobe I2C (and unstrobe the FIFO write).
@@ -116,10 +115,14 @@ class OLED(Elaboratable):
             # * Wait until I2C indicates what's next:
             #   * If it reads ACK, we have until the end of that SCL cycle to enqueue the next byte.
             #   * Otherwise it'll stop and turn off its busy signal, which means it didn't ACK or we missed the boat.
+            #
+            # When done with a transmission, check to see if there are more to do
+            # for this command.  If so, keep going.
             with m.State("SEND_PREP"):
                 with m.If(self.remain == 0):
-                    m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
-                    m.next = "WAIT_CMD"
+                    m.d.sync += self.rom_rd.addr.eq(self.offset)
+                    m.d.sync += self.offset.eq(self.offset + 1)
+                    m.next = "SEQUENCE_BREAK"
                 with m.Elif(self.i2c.fifo.w_rdy):
                     m.d.sync += self.rom_rd.addr.eq(self.offset)
                     m.next = "SEND_ENQUEUE_WAIT"
@@ -130,15 +133,11 @@ class OLED(Elaboratable):
             with m.State("SEND_ENQUEUE"):
                 m.d.sync += self.offset.eq(self.offset + 1)
                 m.d.sync += self.remain.eq(self.remain - 1)
-
-                with m.If(self.rom_rd.data == SequenceBreak.BYTE):
-                    m.next = "SEQUENCE_BREAK"
-                with m.Else():
-                    m.d.sync += self.i2c.i_addr.eq(0x3C)
-                    m.d.sync += self.i2c.i_rw.eq(0)
-                    m.d.sync += self.i2c.fifo.w_data.eq(self.rom_rd.data)
-                    m.d.sync += self.i2c.fifo.w_en.eq(1)
-                    m.next = "SEND_READY"
+                m.d.sync += self.i2c.i_addr.eq(0x3C)
+                m.d.sync += self.i2c.i_rw.eq(0)
+                m.d.sync += self.i2c.fifo.w_data.eq(self.rom_rd.data)
+                m.d.sync += self.i2c.fifo.w_en.eq(1)
+                m.next = "SEND_READY"
 
             with m.State("SEND_READY"):
                 m.d.sync += self.i2c.i_stb.eq(1)
@@ -159,6 +158,24 @@ class OLED(Elaboratable):
                     m.next = "WAIT_CMD"
 
             with m.State("SEQUENCE_BREAK"):
+                m.d.sync += self.rom_rd.addr.eq(self.offset)
+                m.d.sync += self.offset.eq(self.offset + 1)
+                m.next = "SEQUENCE_BREAK_LOW"
+
+            with m.State("SEQUENCE_BREAK_LOW"):
+                m.d.sync += self.remain.eq(self.rom_rd.data)
+                m.next = "SEQUENCE_BREAK_HIGH"
+
+            with m.State("SEQUENCE_BREAK_HIGH"):
+                remain = self.remain | cast(Cat, self.rom_rd.data.shift_left(8))
+                with m.If(remain == 0):
+                    m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
+                    m.next = "WAIT_CMD"
+                with m.Else():
+                    m.d.sync += self.remain.eq(remain)
+                    m.next = "SEQUENCE_BREAK_WAIT"
+
+            with m.State("SEQUENCE_BREAK_WAIT"):
                 with m.If(~self.i2c.o_busy & self.i2c.o_ack & self.i2c.fifo.w_rdy):
                     m.next = "SEND_PREP"
                 with m.Elif(~self.i2c.o_busy):
