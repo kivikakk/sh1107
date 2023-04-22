@@ -1,11 +1,14 @@
 from typing import Optional
 
-from amaranth import Elaboratable, Memory, Module, Signal
+from amaranth import Elaboratable, Module, Signal
 from amaranth.build import Platform
 from amaranth.hdl.mem import ReadPort
 from amaranth.lib.enum import IntEnum
 
 from i2c import I2C, Speed
+from spi import SPI
+
+from oled import ROM
 
 __all__ = ["OLED"]
 
@@ -25,7 +28,7 @@ class OLED(Elaboratable):
     rom_rd: ReadPort
 
     class Command(IntEnum):
-        # these correspond to offsets in OFFLENS.
+        # these correspond to offsets in ROM.
         # TODO(ari): less hacky
         INIT = 1
         DISPLAY = 2
@@ -41,6 +44,7 @@ class OLED(Elaboratable):
         self.speed = speed
 
         self.i2c = I2C(speed=speed)
+        self.spi = SPI()
 
         self.i_cmd = Signal(OLED.Command)
         self.i_stb = Signal()
@@ -49,23 +53,10 @@ class OLED(Elaboratable):
         self.offset = Signal(range(len(ROM)))
         self.remain = Signal(range(len(ROM)))
 
-        # # TODO(Mia): Given this is read-only, we may want to use Array.  I see
-        # # this using ICESTORM_RAM. TODO(ari): auto determine width for offlens?
-        # # does it just truncate if too small?
-        # self.rom = Memory(width=8, depth=len(ROM), init=ROM)
-        # self.offlens = Memory(width=16, depth=len(OFFLENS), init=OFFLENS)
-
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
 
         m.submodules.i2c = self.i2c
-
-        m.submodules.rom_rd = self.rom_rd = rom_rd = self.rom.read_port(
-            transparent=False
-        )
-        m.submodules.offlens_rd = self.offlens_rd = offlens_rd = self.offlens.read_port(
-            transparent=False
-        )
 
         cmd = Signal.like(self.i_cmd)
 

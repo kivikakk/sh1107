@@ -22,7 +22,6 @@ class Speed:
         100_000,
         400_000,
         1_000_000,
-        # 3_400_000,  XXX(Mia): NYI
     ]
 
     def __init__(self, hz: int | str):
