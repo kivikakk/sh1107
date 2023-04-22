@@ -5,8 +5,7 @@ from amaranth.build import Platform
 from amaranth_boards.icebreaker import ICEBreakerPlatform
 from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
 
-from i2c import Speed
-from minor import Button, ButtonWithHold
+from common import Button, ButtonWithHold, Hz
 from .oled import OLED
 
 __all__ = ["Top"]
@@ -14,13 +13,13 @@ __all__ = ["Top"]
 
 class Top(Elaboratable):
     oled: OLED
-    speed: Speed
+    speed: Hz
 
     o_last_cmd: Signal
 
     sim_switch: Signal
 
-    def __init__(self, *, speed: Speed = Speed(400_000)):
+    def __init__(self, *, speed: Hz = Hz(400_000)):
         self.oled = OLED(speed=speed)
         self.speed = speed
 

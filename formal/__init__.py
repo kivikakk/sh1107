@@ -5,7 +5,8 @@ from amaranth import ClockSignal, Module, ResetSignal, Signal, Value
 # from amaranth.asserts import Assert, Cover, Assume, Initial
 from amaranth.asserts import Assume, Cover
 
-from i2c import I2C, Speed
+from common import Hz
+from i2c import I2C
 
 
 def formal() -> Tuple[Module, list[Signal | Value]]:
@@ -13,7 +14,7 @@ def formal() -> Tuple[Module, list[Signal | Value]]:
     # to main.sby, specifically around the "techmap" call.
     # See https://github.com/amaranth-lang/amaranth/issues/526.
     m = Module()
-    m.submodules.dut = dut = I2C(speed=Speed(100_000))
+    m.submodules.dut = dut = I2C(speed=Hz(100_000))
 
     sync_clk = ClockSignal("sync")
     sync_rst = ResetSignal("sync")

@@ -15,7 +15,7 @@ class VirtualI2C:
 
     def __init__(self, i2c: I2C):
         self.i2c = i2c
-        self.tick = 0.1 / i2c.speed.hz
+        self.tick = 0.1 / i2c.speed.value
 
     def start(self) -> sim.Generator:
         # Strobed.  I2C start condition.

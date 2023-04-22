@@ -10,39 +10,19 @@ from amaranth_boards.resources import (
     I2CResource,  # pyright: reportUnknownVariableType=false
 )
 
-from minor import Counter
+from common import Counter, Hz
 
-__all__ = ["I2C", "Speed"]
+__all__ = ["I2C"]
 
 
-class Speed:
-    hz: int
-
+class I2C(Elaboratable):
     VALID_SPEEDS: Final[list[int]] = [
         100_000,
         400_000,
         1_000_000,
     ]
 
-    def __init__(self, hz: int | str):
-        hz = int(hz)
-        assert hz in self.VALID_SPEEDS
-        self.hz = hz
-
-    def __repr__(self) -> str:
-        return f"{self.hz}Hz"
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, Speed):
-            return NotImplemented
-        return self.hz == other.hz
-
-    def __hash__(self) -> int:
-        return hash(self.hz)
-
-
-class I2C(Elaboratable):
-    speed: Speed
+    speed: Hz
 
     i_addr: Signal
     i_rw: Signal
@@ -65,7 +45,8 @@ class I2C(Elaboratable):
     byte: Signal
     byte_ix: Signal
 
-    def __init__(self, *, speed: Speed):
+    def __init__(self, *, speed: Hz):
+        assert speed.value in self.VALID_SPEEDS
         self.speed = speed
 
         self.i_addr = Signal(7, reset=0x3C)
@@ -135,7 +116,7 @@ class I2C(Elaboratable):
         # NOTE(Mia): we might need to keep scl_o=0 and toggle scl_oe instead for
         # clock stretching?
 
-        m.submodules.c = c = Counter(hz=self.speed.hz * 2)
+        m.submodules.c = c = Counter(hz=self.speed.value * 2)
         with m.If(c.o_full):
             m.d.sync += self.scl_o.eq(~self.scl_o)
 

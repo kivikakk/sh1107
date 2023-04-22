@@ -8,7 +8,7 @@ from pyglet import gl
 from pyglet.image import ImageData
 from pyglet.window import Window, key
 
-from i2c import Speed
+from common import Hz
 from oled import Top
 from oled.sh1107 import Base, Cmd, DataBytes
 from .connector import Connector
@@ -18,7 +18,7 @@ __all__ = ["run"]
 
 
 def run(args: Namespace):
-    top = Top(speed=Speed(1_000_000))
+    top = Top(speed=Hz(1_000_000))
     simulator = Simulator(top)
 
     v = Display(top, simulator)

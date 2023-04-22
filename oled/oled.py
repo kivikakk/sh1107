@@ -1,22 +1,25 @@
-from typing import Optional
+from typing import Final, Optional
 
 from amaranth import Elaboratable, Module, Signal
 from amaranth.build import Platform
 from amaranth.hdl.mem import ReadPort
 from amaranth.lib.enum import IntEnum
+from amaranth_boards.icebreaker import ICEBreakerPlatform
+from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
 
-from i2c import I2C, Speed
-from spi import SPI
-
-from oled import ROM
+from common import Hz
+from i2c import I2C
+from vendor.amlib.amlib.io.spi import SPIControllerInterface
+from .rom import ROM
 
 __all__ = ["OLED"]
 
 
 class OLED(Elaboratable):
-    speed: Speed
+    speed: Hz
 
     i2c: I2C
+    spi_flash: SPIControllerInterface
 
     i_cmd: Signal
     i_stb: Signal
@@ -40,11 +43,18 @@ class OLED(Elaboratable):
         BUSY = 1
         FAILURE = 2
 
-    def __init__(self, *, speed: Speed):
+    VALID_SPEEDS: Final[list[int]] = [
+        100_000,
+        400_000,
+        1_000_000,  # TODO check on hardware
+    ]
+
+    def __init__(self, *, speed: Hz):
+        assert speed.value in self.VALID_SPEEDS
         self.speed = speed
 
         self.i2c = I2C(speed=speed)
-        self.spi = SPI()
+        self.spi_flash = SPIControllerInterface(divisor=12)  # ?
 
         self.i_cmd = Signal(OLED.Command)
         self.i_stb = Signal()
@@ -57,6 +67,14 @@ class OLED(Elaboratable):
         m = Module()
 
         m.submodules.i2c = self.i2c
+        m.submodules.spi_flash = self.spi_flash
+
+        match platform:
+            case ICEBreakerPlatform() | OrangeCrabR0_2_85FPlatform():
+                res = platform.request("spi_flash")
+                m.d.comb += self.spi_flash.connect_to_resource(res)
+            case _:
+                pass
 
         cmd = Signal.like(self.i_cmd)
 

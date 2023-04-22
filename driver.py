@@ -9,20 +9,26 @@ from pathlib import Path
 from typing import Dict, Optional, Type
 from unittest import TestLoader, TextTestRunner
 
+from amaranth import Module
 from amaranth.back import rtlil
 from amaranth.build import Platform
 from amaranth.hdl import Fragment
 from amaranth_boards.icebreaker import ICEBreakerPlatform
 from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
 
+from common import Hz
 from formal import formal as prep_formal
-from i2c import Speed
-from oled import Top, ROM
+from oled import OLED, ROM, Top
 
 BOARDS: Dict[str, Type[Platform]] = {
     "icebreaker": ICEBreakerPlatform,
     "orangecrab": OrangeCrabR0_2_85FPlatform,
 }
+
+
+def _top(name: str) -> Type[Module]:
+    mod, klass = name.rsplit(".", 1)
+    return getattr(importlib.import_module(mod), klass)
 
 
 def _outfile(dir: str, ext: str):
@@ -76,8 +82,14 @@ def _print_file_between(
 
 
 def build(args: Namespace):
+    m = _top(args.top)
+    if isinstance(m, Top):
+        elaboratable = m(speed=Hz(args.speed))
+    else:
+        elaboratable = m()
+
     BOARDS[args.board]().build(
-        Top(speed=Speed(args.speed)),
+        elaboratable,
         do_program=args.program,
         debug_verilog=args.verilog,
     )
@@ -109,7 +121,7 @@ def vsh(args: Namespace):
 
 
 def main():
-    parser = ArgumentParser(prog="fpgaxp.oled.main")
+    parser = ArgumentParser(prog="driver")
     subparsers = parser.add_subparsers(required=True)
 
     test_parser = subparsers.add_parser(
@@ -123,6 +135,7 @@ def main():
         help="run tests from a specific subdirectory",
     )
 
+    # TODO!
     formal_parser = subparsers.add_parser(
         "formal",
         help="formally verify the design",
@@ -135,6 +148,12 @@ def main():
     )
     build_parser.set_defaults(func=build)
     build_parser.add_argument(
+        "-t",
+        "--top",
+        help="which top-level module to build (default: oled.Top)",
+        default="oled.Top",
+    )
+    build_parser.add_argument(
         "board",
         choices=BOARDS.keys(),
         help="which board to build for",
@@ -142,9 +161,9 @@ def main():
     build_parser.add_argument(
         "-s",
         "--speed",
-        choices=[str(s) for s in Speed.VALID_SPEEDS],
-        help="bus speed to build at",
-        default=str(Speed.VALID_SPEEDS[0]),
+        choices=[str(s) for s in OLED.VALID_SPEEDS],
+        help="I2C bus speed to build at",
+        default=str(OLED.VALID_SPEEDS[0]),
     )
     build_parser.add_argument(
         "-p",

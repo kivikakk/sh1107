@@ -6,15 +6,15 @@ from amaranth.build import Platform
 from amaranth.sim import Delay, Settle
 
 import sim
-from minor.button import Button
-from . import I2C, Speed, VirtualI2C
+from common import Button, Hz
+from . import I2C, VirtualI2C
 
 
 class Top(Elaboratable):
-    speed: Speed
+    speed: Hz
     button: Button
 
-    def __init__(self, *, speed: Speed):
+    def __init__(self, *, speed: Hz):
         self.speed = speed
 
     def elaborate(self, platform: Optional[Platform]) -> Module:
@@ -64,9 +64,9 @@ class TestI2C(sim.TestCase):
     iv: VirtualI2C
     i2c: I2C
 
-    @sim.args(speed=Speed(100_000))
-    @sim.args(speed=Speed(400_000))
-    @sim.args(speed=Speed(1_000_000))
+    @sim.args(speed=Hz(100_000))
+    @sim.args(speed=Hz(400_000))
+    @sim.args(speed=Hz(1_000_000))
     def test_sim_i2c(self, dut: Top) -> sim.Generator:
         self.button = dut.button
         self.iv = VirtualI2C(dut.i2c)
