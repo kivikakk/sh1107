@@ -23,6 +23,7 @@ pub fn main() !void {
         clk.*.next[0] = if (clk.*.curr[0] == 0) 1 else 0;
 
         // XXX(sar) idk if i should change things with clk rise or fall
+        // Clock rise, probably, since things will usually trigger posedge.
         if (i == 0) {
             swi.*.next[0] = 1;
         } else if (i == 2) {

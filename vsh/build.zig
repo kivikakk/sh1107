@@ -2,9 +2,9 @@ const std = @import("std");
 
 pub fn build(b: *std.Build) void {
     const yosys_data_dir = b.option([]const u8, "yosys_data_dir", "yosys data dir (e.g. per yosys-config --datdir)") orelse
-        @panic("missing -Dyosys_data_dir");
-    const cxxrtl_lib_path = b.option([]const u8, "cxxrtl_lib_path", "path to CXXRTL-compiled .so") orelse
-        @panic("missing -Dcxxrtl_lib_path");
+        guess_yosys_data_dir(b);
+    const cxxrtl_lib_path = b.option([]const u8, "cxxrtl_lib_path", "path to CXXRTL-compiled .o") orelse
+        "../build/oled_i2c.o";
 
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -42,4 +42,13 @@ pub fn build(b: *std.Build) void {
 
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_unit_tests.step);
+}
+
+fn guess_yosys_data_dir(b: *std.Build) []const u8 {
+    const result = std.ChildProcess.exec(.{
+        .allocator = b.allocator,
+        .argv = &.{ "yosys-config", "--datdir" },
+        .expand_arg0 = .expand,
+    }) catch @panic("couldn't run yosys-config; please supply -Dyosys_data_dir");
+    return std.mem.trim(u8, result.stdout, "\n");
 }
