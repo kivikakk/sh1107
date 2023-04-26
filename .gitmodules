@@ -1,3 +1,6 @@
 [submodule "vendor/amlib"]
 	path = vendor/amlib
 	url = https://github.com/kivikakk/amlib
+[submodule "vendor/zig-gamekit"]
+	path = vendor/zig-gamekit
+	url = https://github.com/kivikakk/zig-gamekit
