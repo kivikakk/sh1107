@@ -26,8 +26,8 @@ fn gkInit() !void {
     display = try Display.init();
 }
 
-fn gkUpdate() !void {
-    display.update();
+fn gkUpdate() !bool {
+    return display.update();
 }
 
 fn gkRender() !void {

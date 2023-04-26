@@ -33,7 +33,11 @@ pub fn deinit(self: Display) void {
     self.cxxrtl.deinit();
 }
 
-pub fn update(self: *Display) void {
+pub fn update(self: *Display) bool {
+    if (gk.input.keyPressed(.escape)) {
+        return false;
+    }
+
     const clk = self.cxxrtl.get("clk");
     const swi = self.cxxrtl.get("switch");
     const last_cmd = self.cxxrtl.get("o_last_cmd");
@@ -57,6 +61,8 @@ pub fn update(self: *Display) void {
         self.cxxrtl.step();
         // std.debug.print("step {}: clk {}, last_cmd {}, oled_result {}\n", .{ i, clk.*.curr[0], last_cmd.*.curr[0], oled_result.*.curr[0] });
     }
+
+    return true;
 }
 
 pub fn render(self: *Display) void {
