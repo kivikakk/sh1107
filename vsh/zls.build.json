@@ -1,0 +1,8 @@
+{
+    "build_options": [
+        {
+            "name": "yosys_data_dir",
+            "value": "C:/hrzn/sys/Python3/Lib/site-packages/amaranth_yosys/share"
+        }
+    ]
+}

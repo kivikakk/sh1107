@@ -1,4 +1,5 @@
 const std = @import("std");
+const gkBuild = @import("vendor/zig-gamekit/build.zig");
 
 pub fn build(b: *std.Build) void {
     const yosys_data_dir = b.option([]const u8, "yosys_data_dir", "yosys data dir (e.g. per yosys-config --datdir)") orelse
@@ -18,6 +19,8 @@ pub fn build(b: *std.Build) void {
     exe.linkLibCpp();
     exe.addObjectFile(cxxrtl_lib_path);
     exe.addIncludePath(b.fmt("{s}/include", .{yosys_data_dir}));
+
+    gkBuild.addGameKitToArtifact(b, exe, target, "vendor/zig-gamekit/");
 
     b.installArtifact(exe);
 
