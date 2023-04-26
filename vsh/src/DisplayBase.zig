@@ -16,7 +16,7 @@ pub const top_area: u16 = 112;
 pub const checkbox_size: u16 = 10;
 pub const checkbox_text_gap: u16 = 6;
 pub const checkbox_across: u16 = 80;
-pub const checkbox_down: u16 = 6;
+pub const checkbox_up: u16 = 4;
 
 pub const top_col_width: u16 = 142;
 pub const top_row_height: u16 = 16;

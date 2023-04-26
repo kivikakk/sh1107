@@ -1,27 +1,34 @@
 const gk = @import("gamekit");
 
-const DclkFreq = enum {
-    Neg25,
-    Neg20,
-    Neg15,
-    Neg10,
-    Neg5,
-    Zero,
-    Pos5,
-    Pos10,
-    Pos15,
-    Pos20,
-    Pos25,
-    Pos30,
-    Pos35,
-    Pos40,
-    Pos45,
-    Pos50,
+const DclkFreq = enum(i7) {
+    Neg25 = -25,
+    Neg20 = -20,
+    Neg15 = -15,
+    Neg10 = -10,
+    Neg5 = -5,
+    Zero = 0,
+    Pos5 = 5,
+    Pos10 = 10,
+    Pos15 = 15,
+    Pos20 = 20,
+    Pos25 = 25,
+    Pos30 = 30,
+    Pos35 = 35,
+    Pos40 = 40,
+    Pos45 = 45,
+    Pos50 = 50,
 };
 
 const AddrMode = enum {
     Page,
     Column,
+
+    pub fn str(self: AddrMode) []const u8 {
+        return switch (self) {
+            .Page => "page",
+            .Column => "column",
+        };
+    }
 };
 
 power: bool = false,
