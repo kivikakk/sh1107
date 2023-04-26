@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import importlib.util
+import os
 import re
 import subprocess
 import sys
@@ -128,6 +129,10 @@ def vsh(args: Namespace):
         design = top(speed=Hz(args.speed))
     else:
         design = top()
+
+    # XXX(ari): works better on Windows since osscad's yosys-config a) doesn't execute
+    # cleanly automatically (bash script), and b) its answers are wrong anyway.
+    os.environ["AMARANTH_USE_YOSYS"] = "builtin"
 
     yosys = cast(YosysBinary, find_yosys(lambda _: True))
 
