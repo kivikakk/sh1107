@@ -5,11 +5,15 @@ const DisplayBase = @import("./DisplayBase.zig");
 const Cxxrtl = @import("./Cxxrtl.zig");
 const SH1107 = @import("./SH1107.zig");
 
+const SwitchConnector = @import("./SwitchConnector.zig");
+
 const Display = @This();
 
 base: DisplayBase,
 cxxrtl: Cxxrtl,
 sh1107: SH1107,
+
+switch_connector: ?SwitchConnector,
 
 idata: [DisplayBase.i2c_width * DisplayBase.i2c_height]gk.math.Color = [_]gk.math.Color{DisplayBase.black} ** (DisplayBase.i2c_width * DisplayBase.i2c_height),
 img: gk.gfx.Texture,
@@ -21,10 +25,18 @@ pub fn init() !Display {
 
     const img = gk.gfx.Texture.init(DisplayBase.i2c_width, DisplayBase.i2c_height);
 
+    var switch_connector: ?SwitchConnector = null;
+    if (cxxrtl.find(bool, "switch")) |swi| {
+        switch_connector = SwitchConnector.init(swi);
+    }
+
     return .{
         .base = base,
         .cxxrtl = cxxrtl,
         .sh1107 = .{},
+
+        .switch_connector = switch_connector,
+
         .img = img,
     };
 }
@@ -33,33 +45,37 @@ pub fn deinit(self: Display) void {
     self.cxxrtl.deinit();
 }
 
+var last_oled_result: u2 = 0;
+
 pub fn update(self: *Display) bool {
     if (gk.input.keyPressed(.escape)) {
         return false;
     }
 
-    const clk = self.cxxrtl.get("clk");
-    const swi = self.cxxrtl.get("switch");
-    const last_cmd = self.cxxrtl.get("o_last_cmd");
+    if (gk.input.keyPressed(.key_return)) {
+        self.switch_connector.?.press();
+    }
+
+    const clk = self.cxxrtl.get(bool, "clk");
+    const last_cmd = self.cxxrtl.get(u8, "o_last_cmd");
     _ = last_cmd;
-    const oled_result = self.cxxrtl.get("oled o_result");
-    _ = oled_result;
+    const oled_result = self.cxxrtl.get(u2, "oled o_result");
 
-    for (0..2) |i| {
-        // i%2==0: clock rises
-        // i%2==1: clock falls
-        clk.*.next[0] = if (clk.*.curr[0] == 0) 1 else 0;
-
-        // XXX(sar) idk if i should change things with clk rise or fall
-        // Clock rise, probably, since things will usually trigger posedge.
-        if (i == 0) {
-            swi.*.next[0] = 1;
-        } else if (i == 2) {
-            swi.*.next[0] = 0;
+    for (0..1000) |_| {
+        clk.next(true);
+        if (self.switch_connector) |*swicon| {
+            swicon.tick();
         }
-
         self.cxxrtl.step();
-        // std.debug.print("step {}: clk {}, last_cmd {}, oled_result {}\n", .{ i, clk.*.curr[0], last_cmd.*.curr[0], oled_result.*.curr[0] });
+
+        clk.next(false);
+        self.cxxrtl.step();
+
+        const curr_oled_result = oled_result.curr();
+        if (curr_oled_result != last_oled_result) {
+            std.debug.print("oled_result -> {d}\n", .{curr_oled_result});
+            last_oled_result = curr_oled_result;
+        }
     }
 
     return true;
