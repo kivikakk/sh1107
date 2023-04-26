@@ -28,8 +28,15 @@ class Top(Elaboratable):
         self.switch = Signal()
 
     @property
-    def ports(self):
-        return [self.switch]
+    def ports(self) -> list[Signal]:
+        return [
+            self.switch,
+            self.oled.i2c.scl_o,
+            self.oled.i2c.scl_oe,
+            self.oled.i2c.sda_o,
+            self.oled.i2c.sda_oe,
+            self.oled.i2c.sda_i,
+        ]
 
     def elaborate(self, platform: Optional[Platform]):
         m = Module()

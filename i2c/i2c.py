@@ -20,6 +20,7 @@ class I2C(Elaboratable):
         100_000,
         400_000,
         1_000_000,
+        2_000_000,  # XXX: for vsh
     ]
 
     speed: Hz
@@ -58,7 +59,7 @@ class I2C(Elaboratable):
         self.o_busy = Signal()
         self.o_ack = Signal(reset=1)
 
-        self.assign(scl=Pin(1, "io"), sda=Pin(1, "io"))
+        self.assign(scl=Pin(1, "io", name="scl"), sda=Pin(1, "io", name="sda"))
         self.sda_i.reset = 1
 
         self.byte = Signal(8)

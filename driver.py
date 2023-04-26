@@ -92,10 +92,12 @@ def _print_file_between(
 
 def build(args: Namespace):
     m = _top(args.top)
-    if isinstance(m, Top):
-        elaboratable = m(speed=Hz(args.speed))
-    else:
-        elaboratable = m()
+    # if isinstance(m, Top):
+    # TODO: fix this
+    elaboratable = m(speed=Hz(args.speed))
+    # pass
+    # else:
+    # elaboratable = m()
 
     BOARDS[args.board]().build(
         elaboratable,
@@ -125,10 +127,8 @@ def rom(args: Namespace):
 
 def vsh(args: Namespace):
     top = _top(args.top)
-    if isinstance(top, Top):
-        design = top(speed=Hz(args.speed))
-    else:
-        design = top()
+    # TODO: work with non-oled.Top
+    design = top(speed=Hz(2_000_000))
 
     # XXX(ari): works better on Windows since osscad's yosys-config a) doesn't execute
     # cleanly automatically (bash script), and b) its answers are wrong anyway.
@@ -164,6 +164,7 @@ def vsh(args: Namespace):
             "zig",
             "build",
             *([] if args.build_only else ["run"]),
+            *(["-Doptimize=ReleaseFast"] if args.opt else []),
             f"-Dyosys_data_dir={yosys.data_dir()}",
             f"-Dcxxrtl_lib_path={cxxrtl_lib_path}",
         ],
@@ -264,6 +265,12 @@ def main():
         "--build-only",
         action="store_true",
         help="only build the Virtual SH1107, don't run it",
+    )
+    vsh_parser.add_argument(
+        "-O",
+        "--opt",
+        action="store_true",
+        help="build with -Doptimize=ReleaseFast",
     )
 
     args = parser.parse_args()

@@ -4,6 +4,7 @@ const gk = @import("gamekit");
 const DisplayBase = @import("./DisplayBase.zig");
 const Cxxrtl = @import("./Cxxrtl.zig");
 const SH1107 = @import("./SH1107.zig");
+const Cmd = @import("./Cmd.zig");
 
 const SwitchConnector = @import("./SwitchConnector.zig");
 const OLEDConnector = @import("./OLEDConnector.zig");
@@ -32,7 +33,7 @@ pub fn init() !Display {
         switch_connector = SwitchConnector.init(swi);
     }
 
-    const oled_connector = OLEDConnector.init(cxxrtl, "oled", 0x3c);
+    const oled_connector = OLEDConnector.init(cxxrtl, 0x3c);
 
     return .{
         .base = base,
@@ -66,7 +67,9 @@ pub fn update(self: *Display) bool {
     _ = last_cmd;
     const oled_result = self.cxxrtl.get(u2, "oled o_result");
 
-    for (0..1000) |_| {
+    // TODO: put in own thread?
+    // could be faster ...
+    for (0..4000) |_| {
         clk.next(true);
         if (self.switch_connector) |*swicon| {
             swicon.tick();
@@ -267,4 +270,26 @@ fn drawOLED(self: *Display) void {
             DisplayBase.off_border,
         );
     }
+}
+
+pub fn process_cmd(self: *Display, cmd: Cmd.Command) void {
+    switch (cmd) {
+        .SetLowerColumnAddress => |lower| {
+            self.sh1107.column_address = (self.sh1107.column_address & 0x70) | lower;
+        },
+        .SetHigherColumnAddress => |higher| {
+            self.sh1107.column_address = (self.sh1107.column_address & 0x0F) | (@as(u7, higher) << 4);
+        },
+        .DisplayOn => |on| {
+            self.sh1107.power = on;
+        },
+        .SetPageAddress => |page| {
+            self.sh1107.page_address = page;
+        },
+    }
+}
+
+pub fn process_data(self: *Display, data: u8) void {
+    _ = data;
+    _ = self;
 }

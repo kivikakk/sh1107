@@ -55,7 +55,7 @@ class Counter(Elaboratable):
         full_clock_tgt = clk_counter_max - 1
         assert (
             0 <= half_clock_tgt < full_clock_tgt
-        ), f"{assertion_msg}; !(0 < {half_clock_tgt} < {full_clock_tgt})"
+        ), f"{assertion_msg}; !(0 <= {half_clock_tgt} < {full_clock_tgt})"
 
         m.d.comb += self.o_half.eq(clk_counter == half_clock_tgt)
         m.d.comb += self.o_full.eq(clk_counter == full_clock_tgt)

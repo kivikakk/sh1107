@@ -34,6 +34,7 @@ class OLED(Elaboratable):
         100_000,
         400_000,
         1_000_000,
+        2_000_000,  # XXX vsh
     ]
     DEFAULT_SPEED: Final[int] = 1_000_000
 

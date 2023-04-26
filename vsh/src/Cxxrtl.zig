@@ -39,7 +39,11 @@ pub fn Object(comptime T: type) type {
         object: *c.cxxrtl_object,
 
         pub fn curr(self: Self) T {
-            return @intCast(T, self.object.*.curr[0]);
+            if (T == bool) {
+                return self.object.*.curr[0] == 1;
+            } else {
+                return @intCast(T, self.object.*.curr[0]);
+            }
         }
 
         pub fn next(self: Self, value: T) void {
