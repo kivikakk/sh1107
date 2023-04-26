@@ -6,6 +6,7 @@ const Cxxrtl = @import("./Cxxrtl.zig");
 const SH1107 = @import("./SH1107.zig");
 
 const SwitchConnector = @import("./SwitchConnector.zig");
+const OLEDConnector = @import("./OLEDConnector.zig");
 
 const Display = @This();
 
@@ -14,6 +15,7 @@ cxxrtl: Cxxrtl,
 sh1107: SH1107,
 
 switch_connector: ?SwitchConnector,
+oled_connector: OLEDConnector,
 
 idata: [DisplayBase.i2c_width * DisplayBase.i2c_height]gk.math.Color = [_]gk.math.Color{DisplayBase.black} ** (DisplayBase.i2c_width * DisplayBase.i2c_height),
 img: gk.gfx.Texture,
@@ -30,12 +32,15 @@ pub fn init() !Display {
         switch_connector = SwitchConnector.init(swi);
     }
 
+    const oled_connector = OLEDConnector.init(cxxrtl, "oled", 0x3c);
+
     return .{
         .base = base,
         .cxxrtl = cxxrtl,
         .sh1107 = .{},
 
         .switch_connector = switch_connector,
+        .oled_connector = oled_connector,
 
         .img = img,
     };
@@ -66,6 +71,7 @@ pub fn update(self: *Display) bool {
         if (self.switch_connector) |*swicon| {
             swicon.tick();
         }
+        self.oled_connector.tick(self);
         self.cxxrtl.step();
 
         clk.next(false);
