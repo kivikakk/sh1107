@@ -2,56 +2,33 @@ const std = @import("std");
 const gk = @import("gamekit");
 
 const DisplayBase = @import("./DisplayBase.zig");
-const Cxxrtl = @import("./Cxxrtl.zig");
+const FPGAThread = @import("./FPGAThread.zig");
 const SH1107 = @import("./SH1107.zig");
-const Cmd = @import("./Cmd.zig");
-
-const SwitchConnector = @import("./SwitchConnector.zig");
-const OLEDConnector = @import("./OLEDConnector.zig");
 
 const Display = @This();
 
+fpga_thread: *FPGAThread,
 base: DisplayBase,
-cxxrtl: Cxxrtl,
-sh1107: SH1107,
-
-switch_connector: ?SwitchConnector,
-oled_connector: OLEDConnector,
+img: gk.gfx.Texture,
 
 idata: [DisplayBase.i2c_width * DisplayBase.i2c_height]gk.math.Color = [_]gk.math.Color{DisplayBase.black} ** (DisplayBase.i2c_width * DisplayBase.i2c_height),
-img: gk.gfx.Texture,
 img_stale: bool = true,
 
 pub fn init() !Display {
+    const fpga_thread = try FPGAThread.start();
     const base = try DisplayBase.init();
-    const cxxrtl = Cxxrtl.init();
-
     const img = gk.gfx.Texture.init(DisplayBase.i2c_width, DisplayBase.i2c_height);
 
-    var switch_connector: ?SwitchConnector = null;
-    if (cxxrtl.find(bool, "switch")) |swi| {
-        switch_connector = SwitchConnector.init(swi);
-    }
-
-    const oled_connector = OLEDConnector.init(cxxrtl, 0x3c);
-
     return .{
+        .fpga_thread = fpga_thread,
         .base = base,
-        .cxxrtl = cxxrtl,
-        .sh1107 = .{},
-
-        .switch_connector = switch_connector,
-        .oled_connector = oled_connector,
-
         .img = img,
     };
 }
 
 pub fn deinit(self: Display) void {
-    self.cxxrtl.deinit();
+    self.fpga_thread.stop();
 }
-
-var last_oled_result: u2 = 0;
 
 pub fn update(self: *Display) bool {
     if (gk.input.keyPressed(.escape)) {
@@ -59,32 +36,7 @@ pub fn update(self: *Display) bool {
     }
 
     if (gk.input.keyPressed(.key_return)) {
-        self.switch_connector.?.press();
-    }
-
-    const clk = self.cxxrtl.get(bool, "clk");
-    const last_cmd = self.cxxrtl.get(u8, "o_last_cmd");
-    _ = last_cmd;
-    const oled_result = self.cxxrtl.get(u2, "oled o_result");
-
-    // TODO: put in own thread?
-    // could be faster ...
-    for (0..4000) |_| {
-        clk.next(true);
-        if (self.switch_connector) |*swicon| {
-            swicon.tick();
-        }
-        self.oled_connector.tick(self);
-        self.cxxrtl.step();
-
-        clk.next(false);
-        self.cxxrtl.step();
-
-        const curr_oled_result = oled_result.curr();
-        if (curr_oled_result != last_oled_result) {
-            std.debug.print("oled_result -> {d}\n", .{curr_oled_result});
-            last_oled_result = curr_oled_result;
-        }
+        self.fpga_thread.press_switch_connector();
     }
 
     return true;
@@ -97,8 +49,9 @@ pub fn render(self: *Display) void {
 
     gfx.draw.tex(self.base.voyager2, .{ .x = 0, .y = 0 });
 
-    self.drawTop();
-    self.drawOLED();
+    const sh1107 = self.fpga_thread.acquire_sh1107();
+    self.drawTop(&sh1107);
+    self.drawOLED(&sh1107);
 
     gfx.endPass();
 }
@@ -193,41 +146,41 @@ const TopDrawState = struct {
     }
 };
 
-fn drawTop(self: *Display) void {
+fn drawTop(self: *Display, sh1107: *const SH1107) void {
     var tds = TopDrawState.start(self);
-    tds.check("power on", self.sh1107.power);
-    tds.check("dc/dc on", self.sh1107.dcdc);
-    tds.fmt("dclk", "{d}% {d}x", .{ @enumToInt(self.sh1107.dclk_freq), self.sh1107.dclk_ratio });
-    tds.fmt("pre/dis", "{d}/{d}", .{ self.sh1107.precharge_period, self.sh1107.discharge_period });
-    tds.fmt("vcom desel", "{x:0>2}", .{self.sh1107.vcom_desel});
+    tds.check("power on", sh1107.power);
+    tds.check("dc/dc on", sh1107.dcdc);
+    tds.fmt("dclk", "{d}% {d}x", .{ @enumToInt(sh1107.dclk_freq), sh1107.dclk_ratio });
+    tds.fmt("pre/dis", "{d}/{d}", .{ sh1107.precharge_period, sh1107.discharge_period });
+    tds.fmt("vcom desel", "{x:0>2}", .{sh1107.vcom_desel});
 
     tds.row();
-    tds.check("all on", self.sh1107.all_on);
-    tds.check("reversed", self.sh1107.reversed);
-    tds.fmt("contrast", "{x:0>2}", .{self.sh1107.contrast});
+    tds.check("all on", sh1107.all_on);
+    tds.check("reversed", sh1107.reversed);
+    tds.fmt("contrast", "{x:0>2}", .{sh1107.contrast});
 
     tds.row();
-    tds.fmt("start", "{x:0>2}/{x:0>2}", .{ self.sh1107.start_line, self.sh1107.start_column });
-    tds.fmt("address", "{x:0>2}/{x:0>2}", .{ self.sh1107.page_address, self.sh1107.column_address });
-    tds.fmt("mode", "{s}", .{self.sh1107.addressing_mode.str()});
-    tds.fmt("multiplex", "{x:0>2}", .{self.sh1107.multiplex});
+    tds.fmt("start", "{x:0>2}/{x:0>2}", .{ sh1107.start_line, sh1107.start_column });
+    tds.fmt("address", "{x:0>2}/{x:0>2}", .{ sh1107.page_address, sh1107.column_address });
+    tds.fmt("mode", "{s}", .{sh1107.addressing_mode.str()});
+    tds.fmt("multiplex", "{x:0>2}", .{sh1107.multiplex});
 
     tds.row();
-    tds.check("seg remap", self.sh1107.segment_remap);
-    tds.check("com rev", self.sh1107.com_scan_reversed);
+    tds.check("seg remap", sh1107.segment_remap);
+    tds.check("com rev", sh1107.com_scan_reversed);
 }
 
 fn dtStart(self: *Display) void {
     self.base.dtStart();
 }
 
-fn drawOLED(self: *Display) void {
+fn drawOLED(self: *Display, sh1107: *const SH1107) void {
     if (self.img_stale) {
         self.img.setData(gk.math.Color, &self.idata);
         self.img_stale = false;
     }
 
-    if (self.sh1107.power) {
+    if (sh1107.power) {
         gk.gfx.draw.hollowRect(
             .{
                 .x = @intToFloat(f32, DisplayBase.padding),
@@ -242,11 +195,11 @@ fn drawOLED(self: *Display) void {
         gk.gfx.draw.texScale(
             self.img,
             .{
-                .x = @intToFloat(f32, DisplayBase.padding + DisplayBase.border_width + if (self.sh1107.com_scan_reversed) DisplayBase.i2c_width * DisplayBase.display_scale else 0),
+                .x = @intToFloat(f32, DisplayBase.padding + DisplayBase.border_width + if (sh1107.com_scan_reversed) DisplayBase.i2c_width * DisplayBase.display_scale else 0),
                 .y = @intToFloat(f32, DisplayBase.padding + DisplayBase.border_width + DisplayBase.top_area),
             },
             // TODO: scale X only when com scan reversed
-            // DisplayBase.display_scale * if (self.sh1107.com_scan_reversed) -1 else 1,
+            // DisplayBase.display_scale * if (sh1107.com_scan_reversed) -1 else 1,
             @intToFloat(f32, DisplayBase.display_scale),
         );
     } else {
@@ -270,26 +223,4 @@ fn drawOLED(self: *Display) void {
             DisplayBase.off_border,
         );
     }
-}
-
-pub fn process_cmd(self: *Display, cmd: Cmd.Command) void {
-    switch (cmd) {
-        .SetLowerColumnAddress => |lower| {
-            self.sh1107.column_address = (self.sh1107.column_address & 0x70) | lower;
-        },
-        .SetHigherColumnAddress => |higher| {
-            self.sh1107.column_address = (self.sh1107.column_address & 0x0F) | (@as(u7, higher) << 4);
-        },
-        .DisplayOn => |on| {
-            self.sh1107.power = on;
-        },
-        .SetPageAddress => |page| {
-            self.sh1107.page_address = page;
-        },
-    }
-}
-
-pub fn process_data(self: *Display, data: u8) void {
-    _ = data;
-    _ = self;
 }

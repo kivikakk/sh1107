@@ -2,7 +2,7 @@ const std = @import("std");
 
 const Cxxrtl = @import("./Cxxrtl.zig");
 const I2CConnector = @import("./I2CConnector.zig");
-const Display = @import("./Display.zig");
+const FPGAThread = @import("./FPGAThread.zig");
 const Cmd = @import("./Cmd.zig");
 
 i2c_connector: I2CConnector,
@@ -14,7 +14,7 @@ pub fn init(cxxrtl: Cxxrtl, addr: u7) @This() {
     };
 }
 
-pub fn tick(self: *@This(), display: *Display) void {
+pub fn tick(self: *@This(), fpga_thread: *FPGAThread) void {
     switch (self.i2c_connector.tick()) {
         .Pass => {},
         .Addressed => {
@@ -46,10 +46,10 @@ pub fn tick(self: *@This(), display: *Display) void {
             },
             .Command => |cmd| {
                 std.debug.print("cmd {x:0>2}\n", .{byte});
-                display.process_cmd(cmd);
+                fpga_thread.process_cmd(cmd);
             },
             .Data => |data| {
-                display.process_data(data);
+                fpga_thread.process_data(data);
             },
         },
     }
