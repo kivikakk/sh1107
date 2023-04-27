@@ -51,26 +51,13 @@ pub fn press_switch_connector(self: *FPGAThread) void {
 pub fn process_cmd(self: *FPGAThread, cmd: Cmd.Command) void {
     self.sh1107_mutex.lock();
     defer self.sh1107_mutex.unlock();
-
-    switch (cmd) {
-        .SetLowerColumnAddress => |lower| {
-            self.sh1107.column_address = (self.sh1107.column_address & 0x70) | lower;
-        },
-        .SetHigherColumnAddress => |higher| {
-            self.sh1107.column_address = (self.sh1107.column_address & 0x0F) | (@as(u7, higher) << 4);
-        },
-        .DisplayOn => |on| {
-            self.sh1107.power = on;
-        },
-        .SetPageAddress => |page| {
-            self.sh1107.page_address = page;
-        },
-    }
+    self.sh1107.cmd(cmd);
 }
 
 pub fn process_data(self: *FPGAThread, data: u8) void {
-    _ = data;
-    _ = self;
+    self.sh1107_mutex.lock();
+    defer self.sh1107_mutex.unlock();
+    self.sh1107.data(data);
 }
 
 fn run(fpga_thread: *FPGAThread) void {

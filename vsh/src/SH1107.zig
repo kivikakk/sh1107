@@ -1,5 +1,7 @@
 const gk = @import("gamekit");
 
+const Cmd = @import("./Cmd.zig");
+
 const DclkFreq = enum(i7) {
     Neg25 = -25,
     Neg20 = -20,
@@ -52,4 +54,100 @@ com_scan_reversed: bool = false,
 
 pub fn init() @This() {
     return .{};
+}
+
+pub fn cmd(self: *@This(), c: Cmd.Command) void {
+    switch (c) {
+        .SetLowerColumnAddress => |lower| {
+            self.column_address = (self.column_address & 0x70) | lower;
+        },
+        .SetHigherColumnAddress => |higher| {
+            self.column_address = (self.column_address & 0x0F) | (@as(u7, higher) << 4);
+        },
+        .SetMemoryAddressingMode => |mode| {
+            self.addressing_mode = mode;
+        },
+        .SetContrastControlRegister => |level| {
+            self.contrast = level;
+        },
+        .SetSegmentRemap => |adc| {
+            self.segment_remap = adc == .Flipped;
+        },
+        .SetMultiplexRatio => |ratio| {
+            self.multiplex = ratio;
+        },
+        .SetEntireDisplayOn => |on| {
+            self.all_on = on;
+        },
+        .SetDisplayReverse => |reverse| {
+            self.reversed = reverse;
+        },
+        .SetDisplayOffset => |offset| {
+            self.start_line = offset;
+        },
+        .SetDCDC => |on| {
+            self.dcdc = on;
+        },
+        .DisplayOn => |on| {
+            self.power = on;
+        },
+        .SetPageAddress => |page| {
+            self.page_address = page;
+        },
+        .SetCommonScanOutputDirection => |direction| {
+            self.com_scan_reversed = direction == .Backwards;
+        },
+        .SetDisplayClockFrequency => |cf| {
+            self.dclk_freq = cf.freq;
+            self.dclk_ratio = cf.ratio;
+        },
+        .SetPreDischargePeriod => |predis| {
+            self.precharge_period = predis.precharge;
+            self.discharge_period = predis.discharge;
+        },
+        .SetVCOMDeselectLevel => |level| {
+            self.vcom_desel = level;
+        },
+        .SetDisplayStartColumn => |column| {
+            self.start_column = column;
+        },
+        .ReadModifyWrite => {
+            @panic("not impl");
+        },
+        .End => {
+            @panic("not impl");
+        },
+        .Nop => {
+            // pass
+        },
+    }
+}
+
+pub fn data(self: *@This(), b: u8) void {
+    _ = b;
+    _ = self;
+    // TODO
+    @panic("not impl");
+    // page_count = self.I2C_HEIGHT // 8
+    // for b in data:
+    //     for i in range(7, -1, -1):
+    //         if not self.segment_remap:
+    //             pa = self.page_address * 8 + i
+    //         else:
+    //             pa = (page_count - self.page_address - 1) * 8 + (7 - i)
+    //         self.set_px(
+    //             self.column_address,
+    //             pa,
+    //             1 if ((b >> i) & 0x01) == 0x01 else 0,
+    //         )
+    //     if (
+    //         self.addressing_mode
+    //         == Cmd.SetMemoryAddressingMode.Mode.Page
+    //     ):
+    //         self.column_address = (
+    //             self.column_address + 1
+    //         ) % self.I2C_WIDTH
+    //     else:
+    //         self.page_address = (self.page_address + 1) % page_count
+
 }
