@@ -27,7 +27,6 @@ init: list[list[Base | DataBytes]] = [
     ]
 ]
 for p in range(0x10):
-    # for p in range(0x0):
     if p > 0:
         init.append([])
     init[-1] += [
@@ -37,21 +36,34 @@ for p in range(0x10):
 init.append([Cmd.DisplayOn(True)])
 INIT_SEQUENCE = [Cmd.compose(part) for part in init]
 
-disp: list[Base | DataBytes] = []
-disp += [
-    Cmd.SetPageAddress(0x1),
-    Cmd.SetHigherColumnAddress(0x0),
-    Cmd.SetLowerColumnAddress(0x8),
-    DataBytes([0xFF for _ in range(0x08)]),
-]
-DISPLAY_SEQUENCE = [Cmd.compose(disp)]
+TEST_PATTERNS = True
+if TEST_PATTERNS:
+    disp: list[Base | DataBytes] = []
+    disp += [
+        Cmd.SetPageAddress(0),
+        DataBytes([(x * 2) % 0x100 for x in range(0x80)]),
+    ]
 
-disp2: list[Base | DataBytes] = [
-    Cmd.SetPageAddress(0x1),
-    Cmd.SetHigherColumnAddress(0x1),
-    Cmd.SetLowerColumnAddress(0x8),
-    DataBytes([0xFF for _ in range(0x08)]),
-]
+    disp2: list[Base | DataBytes] = [
+        Cmd.SetSegmentRemap("Flipped"),
+    ] + disp
+else:
+    disp: list[Base | DataBytes] = []
+    disp += [
+        Cmd.SetPageAddress(0x1),
+        Cmd.SetHigherColumnAddress(0x0),
+        Cmd.SetLowerColumnAddress(0x8),
+        DataBytes([0xFF for _ in range(0x08)]),
+    ]
+
+    disp2: list[Base | DataBytes] = [
+        Cmd.SetPageAddress(0x1),
+        Cmd.SetHigherColumnAddress(0x1),
+        Cmd.SetLowerColumnAddress(0x8),
+        DataBytes([0xFF for _ in range(0x08)]),
+    ]
+
+DISPLAY_SEQUENCE = [Cmd.compose(disp)]
 DISPLAY2_SEQUENCE = [Cmd.compose(disp2)]
 
 POWEROFF_SEQUENCE = [Cmd.compose([Cmd.DisplayOn(False)])]

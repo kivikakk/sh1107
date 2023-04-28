@@ -166,7 +166,7 @@ pub fn data(self: *@This(), b: u8) Write {
     const i2c_height = 128;
     const page_count = i2c_height / 8;
 
-    // ensure we can just reply on wrapping addition
+    // ensure we can rely entirely on wrapping addition
     comptime std.debug.assert(i2c_width - 1 == std.math.maxInt(@TypeOf(self.column_address)));
     comptime std.debug.assert(page_count - 1 == std.math.maxInt(@TypeOf(self.page_address)));
 
@@ -175,16 +175,26 @@ pub fn data(self: *@This(), b: u8) Write {
         .Column => self.page_address +%= 1,
     };
 
-    const row = switch (self.segment_remap) {
-        .Normal => @as(u7, self.page_address) * 8,
-        .Flipped => (@as(u7, page_count) - self.page_address - 1) * 8,
-    };
+    var row: u7 = undefined;
     var value: u8 = 0;
 
-    // TODO: flip direction with seg remap
-    var i: u4 = 8;
-    while (i > 0) : (i -= 1) {
-        value = (value << 1) | @boolToInt(((b >> @truncate(u3, i - 1)) & 0x1) == 0x1);
+    switch (self.segment_remap) {
+        .Normal => {
+            row = @as(u7, self.page_address) * 8;
+
+            var i: u4 = 8;
+            while (i > 0) : (i -= 1) {
+                value = (value << 1) | ((b >> @truncate(u3, i - 1)) & 0x1);
+            }
+        },
+        .Flipped => {
+            row = (@as(u7, page_count) - self.page_address - 1) * 8;
+
+            var i: u4 = 0;
+            while (i < 8) : (i += 1) {
+                value = (value << 1) | ((b >> @truncate(u3, i)) & 0x1);
+            }
+        },
     }
 
     return .{
