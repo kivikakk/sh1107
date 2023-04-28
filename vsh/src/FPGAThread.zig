@@ -13,10 +13,14 @@ const OLEDConnector = @import("./OLEDConnector.zig");
 const FPGAThread = @This();
 
 thread: std.Thread,
-stop_signal: std.atomic.Atomic(bool),
-press_signal: std.atomic.Atomic(bool),
-sh1107_mutex: std.Thread.Mutex,
+stop_signal: Atomic(bool),
+press_signal: Atomic(bool),
+sh1107_mutex: std.Thread.Mutex = .{},
 sh1107: SH1107,
+
+idata_mutex: std.Thread.Mutex = .{},
+idata: [DisplayBase.i2c_width * DisplayBase.i2c_height]gk.math.Color = [_]gk.math.Color{DisplayBase.black} ** (DisplayBase.i2c_width * DisplayBase.i2c_height),
+idata_stale: Atomic(bool),
 
 pub fn start() !*FPGAThread {
     var fpga_thread = try std.heap.c_allocator.create(FPGAThread);
@@ -24,8 +28,8 @@ pub fn start() !*FPGAThread {
         .thread = undefined,
         .stop_signal = Atomic(bool).init(false),
         .press_signal = Atomic(bool).init(false),
-        .sh1107_mutex = .{},
         .sh1107 = .{},
+        .idata_stale = Atomic(bool).init(false),
     };
     const thread = try std.Thread.spawn(.{}, run, .{fpga_thread});
     fpga_thread.thread = thread;
@@ -55,9 +59,26 @@ pub fn process_cmd(self: *FPGAThread, cmd: Cmd.Command) void {
 }
 
 pub fn process_data(self: *FPGAThread, data: u8) void {
-    self.sh1107_mutex.lock();
-    defer self.sh1107_mutex.unlock();
-    self.sh1107.data(data);
+    const pxw = pxw: {
+        self.sh1107_mutex.lock();
+        defer self.sh1107_mutex.unlock();
+        break :pxw self.sh1107.data(data);
+    };
+
+    self.idata_mutex.lock();
+    defer self.idata_mutex.unlock();
+    defer self.idata_stale.store(true, .Release);
+    for (0..8) |i| {
+        const px = ((pxw.value >> @truncate(u3, i)) & 1) == 1;
+        const x = pxw.column;
+        const y = pxw.row + i;
+
+        const off = y * DisplayBase.i2c_height + x;
+        self.idata[off] = if (px)
+            DisplayBase.white
+        else
+            DisplayBase.black;
+    }
 }
 
 fn run(fpga_thread: *FPGAThread) void {

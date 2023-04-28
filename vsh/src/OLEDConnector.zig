@@ -30,9 +30,7 @@ pub fn tick(self: *@This(), fpga_thread: *FPGAThread) void {
             self.parser = null;
         },
         .Byte => |byte| switch (self.parser.?.feed(byte)) {
-            .Pass => {
-                std.debug.print("pass {x:0>2}\n", .{byte});
-            },
+            .Pass => {},
             .Unrecoverable => {
                 std.debug.print("command parser noped out, fed {x:0>2} -- " ++
                     "state: {} / continuation: {} / partial_cmd: {?x:0>2}\n", .{
@@ -45,7 +43,6 @@ pub fn tick(self: *@This(), fpga_thread: *FPGAThread) void {
                 self.i2c_connector.reset();
             },
             .Command => |cmd| {
-                std.debug.print("cmd {x:0>2}\n", .{byte});
                 fpga_thread.process_cmd(cmd);
             },
             .Data => |data| {

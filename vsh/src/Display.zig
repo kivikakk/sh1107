@@ -11,9 +11,6 @@ fpga_thread: *FPGAThread,
 base: DisplayBase,
 img: gk.gfx.Texture,
 
-idata: [DisplayBase.i2c_width * DisplayBase.i2c_height]gk.math.Color = [_]gk.math.Color{DisplayBase.black} ** (DisplayBase.i2c_width * DisplayBase.i2c_height),
-img_stale: bool = true,
-
 pub fn init() !Display {
     const fpga_thread = try FPGAThread.start();
     const base = try DisplayBase.init();
@@ -166,8 +163,8 @@ fn drawTop(self: *Display, sh1107: *const SH1107) void {
     tds.fmt("multiplex", "{x:0>2}", .{sh1107.multiplex});
 
     tds.row();
-    tds.check("seg remap", sh1107.segment_remap);
-    tds.check("com rev", sh1107.com_scan_reversed);
+    tds.check("seg remap", sh1107.segment_remap == .Flipped);
+    tds.check("com rev", sh1107.com_scan_dir == .Backwards);
 }
 
 fn dtStart(self: *Display) void {
@@ -175,9 +172,10 @@ fn dtStart(self: *Display) void {
 }
 
 fn drawOLED(self: *Display, sh1107: *const SH1107) void {
-    if (self.img_stale) {
-        self.img.setData(gk.math.Color, &self.idata);
-        self.img_stale = false;
+    if (self.fpga_thread.idata_stale.compareAndSwap(true, false, .Acquire, .Monotonic) == null) {
+        self.fpga_thread.idata_mutex.lock();
+        defer self.fpga_thread.idata_mutex.unlock();
+        self.img.setData(gk.math.Color, &self.fpga_thread.idata);
     }
 
     if (sh1107.power) {
@@ -195,7 +193,7 @@ fn drawOLED(self: *Display, sh1107: *const SH1107) void {
         gk.gfx.draw.texScale(
             self.img,
             .{
-                .x = @intToFloat(f32, DisplayBase.padding + DisplayBase.border_width + if (sh1107.com_scan_reversed) DisplayBase.i2c_width * DisplayBase.display_scale else 0),
+                .x = @intToFloat(f32, DisplayBase.padding + DisplayBase.border_width + if (sh1107.com_scan_dir == .Backwards) DisplayBase.i2c_width * DisplayBase.display_scale else 0),
                 .y = @intToFloat(f32, DisplayBase.padding + DisplayBase.border_width + DisplayBase.top_area),
             },
             // TODO: scale X only when com scan reversed
