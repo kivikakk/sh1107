@@ -46,6 +46,7 @@ if TEST_PATTERNS:
 
     disp2: list[Base | DataBytes] = [
         Cmd.SetSegmentRemap("Flipped"),
+        Cmd.SetCommonOutputScanDirection("Backwards"),
     ] + disp
 else:
     disp: list[Base | DataBytes] = []

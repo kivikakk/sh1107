@@ -68,13 +68,21 @@ const TopDrawState = struct {
     }
 
     pub fn check(self: *TopDrawState, name: []const u8, value: bool) void {
-        // TODO: bold if value is true
         gk.gfx.draw.textOptions(name, self.display.base.fontbook, .{
             .x = self.left + @intToFloat(f32, DisplayBase.checkbox_size + DisplayBase.checkbox_text_gap),
             .y = self.top,
             .alignment = .left_middle,
             .color = DisplayBase.white,
         });
+        if (value) {
+            // "bold"
+            gk.gfx.draw.textOptions(name, self.display.base.fontbook, .{
+                .x = self.left + @intToFloat(f32, DisplayBase.checkbox_size + DisplayBase.checkbox_text_gap) + 0.5,
+                .y = self.top,
+                .alignment = .left_middle,
+                .color = DisplayBase.white,
+            });
+        }
 
         const y = self.top - @intToFloat(f32, DisplayBase.checkbox_up);
 
@@ -190,15 +198,14 @@ fn drawOLED(self: *Display, sh1107: *const SH1107) void {
             DisplayBase.on_border,
         );
 
-        gk.gfx.draw.texScale(
+        gk.gfx.draw.texScaleXY(
             self.img,
             .{
                 .x = @intToFloat(f32, DisplayBase.padding + DisplayBase.border_width + if (sh1107.com_scan_dir == .Backwards) DisplayBase.i2c_width * DisplayBase.display_scale else 0),
                 .y = @intToFloat(f32, DisplayBase.padding + DisplayBase.border_width + DisplayBase.top_area),
             },
-            // TODO: scale X only when com scan reversed
-            // DisplayBase.display_scale * if (sh1107.com_scan_reversed) -1 else 1,
-            @intToFloat(f32, DisplayBase.display_scale),
+            @intToFloat(f32, DisplayBase.display_scale) * if (sh1107.com_scan_dir == .Backwards) @as(f32, -1) else @as(f32, 1),
+            DisplayBase.display_scale,
         );
     } else {
         gk.gfx.draw.rect(
