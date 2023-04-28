@@ -28,7 +28,7 @@ The current test deployment target is the iCEBreaker ([Crowd Supply](https://www
 
 Maybe the most interesting thing right now is the Virtual SH1107 for testing the simulation:
 
-[![screenshot of the Virtual SH1107 testbench](doc/vsh-s.png)](doc/vsh.png)
+[<img alt="screenshot of the Virtual SH1107 testbench" src="doc/vsh-s.png" width="326">](doc/vsh.png)
 
 Initially this was implemented in Python and ran cooperatively with Amaranth's own simulator, like the unit tests, but it was pretty slow. It's now written in [Zig](https://ziglang.org), and interacts directly with the simulated hardware by compiling it to C++ through Yosys's [CXXRTL backend](https://github.com/YosysHQ/yosys/tree/master/backends/cxxrtl).
 
