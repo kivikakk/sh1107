@@ -138,7 +138,7 @@ class OLED(Elaboratable):
                 m.d.sync += self.offset.eq(self.offset + 1)
                 m.d.sync += self.remain.eq(self.remain - 1)
                 m.d.sync += self.i2c.i_addr.eq(0x3C)
-                m.d.sync += self.i2c.i_rw.eq(0)
+                m.d.sync += self.i2c.i_rw.eq(I2C.RW.W)
                 m.d.sync += self.i2c.fifo.w_data.eq(self.rom_rd.data)
                 m.d.sync += self.i2c.fifo.w_en.eq(1)
 

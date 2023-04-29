@@ -43,6 +43,11 @@ const Tick = union(enum) {
     Byte: u8,
 };
 
+const RW = enum(u1) {
+    W = 0,
+    R = 1,
+};
+
 pub fn tick(self: *@This()) Tick {
     const scl_o = self.track("scl_o");
     const scl_oe = self.track("scl_oe");
@@ -56,12 +61,12 @@ pub fn tick(self: *@This()) Tick {
             const byte = self.byte_receiver.byte;
             if (!self.addressed) {
                 const addr: u7 = @truncate(u7, byte >> 1);
-                const rw: u1 = @truncate(u1, byte);
-                if (addr == self.addr and rw == 0) {
+                const rw = @intToEnum(RW, @truncate(u1, byte));
+                if (addr == self.addr and rw == .W) {
                     self.sda_i.next(false);
                     self.addressed = true;
                     return .Addressed;
-                } else if (addr == self.addr and rw == 1) {
+                } else if (addr == self.addr and rw == .R) {
                     std.debug.print("NYI: read\n", .{});
                     return .Pass;
                 } else {

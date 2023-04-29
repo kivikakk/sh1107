@@ -2,6 +2,7 @@ from typing import Final, Optional, cast
 
 from amaranth import Elaboratable, Module, Signal
 from amaranth.build import Attrs, Platform
+from amaranth.lib.enum import IntEnum
 from amaranth.lib.fifo import SyncFIFO
 from amaranth.lib.io import Pin
 from amaranth_boards.icebreaker import ICEBreakerPlatform
@@ -23,6 +24,10 @@ class I2C(Elaboratable):
         2_000_000,  # XXX: for vsh
     ]
 
+    class RW(IntEnum):
+        W = 0
+        R = 1
+
     speed: Hz
 
     i_addr: Signal
@@ -43,6 +48,8 @@ class I2C(Elaboratable):
     sda_oe: Signal
     sda_i: Signal
 
+    addr: Signal
+    rw: Signal
     byte: Signal
     byte_ix: Signal
 
@@ -51,7 +58,7 @@ class I2C(Elaboratable):
         self.speed = speed
 
         self.i_addr = Signal(7, reset=0x3C)
-        self.i_rw = Signal()
+        self.i_rw = Signal(I2C.RW)
         self.i_stb = Signal()
 
         self.fifo = SyncFIFO(width=8, depth=1)
@@ -62,6 +69,8 @@ class I2C(Elaboratable):
         self.assign(scl=Pin(1, "io", name="scl"), sda=Pin(1, "io", name="sda"))
         self.sda_i.reset = 1
 
+        self.addr = Signal.like(self.i_addr)
+        self.rw = Signal.like(self.i_rw)
         self.byte = Signal(8)
         self.byte_ix = Signal(range(7))
 
@@ -132,6 +141,8 @@ class I2C(Elaboratable):
                     m.d.sync += self.sda_o.eq(0)
                     m.d.sync += c.en.eq(1)
 
+                    m.d.sync += self.addr.eq(self.i_addr)
+                    m.d.sync += self.rw.eq(self.rw)
                     m.d.sync += self.byte.eq((self.i_addr << 1) | self.i_rw)
                     m.d.sync += self.byte_ix.eq(0)
 

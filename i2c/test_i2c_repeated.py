@@ -45,6 +45,8 @@ class Top(Elaboratable):
                 with m.If(i2c.o_busy & i2c.o_ack & i2c.fifo.w_rdy):
                     m.d.sync += i2c.fifo.w_data.eq(0x8C)
                     m.d.sync += i2c.fifo.w_en.eq(1)
+                    # Change destination address to trigger repeated START.
+                    m.d.sync += i2c.i_addr.eq(0x3D)
                     m.next = "SECOND_DONE"
                 with m.Elif(~i2c.o_busy):
                     # Failed.  Nothing to write.
@@ -56,7 +58,7 @@ class Top(Elaboratable):
         return m
 
 
-class TestI2C(sim.TestCase):
+class TestI2CRepeatedStart(sim.TestCase):
     switch: Signal
     iv: VirtualI2C
     i2c: I2C
