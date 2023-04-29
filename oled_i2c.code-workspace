@@ -7,9 +7,9 @@
 	"settings": {
 		// autoComplete
 		"python.autoComplete.extraPaths": [
-			"../../3rd/amaranth",
-			"../../3rd/amaranth-soc",
-			"../../3rd/amaranth-boards",
+			"../amaranth",
+			"../amaranth-soc",
+			"../amaranth-boards",
 		],
 		// analysis
 		"python.analysis.typeCheckingMode": "strict",
@@ -31,9 +31,12 @@
 			}
 		],
 		"python.analysis.extraPaths": [
-			"../../3rd/amaranth",
-			"../../3rd/amaranth-soc",
-			"../../3rd/amaranth-boards",
+			"../amaranth",
+			"../amaranth-soc",
+			"../amaranth-boards",
+		],
+		"python.analysis.exclude": [
+			"vendor/amlib"
 		],
 		"python.analysis.diagnosticSeverityOverrides": {
 			"reportUnknownMemberType": "none",
@@ -67,7 +70,7 @@
 			"--ignore=E501,E203,W503",
 		],
 		"clangd.fallbackFlags": [
-			"-I${workspaceFolder}/../../3rd/oss-cad-suite/share/yosys/include",
+			"-I${workspaceFolder}/../oss-cad-suite/share/yosys/include",
 			"-I${workspaceFolder}/build",
 		],
 	}
