@@ -1,16 +1,17 @@
 #!/usr/bin/env python
 
 import importlib.util
+import inspect
 import os
 import re
 import subprocess
 import sys
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
-from typing import Dict, Optional, Type, cast
+from typing import Any, Dict, Optional, Type, cast
 from unittest import TestLoader, TextTestRunner
 
-from amaranth import Module
+from amaranth import Elaboratable
 from amaranth._toolchain.yosys import (
     find_yosys,  # pyright: reportUnknownVariableType=false
 )
@@ -23,7 +24,7 @@ from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
 
 from common import Hz
 from formal import formal as prep_formal
-from oled import OLED, ROM, Top
+from oled import OLED, ROM
 
 BOARDS: Dict[str, Type[Platform]] = {
     "icebreaker": ICEBreakerPlatform,
@@ -31,18 +32,20 @@ BOARDS: Dict[str, Type[Platform]] = {
 }
 
 
-def _top(name: str) -> Type[Module]:
-    mod, klass = name.rsplit(".", 1)
-    return getattr(importlib.import_module(mod), klass)
+def _build_top(args: Namespace, **kwargs: Any) -> Elaboratable:
+    mod, klass_name = args.top.rsplit(".", 1)
+    klass = getattr(importlib.import_module(mod), klass_name)
+
+    sig = inspect.signature(klass)
+    if "speed" in sig.parameters and "speed" not in kwargs:
+        kwargs["speed"] = Hz(args.speed)
+
+    return klass(**kwargs)
 
 
-def _outdir(dir: str) -> Path:
+def _path(rest: str) -> Path:
     base = Path(sys.argv[0]).absolute()
-    return base.parent / dir
-
-
-def _outfile(dir: str, ext: str) -> str:
-    return str(_outdir(dir) / f"oled_i2c{ext}")
+    return base.parent / rest
 
 
 def test(args: Namespace):
@@ -59,12 +62,11 @@ def formal(args: Namespace):
     design, ports = prep_formal()
     fragment = Fragment.get(design, None)
     output = rtlil.convert(fragment, name="formal_top", ports=ports)
-    with open(_outfile("build", ".il"), "w") as f:
+    with open(_path("build/oled_i2c.il"), "w") as f:
         f.write(output)
 
-    sby_file = _outfile("formal", ".sby")
-    # XXX: spaces in directory names
-    subprocess.run(f"sby --prefix build/oled_i2c -f {sby_file}", shell=True, check=True)
+    sby_file = _path("formal/oled_i2c.sby")
+    subprocess.run(["sby", "--prefix", "build/oled_i2c", "-f", sby_file], check=True)
 
 
 def _print_file_between(
@@ -91,13 +93,7 @@ def _print_file_between(
 
 
 def build(args: Namespace):
-    m = _top(args.top)
-    # if isinstance(m, Top):
-    # TODO: fix this
-    elaboratable = m(speed=Hz(args.speed))
-    # pass
-    # else:
-    # elaboratable = m()
+    elaboratable = _build_top(args)
 
     BOARDS[args.board]().build(
         elaboratable,
@@ -121,14 +117,11 @@ def rom(args: Namespace):
         f.write(ROM)
 
     if args.program:
-        # XXX: spaces in directory names
-        subprocess.run(f"iceprog -o 0x800000 {path}", shell=True, check=True)
+        subprocess.run(["iceprog", "-o", "0x800000", path], check=True)
 
 
 def vsh(args: Namespace):
-    top = _top(args.top)
-    # TODO: work with non-oled.Top
-    design = top(speed=Hz(2_000_000))
+    design = _build_top(args, speed=Hz(2_000_000))
 
     # XXX(ari): works better on Windows since osscad's yosys-config a) doesn't execute
     # cleanly automatically (bash script), and b) its answers are wrong anyway.
@@ -136,20 +129,20 @@ def vsh(args: Namespace):
 
     yosys = cast(YosysBinary, find_yosys(lambda _: True))
 
-    output = cast(str, cxxrtl.convert(design, ports=design.ports))
-    cxxrtl_cc_file = _outfile("build", ".cc")
+    output = cast(str, cxxrtl.convert(design, ports=getattr(design, "ports", [])))
+    cxxrtl_cc_file = _path("build/oled_i2c.cc")
     with open(cxxrtl_cc_file, "w") as f:
         f.write(output)
 
-    cxxrtl_lib_path = _outfile("build", ".o")
+    cxxrtl_lib_path = _path("build/oled_i2c.o")
 
     subprocess.run(
         [
             "zig",
             "c++",
             "-DCXXRTL_INCLUDE_CAPI_IMPL",
-            "-I" + str(_outdir("vsh")),
-            "-I" + str(_outdir("build")),
+            "-I" + str(_path("vsh")),
+            "-I" + str(_path("build")),
             "-I" + str(cast(Path, yosys.data_dir()) / "include"),
             "-c",
             cxxrtl_cc_file,
@@ -168,7 +161,7 @@ def vsh(args: Namespace):
             f"-Dyosys_data_dir={yosys.data_dir()}",
             f"-Dcxxrtl_lib_path={cxxrtl_lib_path}",
         ],
-        cwd=_outdir("vsh"),
+        cwd=_path("vsh"),
         check=True,
     )
 
