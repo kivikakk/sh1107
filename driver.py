@@ -62,11 +62,11 @@ def formal(args: Namespace):
     design, ports = prep_formal()
     fragment = Fragment.get(design, None)
     output = rtlil.convert(fragment, name="formal_top", ports=ports)
-    with open(_path("build/oled_i2c.il"), "w") as f:
+    with open(_path("build/sh1107.il"), "w") as f:
         f.write(output)
 
-    sby_file = _path("formal/oled_i2c.sby")
-    subprocess.run(["sby", "--prefix", "build/oled_i2c", "-f", sby_file], check=True)
+    sby_file = _path("formal/sh1107.sby")
+    subprocess.run(["sby", "--prefix", "build/sh1107", "-f", sby_file], check=True)
 
 
 def _print_file_between(
@@ -130,17 +130,18 @@ def vsh(args: Namespace):
     yosys = cast(YosysBinary, find_yosys(lambda _: True))
 
     output = cast(str, cxxrtl.convert(design, ports=getattr(design, "ports", [])))
-    cxxrtl_cc_file = _path("build/oled_i2c.cc")
+    cxxrtl_cc_file = _path("build/sh1107.cc")
     with open(cxxrtl_cc_file, "w") as f:
         f.write(output)
 
-    cxxrtl_lib_path = _path("build/oled_i2c.o")
+    cxxrtl_lib_path = _path("build/sh1107.o")
 
     subprocess.run(
         [
             "zig",
             "c++",
             "-DCXXRTL_INCLUDE_CAPI_IMPL",
+            "-DCXXRTL_INCLUDE_VCD_CAPI_IMPL",
             "-I" + str(_path("vsh")),
             "-I" + str(_path("build")),
             "-I" + str(cast(Path, yosys.data_dir()) / "include"),
@@ -152,18 +153,20 @@ def vsh(args: Namespace):
         check=True,
     )
 
-    subprocess.run(
-        [
-            "zig",
-            "build",
-            *([] if args.build_only else ["run"]),
-            *(["-Doptimize=ReleaseFast"] if args.opt else []),
-            f"-Dyosys_data_dir={yosys.data_dir()}",
-            f"-Dcxxrtl_lib_path={cxxrtl_lib_path}",
-        ],
-        cwd=_path("vsh"),
-        check=True,
-    )
+    cmd: list[str] = ["zig", "build"]
+    if not args.build_only:
+        cmd += ["run"]
+    cmd += [
+        *(["-Doptimize=ReleaseFast"] if args.opt else []),
+        f"-Dyosys_data_dir={yosys.data_dir()}",
+        f"-Dcxxrtl_lib_path={cxxrtl_lib_path}",
+    ]
+    if not args.build_only:
+        cmd += ["--"]
+        if args.vcd:
+            cmd += ["--vcd"]
+
+    subprocess.run(cmd, cwd=_path("vsh"), check=True)
 
 
 def main():

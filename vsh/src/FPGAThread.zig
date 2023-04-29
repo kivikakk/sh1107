@@ -2,6 +2,7 @@ const std = @import("std");
 const Atomic = std.atomic.Atomic;
 const gk = @import("gamekit");
 
+const main = @import("./main.zig");
 const DisplayBase = @import("./DisplayBase.zig");
 const Cxxrtl = @import("./Cxxrtl.zig");
 const SH1107 = @import("./SH1107.zig");
@@ -81,20 +82,27 @@ pub fn process_data(self: *FPGAThread, data: u8) void {
     }
 }
 
+// Called with Thread.spawn.
 fn run(fpga_thread: *FPGAThread) void {
     var state = State.init(fpga_thread);
-    state.run();
+    state.run() catch @panic("FPGAThread threw");
 }
 
 const State = struct {
     fpga_thread: *FPGAThread,
 
     cxxrtl: Cxxrtl,
+    vcd: ?Cxxrtl.Vcd,
     switch_connector: ?SwitchConnector,
     oled_connector: OLEDConnector,
 
     fn init(fpga_thread: *FPGAThread) State {
         const cxxrtl = Cxxrtl.init();
+
+        var vcd: ?Cxxrtl.Vcd = null;
+        if (main.write_vcd) {
+            vcd = Cxxrtl.Vcd.init(cxxrtl);
+        }
 
         var switch_connector: ?SwitchConnector = null;
         if (cxxrtl.find(bool, "switch")) |swi| {
@@ -107,17 +115,27 @@ const State = struct {
             .fpga_thread = fpga_thread,
 
             .cxxrtl = cxxrtl,
+            .vcd = vcd,
             .switch_connector = switch_connector,
             .oled_connector = oled_connector,
         };
     }
 
-    fn run(self: *State) void {
+    fn run(self: *State) !void {
+        var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+        defer _ = gpa.deinit();
+
+        var allocator = gpa.allocator();
+
         const clk = self.cxxrtl.get(bool, "clk");
         const last_cmd = self.cxxrtl.get(u8, "o_last_cmd");
         _ = last_cmd;
         const oled_result = self.cxxrtl.get(u2, "oled o_result");
         var last_oled_result = oled_result.curr();
+
+        if (self.vcd) |*vcd| {
+            vcd.sample();
+        }
 
         while (!self.fpga_thread.stop_signal.load(.Monotonic)) {
             clk.next(true);
@@ -130,14 +148,34 @@ const State = struct {
             self.oled_connector.tick(self.fpga_thread);
             self.cxxrtl.step();
 
+            if (self.vcd) |*vcd| {
+                vcd.sample();
+            }
+
             clk.next(false);
             self.cxxrtl.step();
+
+            if (self.vcd) |*vcd| {
+                vcd.sample();
+            }
 
             const curr_oled_result = oled_result.curr();
             if (curr_oled_result != last_oled_result) {
                 std.debug.print("oled_result -> {d}\n", .{curr_oled_result});
                 last_oled_result = curr_oled_result;
             }
+        }
+
+        if (self.vcd) |*vcd| {
+            defer vcd.deinit();
+
+            var buffer = try vcd.read(allocator);
+            defer allocator.free(buffer);
+
+            var file = try std.fs.cwd().createFile("vsh.vcd", .{});
+            defer file.close();
+
+            try file.writeAll(buffer);
         }
     }
 };

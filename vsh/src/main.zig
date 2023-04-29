@@ -6,8 +6,31 @@ const Display = @import("./Display.zig");
 const Cxxrtl = @import("./Cxxrtl.zig");
 
 var display: Display = undefined;
+pub var write_vcd: bool = false;
 
 pub fn main() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+
+    var allocator = gpa.allocator();
+
+    {
+        var args = try std.process.argsWithAllocator(allocator);
+        defer args.deinit();
+
+        // skip argv[0]
+        _ = args.next();
+
+        while (args.next()) |arg| {
+            if (std.mem.eql(u8, arg, "-v") or std.mem.eql(u8, arg, "--vcd")) {
+                write_vcd = true;
+            } else {
+                std.debug.print("ARG: {s}\n", .{arg});
+                @panic("unknown arg encountered");
+            }
+        }
+    }
+
     try gk.run(.{
         .init = gkInit,
         .update = gkUpdate,

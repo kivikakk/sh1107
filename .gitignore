@@ -2,3 +2,4 @@
 **/zig-cache/
 **/zig-out/
 rom.bin
+vsh.vcd

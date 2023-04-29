@@ -27,10 +27,10 @@ module \$dff (CLK, D, Q);
 endmodule
 END
 design -stash dff2ff
-read_ilang oled_i2c.il
+read_ilang sh1107.il
 proc
 techmap -map %dff2ff formal_top/w:clk %co*
 prep -top formal_top
 
 [files]
-build/oled_i2c.il
+build/sh1107.il
