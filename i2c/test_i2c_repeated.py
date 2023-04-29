@@ -67,7 +67,7 @@ class TestI2CRepeatedStart(sim.TestCase):
     @sim.args(speed=Hz(400_000))
     @sim.args(speed=Hz(1_000_000))
     @sim.args(speed=Hz(2_000_000))
-    def test_sim_i2c(self, dut: Top) -> sim.Generator:
+    def test_sim_i2c_repeated_start(self, dut: Top) -> sim.Generator:
         self.switch = dut.switch
         self.iv = VirtualI2C(dut.i2c)
         self.i2c = dut.i2c
@@ -114,11 +114,17 @@ class TestI2CRepeatedStart(sim.TestCase):
                 yield from self.iv.nack()
             else:
                 yield from self.iv.ack()
-                yield from self.iv.send(0x8C, next="STOP")
+                yield from self.iv.repeated_start()
+                yield from self.iv.send((0x3D << 1) | 0)
                 if nack_after == 3:
                     yield from self.iv.nack()
                 else:
                     yield from self.iv.ack()
+                    yield from self.iv.send(0x8C, next="STOP")
+                    if nack_after == 4:
+                        yield from self.iv.nack()
+                    else:
+                        yield from self.iv.ack()
 
         yield from self.iv.stop()
 
@@ -132,6 +138,7 @@ class TestI2CRepeatedStart(sim.TestCase):
         yield from self._bench_complete(nack_after=1)
         yield from self._bench_complete(nack_after=2)
         yield from self._bench_complete(nack_after=3)
+        yield from self._bench_complete(nack_after=4)
 
 
 if __name__ == "__main__":

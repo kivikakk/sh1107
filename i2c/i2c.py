@@ -48,6 +48,9 @@ class I2C(Elaboratable):
     sda_oe: Signal
     sda_i: Signal
 
+    # XXX(ari): trying this out for test
+    scl_o_last: Signal
+
     addr: Signal
     rw: Signal
     byte: Signal
@@ -68,6 +71,7 @@ class I2C(Elaboratable):
 
         self.assign(scl=Pin(1, "io", name="scl"), sda=Pin(1, "io", name="sda"))
         self.sda_i.reset = 1
+        self.scl_o_last = Signal.like(self.scl_o)
 
         self.addr = Signal.like(self.i_addr)
         self.rw = Signal.like(self.i_rw)
@@ -88,6 +92,8 @@ class I2C(Elaboratable):
         m = Module()
 
         m.submodules.fifo = self.fifo
+
+        m.d.sync += self.scl_o_last.eq(self.scl_o)
 
         match platform:
             case ICEBreakerPlatform():
@@ -132,6 +138,7 @@ class I2C(Elaboratable):
 
         with m.FSM():
             with m.State("IDLE"):
+                # SCL and SDA are high.
                 m.d.sync += self.sda_oe.eq(1)
                 m.d.sync += self.sda_o.eq(1)
                 m.d.sync += self.scl_o.eq(1)
@@ -150,6 +157,7 @@ class I2C(Elaboratable):
                     # This edge: SDA goes low.
 
             with m.State("START"):
+                # SCL is high, SDA is low.
                 with m.If(c.o_full):
                     m.next = "DATA"
                     # This edge: SCL goes low.
@@ -162,6 +170,7 @@ class I2C(Elaboratable):
                 m.next = "DATA"
 
             with m.State("DATA"):
+                # SCL is low, SDA depends.
                 with m.If(c.o_half):
                     # Next edge: SCL goes high -- send bit. (MSB)
                     m.d.sync += self.sda_o.eq((self.byte >> (7 - self.byte_ix)) & 0x1)
@@ -184,8 +193,10 @@ class I2C(Elaboratable):
                     m.d.sync += self.sda_oe.eq(0)
                 with m.Elif(c.o_full):
                     m.next = "ACK_L"
+                    # This edge: SCL goes high.
 
             with m.State("ACK_L"):
+                # SCL is high.
                 with m.If(c.o_half):
                     # Next edge: SCL goes low -- read ACK.
                     # SDA should be brought low by the addressee.
@@ -195,12 +206,42 @@ class I2C(Elaboratable):
                     # This edge: SCL goes low.
                     with m.If(self.fifo.r_rdy):
                         m.d.sync += self.fifo.r_en.eq(1)
-                        with m.If(self.o_ack):
+                        with m.If(self.o_ack & (self.addr == self.i_addr)):
                             m.next = "DATA_OBTAIN"
+                        with m.Elif(self.o_ack & (self.addr != self.i_addr)):
+                            # Don't consume FIFO just yet.
+                            m.d.sync += self.fifo.r_en.eq(0)
+
+                            m.d.sync += self.addr.eq(self.i_addr)
+                            m.d.sync += self.rw.eq(self.rw)
+                            m.d.sync += self.byte.eq((self.i_addr << 1) | self.i_rw)
+                            m.d.sync += self.byte_ix.eq(0)
+
+                            m.next = "REPEATED_START_WAIT"
                         with m.Else():
                             m.next = "FIN_EMPTY"
                     with m.Else():
                         m.next = "FIN"
+
+            with m.State("REPEATED_START_WAIT"):
+                # SCL is low, SDA depends.
+                with m.If(c.o_half):
+                    # Next edge: SCL goes high -- bring SDA high so
+                    # we can drop SDA during the SCL high period.
+                    m.d.sync += self.sda_o.eq(1)
+                with m.If(c.o_full):
+                    # This edge: SCL goes high.
+                    m.next = "REPEATED_START"
+
+            with m.State("REPEATED_START"):
+                # SCL is high, SDA is high.
+                with m.If(c.o_half):
+                    # Next edge: SCL goes low.  Bring SDA low
+                    # mid SCL-high to repeat start.
+                    m.d.sync += self.sda_o.eq(0)
+                with m.Elif(c.o_full):
+                    m.next = "DATA"
+                    # This edge: SCL goes low.
 
             with m.State("FIN_EMPTY"):
                 m.d.sync += self.fifo.r_en.eq(0)

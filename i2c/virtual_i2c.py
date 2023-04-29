@@ -29,6 +29,18 @@ class VirtualI2C:
         assert not (yield self.i2c.scl_o)
         assert not (yield self.i2c.sda_o)
 
+    def repeated_start(self) -> sim.Generator:
+        assert (yield self.i2c.scl_o_last)
+        assert not (yield self.i2c.scl_o)
+
+        assert (yield self.i2c.sda_o)
+        yield Delay(10 * self.tick)
+        yield Settle()
+
+        # I2C clock starts.
+        assert not (yield self.i2c.scl_o)
+        assert not (yield self.i2c.sda_o)
+
     def send(
         self, byte: int, *, next: int | Literal["STOP"] | None = None
     ) -> sim.Generator:
