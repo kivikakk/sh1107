@@ -37,7 +37,7 @@ def _build_top(args: Namespace, **kwargs: Any) -> Elaboratable:
     klass = getattr(importlib.import_module(mod), klass_name)
 
     sig = inspect.signature(klass)
-    if "speed" in sig.parameters and "speed" not in kwargs:
+    if "speed" in sig.parameters and "speed" in args:
         kwargs["speed"] = Hz(args.speed)
 
     return klass(**kwargs)

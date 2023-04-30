@@ -120,6 +120,15 @@ const Value = struct {
     inline fn rising(self: Value) bool {
         return !self.stable and self.value;
     }
+
+    pub fn format(value: Value, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+        _ = options;
+        _ = fmt;
+        return std.fmt.format(writer, "{} -> {}", .{
+            if (value.stable) value.value else !value.value,
+            value.value,
+        });
+    }
 };
 
 fn track(self: *@This(), comptime field: []const u8) Value {
