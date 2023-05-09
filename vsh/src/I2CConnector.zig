@@ -88,6 +88,7 @@ pub fn tick(self: *@This()) Tick {
             return .Error;
         },
         .Fish => {
+            self.sda_i.next(true);
             if (!self.addressed) {
                 std.debug.print("command parser fish while unaddressed\n", .{});
             }
@@ -161,7 +162,7 @@ const ByteReceiver = struct {
     };
 
     fn process(self: *ByteReceiver, scl_o: Value, scl_oe: Value, sda_o: Value, sda_oe: Value) Result {
-        const all_stable = scl_o.stable and scl_oe.stable and sda_o.stable and sda_oe.stable;
+        const all_stable = scl_oe.stable and scl_o.stable and sda_oe.stable and sda_o.stable;
 
         switch (self.state) {
             .IDLE => {
@@ -186,6 +187,7 @@ const ByteReceiver = struct {
                     self.state = .WAIT_BIT_SCL_FALL;
                 } else if (!scl_oe.stable_high() or !sda_oe.stable_high()) {
                     self.state = .IDLE;
+                    std.debug.print("WAIT_BIT_SCL_RISE: scl_oe({}), sda_oe({})\n", .{ scl_oe, sda_oe });
                     return .Error;
                 }
             },
@@ -203,10 +205,18 @@ const ByteReceiver = struct {
                         return .Fish;
                     } else {
                         self.state = .IDLE;
+                        std.debug.print("WAIT_BIT_SCL_FALL: bits({}), byte({})\n", .{ self.bits, self.byte });
                         return .Error;
                     }
+                } else if (scl_oe.stable_high() and scl_o.stable_high() and sda_oe.stable_high() and sda_o.falling()) {
+                    // repeated start
+                    self.state = .START_SDA_LOW;
+                    self.bits = 0;
+                    self.byte = 0;
+                    return .Fish;
                 } else if (!all_stable) {
                     self.state = .IDLE;
+                    std.debug.print("WAIT_BIT_SCL_FALL: scl_oe({}), scl_o({}), sda_oe({}), sda_o({})\n", .{ scl_oe, scl_o, sda_oe, sda_o });
                     return .Error;
                 }
             },
@@ -217,6 +227,7 @@ const ByteReceiver = struct {
                     self.state = .WAIT_ACK_SCL_FALL;
                 } else if (!all_stable) {
                     self.state = .IDLE;
+                    std.debug.print("WAIT_ACK_SCL_RISE: scl_oe({}), scl_o({}), sda_oe({}), sda_o({})\n", .{ scl_oe, scl_o, sda_oe, sda_o });
                     return .Error;
                 }
             },
@@ -228,6 +239,7 @@ const ByteReceiver = struct {
                     return .ReleaseSda;
                 } else if (!(scl_oe.stable and scl_o.stable)) {
                     self.state = .IDLE;
+                    std.debug.print("WAIT_ACK_SCL_FALL: scl_oe({}), scl_o({})\n", .{ scl_oe, scl_o });
                     return .Error;
                 }
             },
