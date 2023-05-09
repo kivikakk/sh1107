@@ -130,7 +130,6 @@ class I2C(Elaboratable):
 
         with m.FSM():
             with m.State("IDLE"):
-                # SCL and SDA are high.
                 m.d.sync += self.sda_oe.eq(1)
                 m.d.sync += self.sda_o.eq(1)
                 m.d.sync += self.scl_o.eq(1)
@@ -141,127 +140,114 @@ class I2C(Elaboratable):
                     m.d.sync += c.en.eq(1)
                     m.d.sync += self.fifo.r_en.eq(1)
 
-                    m.next = "LATCHING"
-                    # This edge: SDA goes low.
+                    m.next = "START: LATCHING R_EN"
 
-            with m.State("LATCHING"):
+            with m.State("START: LATCHING R_EN"):
                 m.d.sync += self.fifo.r_en.eq(0)
-                m.next = "LATCHED"
+                m.next = "START: LATCHED R_EN"
 
-            with m.State("LATCHED"):
+            with m.State("START: LATCHED R_EN"):
                 m.d.sync += self.rw.eq(self.fifo.r_data[0])
                 m.d.sync += self.byte.eq(self.fifo.r_data[:8])
                 m.d.sync += self.byte_ix.eq(0)
-                m.next = "START"
+                m.next = "START: WAIT SCL"
 
-            with m.State("START"):
-                # SCL is high, SDA is low.
+            with m.State("START: WAIT SCL"):
+                # SDA is low.
                 with m.If(c.o_full):
-                    m.next = "DATA"
-                    # This edge: SCL goes low.
+                    m.next = "DATA BIT: SCL LOW"
 
-            # This comes from ACK_L.
-            with m.State("DATA_OBTAIN"):
-                m.d.sync += self.byte.eq(self.fifo.r_data)
-                m.d.sync += self.byte_ix.eq(0)
-                m.d.sync += self.fifo.r_en.eq(0)
-                m.next = "DATA"
-
-            with m.State("DATA"):
-                # SCL is low, SDA depends.
+            # This comes from "START: WAIT SCL" or "ACK BIT: SCL HIGH".
+            with m.State("DATA BIT: SCL LOW"):
                 with m.If(c.o_half):
-                    # Next edge: SCL goes high -- send bit. (MSB)
+                    # Set SDA in prep for SCL high. (MSB)
                     m.d.sync += self.sda_o.eq((self.byte >> (7 - self.byte_ix)) & 0x1)
                 with m.Elif(c.o_full):
-                    m.next = "DATA_L"
+                    m.next = "DATA BIT: SCL HIGH"
 
-            with m.State("DATA_L"):
+            with m.State("DATA BIT: SCL HIGH"):
                 with m.If(c.o_full):
                     with m.If(self.byte_ix < 7):
                         m.d.sync += self.byte_ix.eq(self.byte_ix + 1)
-                        m.next = "DATA"
-                        # This edge: SCL goes low. Wait for next SCL^ before next data bit.
+                        m.next = "DATA BIT: SCL LOW"
+                        # Wait for next SCL^ before next data bit.
                     with m.Else():
-                        m.next = "ACK"
-                        # This edge: SCL goes low. Wait for next SCL^ before R/W.
+                        m.next = "ACK BIT: SCL LOW"
+                        # Wait for next SCL^ before R/W.
 
-            with m.State("ACK"):
+            with m.State("ACK BIT: SCL LOW"):
                 with m.If(c.o_half):
-                    # Next edge: SCL goes high. Let go of SDA.
+                    # Let go of SDA.
                     m.d.sync += self.sda_oe.eq(0)
                 with m.Elif(c.o_full):
-                    m.next = "ACK_L"
-                    # This edge: SCL goes high.
+                    m.next = "ACK BIT: SCL HIGH"
 
-            with m.State("ACK_L"):
-                # SCL is high.
+            with m.State("ACK BIT: SCL HIGH"):
                 with m.If(c.o_half):
                     # Next edge: SCL goes low -- read ACK.
                     # SDA should be brought low by the addressee.
                     m.d.sync += self.o_ack.eq(~self.sda_i)
                     m.d.sync += self.sda_oe.eq(1)
                 with m.Elif(c.o_full):
-                    # This edge: SCL goes low.
                     with m.If(self.fifo.r_rdy):
+                        # TODO(Ch): si leemos antes, tal vez podamos ahorrar uno
+                        # o dos ciclos y poder funcionar a 2MHz@12MHz?
+                        # Necesitamos activar r_en tan pronto como r_rdy sea
+                        # alta; un registro o algo para almacenar "FIFO leído"
+                        # también.  La rapidez con la que podamos funcionar
+                        # depende de si se nos proporcionan datos a tiempo.
+                        # TODO Formal prob puede ayudarnos aquí.
                         m.d.sync += self.fifo.r_en.eq(1)
-                        m.next = "ACK_LATCHING"
+                        m.next = "POST-ACK: LATCHING R_EN"
                     with m.Else():
-                        m.next = "FIN"
+                        m.next = "FIN: SCL LOW"
 
-            with m.State("ACK_LATCHING"):
+            with m.State("POST-ACK: LATCHING R_EN"):
                 m.d.sync += self.fifo.r_en.eq(0)
-                m.next = "ACK_LATCHED"
+                m.next = "POST-ACK: LATCHED R_EN"
 
-            with m.State("ACK_LATCHED"):
+            with m.State("POST-ACK: LATCHED R_EN"):
                 with m.If(self.o_ack & ~self.fifo.r_data[8]):
-                    m.next = "DATA_OBTAIN"
+                    m.d.sync += self.byte.eq(self.fifo.r_data[:8])
+                    m.d.sync += self.byte_ix.eq(0)
+                    m.next = "DATA BIT: SCL LOW"
                 with m.Elif(self.o_ack & self.fifo.r_data[8]):
                     m.d.sync += self.rw.eq(self.fifo.r_data[0])
                     m.d.sync += self.byte.eq(self.fifo.r_data[:8])
                     m.d.sync += self.byte_ix.eq(0)
-
-                    m.next = "REPEATED_START_WAIT"
+                    m.next = "REP START: SCL LOW"
                 with m.Else():
-                    m.next = "FIN_EMPTY"
+                    m.next = "FIN: SCL LOW"
 
-            with m.State("REPEATED_START_WAIT"):
-                # SCL is low, SDA depends.
+            with m.State("REP START: SCL LOW"):
                 with m.If(c.o_half):
-                    # Next edge: SCL goes high -- bring SDA high so
-                    # we can drop SDA during the SCL high period.
+                    # Bring SDA high so we can drop it during the SCL high
+                    # period.
                     m.d.sync += self.sda_o.eq(1)
                 with m.If(c.o_full):
-                    # This edge: SCL goes high.
-                    m.next = "REPEATED_START"
+                    m.next = "REP START: SCL HIGH"
 
-            with m.State("REPEATED_START"):
-                # SCL is high, SDA is high.
+            with m.State("REP START: SCL HIGH"):
+                # SDA is high.
                 with m.If(c.o_half):
-                    # Next edge: SCL goes low.  Bring SDA low
-                    # mid SCL-high to repeat start.
+                    # Bring SDA low mid SCL-high to repeat start.
                     m.d.sync += self.sda_o.eq(0)
                 with m.Elif(c.o_full):
-                    m.next = "DATA"
-                    # This edge: SCL goes low.
+                    m.next = "DATA BIT: SCL LOW"
 
-            with m.State("FIN_EMPTY"):
-                m.d.sync += self.fifo.r_en.eq(0)
-                m.next = "FIN"
-
-            with m.State("FIN"):
+            with m.State("FIN: SCL LOW"):
                 with m.If(c.o_half):
-                    # Next edge: SCL goes high -- bring SDA low.
+                    # Bring SDA low during SCL low.
                     m.d.sync += self.sda_o.eq(0)
                 with m.Elif(c.o_full):
-                    # This edge: SCL goes high.
-                    m.next = "STOP"
+                    m.next = "FIN: SCL HIGH"
 
-            with m.State("STOP"):
+            with m.State("FIN: SCL HIGH"):
                 with m.If(c.o_half):
-                    # Next edge: we'll stop clocking.  Bring SDA high.
+                    # Bring SDA high during SCL high to finish.
                     m.d.sync += self.sda_o.eq(1)
                 with m.Elif(c.o_full):
-                    # This edge: stop clocking.  Ensure we keep SCL high.
+                    # Turn off the clock to keep SCL high.
                     m.d.sync += c.en.eq(0)
                     m.d.sync += self.o_busy.eq(0)
                     m.d.sync += self.scl_o.eq(1)

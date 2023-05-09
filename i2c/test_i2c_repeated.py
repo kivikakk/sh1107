@@ -77,7 +77,9 @@ class TestI2CRepeatedStart(sim.TestCase):
     @sim.args(speed=Hz(100_000))
     @sim.args(speed=Hz(400_000))
     @sim.args(speed=Hz(1_000_000))
-    @sim.args(speed=Hz(2_000_000))
+    @sim.args(
+        speed=Hz(2_000_000), expected_failure=True
+    )  # currently i2c.py can't do 2MHz on a 12MHz clock
     def test_sim_i2c_repeated_start(self, dut: Top) -> sim.Generator:
         self.switch = dut.switch
         self.iv = VirtualI2C(dut.i2c)

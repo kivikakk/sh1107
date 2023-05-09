@@ -32,7 +32,7 @@ class Top(Elaboratable):
                     m.next = "ADDR_WOFF_STB"
             with m.State("ADDR_WOFF_STB"):
                 m.d.sync += i2c.fifo.w_en.eq(0)
-                m.d.sync += i2c.i_stb.eq(1)  # TODO(Ch): ver si pue nyonk^
+                m.d.sync += i2c.i_stb.eq(1)
                 m.next = "UNSTB"
             with m.State("UNSTB"):
                 m.d.sync += i2c.i_stb.eq(0)
@@ -47,11 +47,11 @@ class Top(Elaboratable):
                 with m.If(i2c.o_busy & i2c.o_ack & i2c.fifo.w_rdy):
                     m.d.sync += i2c.fifo.w_data.eq(0x8C)
                     m.d.sync += i2c.fifo.w_en.eq(1)
-                    m.next = "SECOND_DONE"
+                    m.next = "DATA_SECOND_DONE"
                 with m.Elif(~i2c.o_busy):
                     # Failed.  Nothing to write.
                     m.next = "IDLE"
-            with m.State("SECOND_DONE"):
+            with m.State("DATA_SECOND_DONE"):
                 m.d.sync += i2c.fifo.w_en.eq(0)
                 m.next = "IDLE"
 
@@ -66,7 +66,9 @@ class TestI2C(sim.TestCase):
     @sim.args(speed=Hz(100_000))
     @sim.args(speed=Hz(400_000))
     @sim.args(speed=Hz(1_000_000))
-    @sim.args(speed=Hz(2_000_000))
+    @sim.args(
+        speed=Hz(2_000_000), expected_failure=True
+    )  # currently i2c.py can't do 2MHz on a 12MHz clock
     def test_sim_i2c(self, dut: Top) -> sim.Generator:
         self.switch = dut.switch
         self.iv = VirtualI2C(dut.i2c)

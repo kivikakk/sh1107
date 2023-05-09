@@ -36,9 +36,8 @@ def formal() -> Tuple[Module, list[Signal | Value]]:
     return m, [
         sync_clk,
         sync_rst,
-        dut.i_addr,
-        dut.i_rw,
         dut.i_stb,
+        dut.rw,
         dut.fifo.w_data,
         dut.fifo.w_en,
     ]

@@ -4,10 +4,10 @@ import typing
 import unittest
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Callable, Iterator, Optional, Self, Tuple, cast
+from typing import Any, Callable, Iterator, Optional, Self, Tuple
 
 from amaranth import Elaboratable, Record, Signal
-from amaranth.hdl.ast import Statement
+from amaranth.hdl.ast import Operator, Statement
 from amaranth.sim import Delay, Settle, Simulator
 
 __all__ = ["clock", "Generator", "TestCase", "args"]
@@ -35,7 +35,7 @@ def override_clock(new_clock: Optional[float]) -> Iterator[None]:
 
 
 Generator = typing.Generator[
-    Signal | Record | Delay | Settle | Statement | None,
+    Signal | Record | Delay | Settle | Statement | Operator | None,
     bool | int,
     None,
 ]
@@ -75,6 +75,7 @@ class TestCase(unittest.TestCase):
             return subbed.removesuffix("_").removeprefix("_")
 
         for sim_args in all_sim_args:
+            expected_failure = sim_args[1].pop("expected_failure", False)
             suffix = sim_args_into_str(sim_args)
             if len(all_sim_args) > 1 and suffix:
                 target = f"{name}_{suffix}"
@@ -113,14 +114,16 @@ class TestCase(unittest.TestCase):
                     print("\nFailing VCD at: ", vcd_path)
                     raise sim_exc
 
+            def proxy(
+                self: TestCase, target: str = target, sim_args: SimArgs = sim_args
+            ):
+                return wrapper(self, target, sim_args)
+
+            if expected_failure:
+                proxy = unittest.expectedFailure(proxy)
+
             assert not hasattr(cls, target)
-            setattr(
-                cls,
-                target,
-                lambda s, t=target, sa=sim_args: wrapper(
-                    cast(TestCase, s), cast(str, t), cast(SimArgs, sa)
-                ),
-            )
+            setattr(cls, target, proxy)
 
 
 def args(*args: Any, **kwargs: Any):
