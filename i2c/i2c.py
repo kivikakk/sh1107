@@ -140,13 +140,13 @@ class I2C(Elaboratable):
                     m.d.sync += c.en.eq(1)
                     m.d.sync += self.fifo.r_en.eq(1)
 
-                    m.next = "START: LATCHING R_EN"
-
-            with m.State("START: LATCHING R_EN"):
-                m.d.sync += self.fifo.r_en.eq(0)
-                m.next = "START: LATCHED R_EN"
+                    m.next = "START: LATCHED R_EN"
 
             with m.State("START: LATCHED R_EN"):
+                m.d.sync += self.fifo.r_en.eq(0)
+                m.next = "START: UNLATCHED R_EN"
+
+            with m.State("START: UNLATCHED R_EN"):
                 m.d.sync += self.rw.eq(self.fifo.r_data[0])
                 m.d.sync += self.byte.eq(self.fifo.r_data[:8])
                 m.d.sync += self.byte_ix.eq(0)
@@ -198,15 +198,15 @@ class I2C(Elaboratable):
                         # depende de si se nos proporcionan datos a tiempo.
                         # TODO Formal prob puede ayudarnos aquí.
                         m.d.sync += self.fifo.r_en.eq(1)
-                        m.next = "POST-ACK: LATCHING R_EN"
+                        m.next = "POST-ACK: LATCHED R_EN"
                     with m.Else():
                         m.next = "FIN: SCL LOW"
 
-            with m.State("POST-ACK: LATCHING R_EN"):
-                m.d.sync += self.fifo.r_en.eq(0)
-                m.next = "POST-ACK: LATCHED R_EN"
-
             with m.State("POST-ACK: LATCHED R_EN"):
+                m.d.sync += self.fifo.r_en.eq(0)
+                m.next = "POST-ACK: UNLATCHED R_EN"
+
+            with m.State("POST-ACK: UNLATCHED R_EN"):
                 with m.If(self.o_ack & ~self.fifo.r_data[8]):
                     m.d.sync += self.byte.eq(self.fifo.r_data[:8])
                     m.d.sync += self.byte_ix.eq(0)
