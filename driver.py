@@ -13,7 +13,7 @@ from unittest import TestLoader, TextTestRunner
 
 from amaranth import Elaboratable
 from amaranth._toolchain.yosys import (
-    find_yosys,  # pyright: reportUnknownVariableType=false
+    find_yosys,  # pyright: ignore[reportUnknownVariableType]
 )
 from amaranth._toolchain.yosys import YosysBinary
 from amaranth.back import cxxrtl, rtlil

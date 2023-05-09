@@ -126,10 +126,10 @@ class TestCase(unittest.TestCase):
 def args(*args: Any, **kwargs: Any):
     def wrapper(sim_test: Callable[..., Generator]) -> Callable[..., Generator]:
         if not hasattr(sim_test, "_sim_args"):
-            sim_test._sim_args = []
-        sim_test._sim_args.append(
+            sim_test._sim_args = []  # pyright: ignore[reportFunctionMemberAccess]
+        sim_test._sim_args.append(  # pyright: ignore[reportFunctionMemberAccess]
             (args, kwargs)
-        )  # pyright: reportFunctionMemberAccess=none
+        )
         return sim_test
 
     return wrapper

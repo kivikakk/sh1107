@@ -59,9 +59,9 @@ class VirtualI2C:
                 assert not (yield self.i2c.fifo.w_en)
             assert (yield self.i2c.scl_o)
             if byte & (1 << (7 - bit)):  # MSB
-                assert (yield self.i2c.sda_o)
+                assert (yield self.i2c.sda_o), f"expected SDA high on bit {bit}"
             else:
-                assert not (yield self.i2c.sda_o)
+                assert not (yield self.i2c.sda_o), f"expected SDA low on bit {bit}"
             yield Delay(5 * self.tick)
             yield Settle()
 

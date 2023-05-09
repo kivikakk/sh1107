@@ -27,31 +27,42 @@ class Top(Elaboratable):
         with m.FSM():
             with m.State("IDLE"):
                 with m.If(self.switch):
-                    m.d.sync += i2c.i_addr.eq(0x3C)
-                    m.d.sync += i2c.i_rw.eq(I2C.RW.W)
-                    with m.If(i2c.fifo.w_rdy):
-                        m.d.sync += i2c.fifo.w_data.eq(0xAF)
-                        m.d.sync += i2c.fifo.w_en.eq(1)
-                    m.next = "FIRST_QUEUED"
-            with m.State("FIRST_QUEUED"):
-                m.d.sync += i2c.i_stb.eq(1)
-                m.d.sync += i2c.fifo.w_en.eq(0)
-                m.next = "FIRST_READY"
-            with m.State("FIRST_READY"):
-                m.d.sync += i2c.i_stb.eq(0)
-                # Wait until we need the next byte.
-                m.next = "WAIT_SECOND"
-            with m.State("WAIT_SECOND"):
-                with m.If(i2c.o_busy & i2c.o_ack & i2c.fifo.w_rdy):
-                    m.d.sync += i2c.fifo.w_data.eq(0x8C)
+                    m.d.sync += i2c.fifo.w_data.eq((0x3C << 1) | I2C.RW.W)
                     m.d.sync += i2c.fifo.w_en.eq(1)
-                    # Change destination address to trigger repeated START.
-                    m.d.sync += i2c.i_addr.eq(0x3D)
-                    m.next = "SECOND_DONE"
+                    m.next = "ADDR_WOFF_STB"
+            with m.State("ADDR_WOFF_STB"):
+                m.d.sync += i2c.fifo.w_en.eq(0)
+                m.d.sync += i2c.i_stb.eq(1)
+                m.next = "UNSTB"
+            with m.State("UNSTB"):
+                m.d.sync += i2c.i_stb.eq(0)
+                with m.If(i2c.fifo.w_rdy):
+                    m.d.sync += i2c.fifo.w_data.eq(0xAF)
+                    m.d.sync += i2c.fifo.w_en.eq(1)
+                    m.next = "DATA_FIRST_WOFF"
+            with m.State("DATA_FIRST_WOFF"):
+                m.d.sync += i2c.fifo.w_en.eq(0)
+                m.next = "DATA_SECOND_WAIT"
+            with m.State("DATA_SECOND_WAIT"):
+                with m.If(i2c.o_busy & i2c.o_ack & i2c.fifo.w_rdy):
+                    m.d.sync += i2c.fifo.w_data.eq((1 << 8) | (0x3D << 1) | I2C.RW.W)
+                    m.d.sync += i2c.fifo.w_en.eq(1)
+                    m.next = "DATA_SECOND_WOFF"
                 with m.Elif(~i2c.o_busy):
                     # Failed.  Nothing to write.
                     m.next = "IDLE"
-            with m.State("SECOND_DONE"):
+            with m.State("DATA_SECOND_WOFF"):
+                m.d.sync += i2c.fifo.w_en.eq(0)
+                m.next = "DATA_THIRD_WAIT"
+            with m.State("DATA_THIRD_WAIT"):
+                with m.If(i2c.o_busy & i2c.o_ack & i2c.fifo.w_rdy):
+                    m.d.sync += i2c.fifo.w_data.eq(0x8C)
+                    m.d.sync += i2c.fifo.w_en.eq(1)
+                    m.next = "DATA_THIRD_DONE"
+                with m.Elif(~i2c.o_busy):
+                    # Failed.  Nothing to write.
+                    m.next = "IDLE"
+            with m.State("DATA_THIRD_DONE"):
                 m.d.sync += i2c.fifo.w_en.eq(0)
                 m.next = "IDLE"
 
@@ -85,7 +96,7 @@ class TestI2CRepeatedStart(sim.TestCase):
         # Enqueue the data.
         assert not (yield self.i2c.i_stb)
         assert (yield self.i2c.fifo.w_en)
-        assert (yield self.i2c.fifo.w_data) == 0xAF
+        assert (yield self.i2c.fifo.w_data) == 0x78
         assert not (yield self.i2c.fifo.r_rdy)
         assert (yield self.i2c.fifo.r_level) == 0
         yield Delay(sim.clock())
@@ -109,7 +120,7 @@ class TestI2CRepeatedStart(sim.TestCase):
             yield from self.iv.nack()
         else:
             yield from self.iv.ack()
-            yield from self.iv.send(0xAF, next=0x8C)
+            yield from self.iv.send(0xAF, next=0x17A)
             if nack_after == 2:
                 yield from self.iv.nack()
             else:

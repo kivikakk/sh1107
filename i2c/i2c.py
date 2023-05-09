@@ -8,7 +8,7 @@ from amaranth.lib.io import Pin
 from amaranth_boards.icebreaker import ICEBreakerPlatform
 from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
 from amaranth_boards.resources import (
-    I2CResource,  # pyright: reportUnknownVariableType=false
+    I2CResource,  # pyright: ignore[reportUnknownVariableType]
 )
 
 from common import Counter, Hz
@@ -30,11 +30,8 @@ class I2C(Elaboratable):
 
     speed: Hz
 
-    i_addr: Signal
-    i_rw: Signal
-    i_stb: Signal
-
     fifo: SyncFIFO
+    i_stb: Signal
 
     o_busy: Signal
     o_ack: Signal
@@ -51,7 +48,6 @@ class I2C(Elaboratable):
     # XXX(ari): trying this out for test
     scl_o_last: Signal
 
-    addr: Signal
     rw: Signal
     byte: Signal
     byte_ix: Signal
@@ -60,11 +56,8 @@ class I2C(Elaboratable):
         assert speed.value in self.VALID_SPEEDS
         self.speed = speed
 
-        self.i_addr = Signal(7, reset=0x3C)
-        self.i_rw = Signal(I2C.RW)
+        self.fifo = SyncFIFO(width=9, depth=1)
         self.i_stb = Signal()
-
-        self.fifo = SyncFIFO(width=8, depth=1)
 
         self.o_busy = Signal()
         self.o_ack = Signal(reset=1)
@@ -73,10 +66,9 @@ class I2C(Elaboratable):
         self.sda_i.reset = 1
         self.scl_o_last = Signal.like(self.scl_o)
 
-        self.addr = Signal.like(self.i_addr)
-        self.rw = Signal.like(self.i_rw)
+        self.rw = Signal(I2C.RW)
         self.byte = Signal(8)
-        self.byte_ix = Signal(range(7))
+        self.byte_ix = Signal(range(8))
 
     def assign(self, *, scl: Pin, sda: Pin):
         self.scl = scl
@@ -143,18 +135,24 @@ class I2C(Elaboratable):
                 m.d.sync += self.sda_o.eq(1)
                 m.d.sync += self.scl_o.eq(1)
 
-                with m.If(self.i_stb & self.fifo.r_rdy):
+                with m.If(self.i_stb):
                     m.d.sync += self.o_busy.eq(1)
                     m.d.sync += self.sda_o.eq(0)
                     m.d.sync += c.en.eq(1)
+                    m.d.sync += self.fifo.r_en.eq(1)
 
-                    m.d.sync += self.addr.eq(self.i_addr)
-                    m.d.sync += self.rw.eq(self.rw)
-                    m.d.sync += self.byte.eq((self.i_addr << 1) | self.i_rw)
-                    m.d.sync += self.byte_ix.eq(0)
-
-                    m.next = "START"
+                    m.next = "LATCHING"
                     # This edge: SDA goes low.
+
+            with m.State("LATCHING"):
+                m.d.sync += self.fifo.r_en.eq(0)
+                m.next = "LATCHED"
+
+            with m.State("LATCHED"):
+                m.d.sync += self.rw.eq(self.fifo.r_data[0])
+                m.d.sync += self.byte.eq(self.fifo.r_data[:8])
+                m.d.sync += self.byte_ix.eq(0)
+                m.next = "START"
 
             with m.State("START"):
                 # SCL is high, SDA is low.
@@ -206,22 +204,25 @@ class I2C(Elaboratable):
                     # This edge: SCL goes low.
                     with m.If(self.fifo.r_rdy):
                         m.d.sync += self.fifo.r_en.eq(1)
-                        with m.If(self.o_ack & (self.addr == self.i_addr)):
-                            m.next = "DATA_OBTAIN"
-                        with m.Elif(self.o_ack & (self.addr != self.i_addr)):
-                            # Don't consume FIFO just yet.
-                            m.d.sync += self.fifo.r_en.eq(0)
-
-                            m.d.sync += self.addr.eq(self.i_addr)
-                            m.d.sync += self.rw.eq(self.rw)
-                            m.d.sync += self.byte.eq((self.i_addr << 1) | self.i_rw)
-                            m.d.sync += self.byte_ix.eq(0)
-
-                            m.next = "REPEATED_START_WAIT"
-                        with m.Else():
-                            m.next = "FIN_EMPTY"
+                        m.next = "ACK_LATCHING"
                     with m.Else():
                         m.next = "FIN"
+
+            with m.State("ACK_LATCHING"):
+                m.d.sync += self.fifo.r_en.eq(0)
+                m.next = "ACK_LATCHED"
+
+            with m.State("ACK_LATCHED"):
+                with m.If(self.o_ack & ~self.fifo.r_data[8]):
+                    m.next = "DATA_OBTAIN"
+                with m.Elif(self.o_ack & self.fifo.r_data[8]):
+                    m.d.sync += self.rw.eq(self.fifo.r_data[0])
+                    m.d.sync += self.byte.eq(self.fifo.r_data[:8])
+                    m.d.sync += self.byte_ix.eq(0)
+
+                    m.next = "REPEATED_START_WAIT"
+                with m.Else():
+                    m.next = "FIN_EMPTY"
 
             with m.State("REPEATED_START_WAIT"):
                 # SCL is low, SDA depends.
