@@ -17,6 +17,23 @@ __all__ = ["I2C"]
 
 
 class I2C(Elaboratable):
+    """
+    I2C controller.
+
+    FIFO is 9 bits wide and one word deep; to start, write in Cat(rw<1>,
+    addr<7>, x<1>) — the MSB is ignored here — and strobe i_stb on the cycle
+    after.
+
+    Write: Feed data one byte at a time into the FIFO as it's emptied, with MSB
+    low (i.e. Cat(data<8>, 0<1>)).  If o_ack goes low, there's been a NACK, and
+    the driver will discard the next queued byte and return to idle eventually.
+    Idle can be detected when o_busy goes low.  Similarly, any other error will
+    cause a return to idle.  To issue a repeated start, instead write Cat(rw<1>,
+    addr<7>, 1<1>).
+
+    Read: Not yet implemented.
+    """
+
     VALID_SPEEDS: Final[list[int]] = [
         100_000,
         400_000,

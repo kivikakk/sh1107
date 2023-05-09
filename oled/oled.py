@@ -106,7 +106,6 @@ class OLED(Elaboratable):
 
             with m.State("START: ADDRESSED LEN[1], LEN[0] AVAILABLE"):
                 m.d.sync += self.remain.eq(self.rom_rd.data)
-                # Prepare our first data byte read
                 m.d.sync += self.rom_rd.addr.eq(self.offset)
                 m.next = "START: ADDRESSED *OFFSET, LEN[1] AVAILABLE"
 
@@ -121,22 +120,6 @@ class OLED(Elaboratable):
                 m.d.sync += self.i2c.i_stb.eq(1)
                 m.next = "LOOP HEAD: SEQ BREAK OR WAIT I2C"
 
-            # Send loop:
-            # * If remain == 0, we're done with this transmission.
-            # * Otherwise, when the I2C FIFO is ready, grab the next byte of
-            #   data from the ROM.
-            # * Set the I2C address + write bit, latch the data from the ROM
-            #   into the FIFO, adjust pointers.
-            # * Strobe I2C (and unstrobe the FIFO write).
-            # * Unstrobe I2C.
-            # * Wait until I2C indicates what's next:
-            #   * If it reads ACK, we have until the end of that SCL cycle to
-            #     enqueue the next byte.
-            #   * Otherwise it'll stop and turn off its busy signal, which means
-            #     it didn't ACK or we missed the boat.
-            #
-            # When done with a transmission, check to see if there are more to
-            # do for this command.  If so, keep going.
             with m.State("LOOP HEAD: SEQ BREAK OR WAIT I2C"):
                 # XXX(Ch): Compare desactivando aquí con en su propio estado
                 # (wrt. celdas utilizadas)
@@ -146,6 +129,7 @@ class OLED(Elaboratable):
                     m.d.sync += self.offset.eq(self.offset + 1)
                     m.next = "SEQ BREAK: ADDRESSED NEXTLEN[1], NEXTLEN[0] AVAILABLE"
                 with m.Elif(self.i2c.fifo.w_rdy):
+                    # TODO(Ch): qué pasa si ~o_busy ahora?  (i.e. dirección incorrecta)
                     m.d.sync += self.offset.eq(self.offset + 1)
                     m.d.sync += self.remain.eq(self.remain - 1)
                     m.d.sync += self.i2c.fifo.w_data.eq(self.rom_rd.data)
@@ -163,7 +147,7 @@ class OLED(Elaboratable):
                 with m.If(self.i2c.o_busy & self.i2c.o_ack & self.i2c.fifo.w_rdy):
                     m.next = "LOOP HEAD: SEQ BREAK OR WAIT I2C"
                 with m.Elif(~self.i2c.o_busy):
-                    # Failed.  Nothing to write.
+                    # Failed.  Stop.
                     m.d.sync += self.o_result.eq(OLED.Result.FAILURE)
                     m.next = "IDLE"
 
