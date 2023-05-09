@@ -213,6 +213,8 @@ const ByteReceiver = struct {
                     self.state = .START_SDA_LOW;
                     self.bits = 0;
                     self.byte = 0;
+                    // NOTE(Ch): cuando queremos manejar lecturas también, este
+                    // "Fish" prob tendrá que cambiar.
                     return .Fish;
                 } else if (!all_stable) {
                     self.state = .IDLE;
