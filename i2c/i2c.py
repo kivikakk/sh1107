@@ -45,6 +45,13 @@ class I2C(Elaboratable):
         W = 0
         R = 1
 
+    class NextByte(IntEnum):
+        IDLE = 0
+        WANTED = 1
+        R_EN_LATCHED = 2
+        R_EN_UNLATCHED = 3
+        READY = 4
+
     speed: Hz
 
     fifo: SyncFIFO
@@ -64,10 +71,13 @@ class I2C(Elaboratable):
 
     # XXX(ari): trying this out for test
     scl_o_last: Signal
+    rip: Signal
 
     rw: Signal
     byte: Signal
     byte_ix: Signal
+
+    next_byte: Signal
 
     def __init__(self, *, speed: Hz):
         assert speed.value in self.VALID_SPEEDS
@@ -81,11 +91,15 @@ class I2C(Elaboratable):
 
         self.assign(scl=Pin(1, "io", name="scl"), sda=Pin(1, "io", name="sda"))
         self.sda_i.reset = 1
+
         self.scl_o_last = Signal.like(self.scl_o)
+        self.rip = Signal()
 
         self.rw = Signal(I2C.RW)
-        self.byte = Signal(8)
-        self.byte_ix = Signal(range(8))
+        self.byte = Signal(9)  # NextByte caches the whole FIFO word here.
+        self.byte_ix = Signal(range(8))  # ... but we never write the whole thing out.
+
+        self.next_byte = Signal(I2C.NextByte)
 
     def assign(self, *, scl: Pin, sda: Pin):
         self.scl = scl
@@ -145,6 +159,20 @@ class I2C(Elaboratable):
         with m.If(c.o_full):
             m.d.sync += self.scl_o.eq(~self.scl_o)
 
+        with m.Switch(self.next_byte):
+            with m.Case(I2C.NextByte.IDLE):
+                pass
+            with m.Case(I2C.NextByte.WANTED):
+                with m.If(self.fifo.r_rdy):
+                    m.d.sync += self.fifo.r_en.eq(1)
+                    m.d.sync += self.next_byte.eq(I2C.NextByte.R_EN_LATCHED)
+            with m.Case(I2C.NextByte.R_EN_LATCHED):
+                m.d.sync += self.fifo.r_en.eq(0)
+                m.d.sync += self.next_byte.eq(I2C.NextByte.R_EN_UNLATCHED)
+            with m.Case(I2C.NextByte.R_EN_UNLATCHED):
+                m.d.sync += self.byte.eq(self.fifo.r_data)
+                m.d.sync += self.next_byte.eq(I2C.NextByte.READY)
+
         with m.FSM():
             with m.State("IDLE"):
                 m.d.sync += self.sda_oe.eq(1)
@@ -189,6 +217,7 @@ class I2C(Elaboratable):
                         m.next = "DATA BIT: SCL LOW"
                         # Wait for next SCL^ before next data bit.
                     with m.Else():
+                        m.d.sync += self.next_byte.eq(I2C.NextByte.WANTED)
                         m.next = "ACK BIT: SCL LOW"
                         # Wait for next SCL^ before R/W.
 
@@ -206,35 +235,23 @@ class I2C(Elaboratable):
                     m.d.sync += self.o_ack.eq(~self.sda_i)
                     m.d.sync += self.sda_oe.eq(1)
                 with m.Elif(c.o_full):
-                    with m.If(self.fifo.r_rdy):
-                        # TODO(Ch): si leemos antes, tal vez podamos ahorrar uno
-                        # o dos ciclos y poder funcionar a 2MHz@12MHz?
-                        # Necesitamos activar r_en tan pronto como r_rdy sea
-                        # alta; un registro o algo para almacenar "FIFO leído"
-                        # también.  La rapidez con la que podamos funcionar
-                        # depende de si se nos proporcionan datos a tiempo.
-                        # TODO Formal prob puede ayudarnos aquí.
-                        m.d.sync += self.fifo.r_en.eq(1)
-                        m.next = "POST-ACK: LATCHED R_EN"
+                    with m.If(self.next_byte == I2C.NextByte.READY):
+                        with m.If(self.o_ack & ~self.byte[8]):
+                            m.d.sync += self.byte_ix.eq(0)
+                            m.next = "DATA BIT: SCL LOW"
+                        with m.Elif(self.o_ack & self.byte[8]):
+                            # m.d.sync += self.rip.eq(1)
+                            m.d.sync += self.rw.eq(self.byte[0])
+                            m.d.sync += self.byte.eq(self.byte[:8])
+                            m.d.sync += self.byte_ix.eq(0)
+                            m.next = "REP START: SCL LOW"
+                        with m.Else():
+                            m.d.sync += self.rip.eq(1)
+                            m.next = "FIN: SCL LOW"
                     with m.Else():
+                        # m.d.sync += self.rip.eq(1)
+                        # m.d.sync += self.next_byte.eq(I2C.NextByte.IDLE)
                         m.next = "FIN: SCL LOW"
-
-            with m.State("POST-ACK: LATCHED R_EN"):
-                m.d.sync += self.fifo.r_en.eq(0)
-                m.next = "POST-ACK: UNLATCHED R_EN"
-
-            with m.State("POST-ACK: UNLATCHED R_EN"):
-                with m.If(self.o_ack & ~self.fifo.r_data[8]):
-                    m.d.sync += self.byte.eq(self.fifo.r_data[:8])
-                    m.d.sync += self.byte_ix.eq(0)
-                    m.next = "DATA BIT: SCL LOW"
-                with m.Elif(self.o_ack & self.fifo.r_data[8]):
-                    m.d.sync += self.rw.eq(self.fifo.r_data[0])
-                    m.d.sync += self.byte.eq(self.fifo.r_data[:8])
-                    m.d.sync += self.byte_ix.eq(0)
-                    m.next = "REP START: SCL LOW"
-                with m.Else():
-                    m.next = "FIN: SCL LOW"
 
             with m.State("REP START: SCL LOW"):
                 with m.If(c.o_half):

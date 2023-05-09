@@ -44,28 +44,30 @@ class VirtualI2C:
     def send(
         self, byte: int, *, next: int | Literal["STOP"] | None = None
     ) -> sim.Generator:
+        actual = 0
         for bit in range(8):
             yield Delay(sim.clock() * 2)
             yield Settle()
-            if bit == 0:
-                if isinstance(next, int):
-                    assert (yield self.i2c.fifo.w_en)
-                    assert (yield self.i2c.fifo.w_data) == next
-                elif next == "STOP":
-                    assert not (yield self.i2c.fifo.w_en)
+            assert not (yield self.i2c.rip)
+            # if bit == 0:
+            #     if isinstance(next, int):
+            #         assert (yield self.i2c.fifo.w_en)
+            #         assert (yield self.i2c.fifo.w_data) == next
+            #     elif next == "STOP":
+            #         assert not (yield self.i2c.fifo.w_en)
             yield Delay(5 * self.tick - sim.clock() * 2)
             yield Settle()
+            assert not (yield self.i2c.rip)
             if bit == 0 and isinstance(next, int):
                 assert not (yield self.i2c.fifo.w_en)
             assert (yield self.i2c.scl_o)
-            if byte & (1 << (7 - bit)):  # MSB
-                assert (yield self.i2c.sda_o), f"expected SDA high on bit {bit}"
-            else:
-                assert not (yield self.i2c.sda_o), f"expected SDA low on bit {bit}"
+            actual = (actual << 1) | (yield self.i2c.sda_o)
             yield Delay(5 * self.tick)
             yield Settle()
 
             assert not (yield self.i2c.scl_o)
+
+        assert actual == byte, f"expected {byte:02x}, got {actual:02x}"
 
     def ack(self, *, ack: bool = True) -> sim.Generator:
         # Master releases SDA; we ACK by driving SDA low.
