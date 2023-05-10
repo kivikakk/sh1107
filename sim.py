@@ -10,7 +10,7 @@ from amaranth import Elaboratable, Record, Signal
 from amaranth.hdl.ast import Operator, Statement
 from amaranth.sim import Delay, Settle, Simulator
 
-__all__ = ["clock", "Generator", "TestCase", "args"]
+__all__ = ["clock", "Generator", "TestCase", "args", "always_args"]
 
 _active_clock = 1 / 12e6
 
@@ -64,6 +64,7 @@ class TestCase(unittest.TestCase):
         dutpn = list(sig.parameters)[1]
         dutc = sig.parameters[dutpn].annotation
 
+        sim_always_args: list[SimArgs] = getattr(sim_test, "_sim_always_args", [])
         all_sim_args: list[SimArgs] = getattr(sim_test, "_sim_args", [([], {})])
 
         delattr(cls, name)
@@ -87,6 +88,9 @@ class TestCase(unittest.TestCase):
             if in_simp is not None:
                 assert in_simp.annotation is bool
                 sim_args[1]["in_sim"] = True
+
+            for args, kwargs in sim_always_args:
+                sim_args = (args + sim_args[0], {**kwargs, **sim_args[1]})
 
             @override_clock(getattr(cls, "SIM_CLOCK", None))
             def wrapper(self: TestCase, target: str, sim_args: SimArgs):
@@ -131,6 +135,20 @@ def args(*args: Any, **kwargs: Any):
         if not hasattr(sim_test, "_sim_args"):
             sim_test._sim_args = []  # pyright: ignore[reportFunctionMemberAccess]
         sim_test._sim_args.append(  # pyright: ignore[reportFunctionMemberAccess]
+            (args, kwargs)
+        )
+        return sim_test
+
+    return wrapper
+
+
+def always_args(*args: Any, **kwargs: Any):
+    def wrapper(sim_test: Callable[..., Generator]) -> Callable[..., Generator]:
+        if not hasattr(sim_test, "_sim_always_args"):
+            sim_test._sim_always_args = (  # pyright: ignore[reportFunctionMemberAccess]
+                []
+            )
+        sim_test._sim_always_args.append(  # pyright: ignore[reportFunctionMemberAccess]
             (args, kwargs)
         )
         return sim_test

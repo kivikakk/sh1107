@@ -63,7 +63,7 @@ class VirtualI2C:
             yield Delay(5 * self.tick)
             yield Settle()
 
-            assert not (yield self.i2c.scl_o)
+            assert not (yield self.i2c.scl_o), f"expected SCL low at end of bit {bit}"
 
         assert actual == byte, f"expected {byte:02x}, got {actual:02x}"
 
@@ -84,6 +84,11 @@ class VirtualI2C:
         if ack:
             yield cast(Signal, self.i2c.sda.i).eq(1)
         yield Delay(self.tick)
+
+        if ack:
+            assert (yield self.i2c.o_ack)
+        else:
+            assert not (yield self.i2c.o_ack)
 
     def nack(self) -> sim.Generator:
         yield from self.ack(ack=False)

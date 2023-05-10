@@ -179,6 +179,8 @@ class I2C(Elaboratable):
 
                 with m.If(self.i_stb):
                     m.d.sync += self.o_busy.eq(1)
+                    m.d.sync += self.o_ack.eq(1)
+                    m.d.sync += self.next_byte.eq(I2C.NextByte.IDLE)
                     m.d.sync += self.sda_o.eq(0)
                     m.d.sync += c.en.eq(1)
                     m.d.sync += self.fifo.r_en.eq(1)

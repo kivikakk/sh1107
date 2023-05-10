@@ -1,73 +1,28 @@
 import unittest
-from typing import Optional
+from typing import Final, Optional
 
-from amaranth import Elaboratable, Module, Signal
-from amaranth.build import Platform
+from amaranth import Signal
 from amaranth.sim import Delay, Settle
 
 import sim
 from common import Hz
 from .i2c import I2C
+from .test_i2c_top import TestI2CTop
 from .virtual_i2c import VirtualI2C
 
 
-class Top(Elaboratable):
-    speed: Hz
-    switch: Signal
-
-    def __init__(self, *, speed: Hz):
-        self.speed = speed
-        self.switch = Signal()
-
-    def elaborate(self, platform: Optional[Platform]) -> Module:
-        m = Module()
-
-        m.submodules.i2c = self.i2c = i2c = I2C(speed=self.speed)
-
-        with m.FSM():
-            with m.State("IDLE"):
-                with m.If(self.switch):
-                    m.d.sync += i2c.fifo.w_data.eq((0x3C << 1) | I2C.RW.W)
-                    m.d.sync += i2c.fifo.w_en.eq(1)
-                    m.next = "ADDR_WOFF_STB"
-            with m.State("ADDR_WOFF_STB"):
-                m.d.sync += i2c.fifo.w_en.eq(0)
-                m.d.sync += i2c.i_stb.eq(1)
-                m.next = "UNSTB"
-            with m.State("UNSTB"):
-                m.d.sync += i2c.i_stb.eq(0)
-                with m.If(i2c.fifo.w_rdy):
-                    m.d.sync += i2c.fifo.w_data.eq(0xAF)
-                    m.d.sync += i2c.fifo.w_en.eq(1)
-                    m.next = "DATA_FIRST_WOFF"
-            with m.State("DATA_FIRST_WOFF"):
-                m.d.sync += i2c.fifo.w_en.eq(0)
-                m.next = "DATA_SECOND_WAIT"
-            with m.State("DATA_SECOND_WAIT"):
-                with m.If(i2c.o_busy & i2c.o_ack & i2c.fifo.w_rdy):
-                    m.d.sync += i2c.fifo.w_data.eq(0x8C)
-                    m.d.sync += i2c.fifo.w_en.eq(1)
-                    m.next = "DATA_SECOND_DONE"
-                with m.Elif(~i2c.o_busy):
-                    # Failed.  Nothing to write.
-                    m.next = "IDLE"
-            with m.State("DATA_SECOND_DONE"):
-                m.d.sync += i2c.fifo.w_en.eq(0)
-                m.next = "IDLE"
-
-        return m
-
-
+# TODO: further unify with TestI2CRepeatedStart
 class TestI2C(sim.TestCase):
     switch: Signal
     iv: VirtualI2C
     i2c: I2C
 
+    @sim.always_args([(0x3C << 1) | I2C.RW.W, 0xAF, 0x8C])
     @sim.args(speed=Hz(100_000))
     @sim.args(speed=Hz(400_000))
     @sim.args(speed=Hz(1_000_000))
     @sim.args(speed=Hz(2_000_000))
-    def test_sim_i2c(self, dut: Top) -> sim.Generator:
+    def test_sim_i2c(self, dut: TestI2CTop) -> sim.Generator:
         self.switch = dut.switch
         self.iv = VirtualI2C(dut.i2c)
         self.i2c = dut.i2c
@@ -90,7 +45,7 @@ class TestI2C(sim.TestCase):
         yield Delay(sim.clock())
         yield Settle()
 
-        # Data is enqueued, we're strobing I2C.  I2C still high.
+        # Data is enqueued, we're strobing I2C.  Lines still high.
         assert (yield self.i2c.i_stb)
         assert not (yield self.i2c.fifo.w_en)
         assert (yield self.i2c.fifo.r_rdy)
@@ -103,7 +58,7 @@ class TestI2C(sim.TestCase):
 
         yield from self.iv.start()
 
-        yield from self.iv.send((0x3C << 1) | 0)
+        yield from self.iv.send(0x78)
         if nack_after == 1:
             yield from self.iv.nack()
         else:
@@ -128,6 +83,7 @@ class TestI2C(sim.TestCase):
             assert (yield self.i2c.sda_o)
 
         assert not (yield self.i2c.fifo.r_rdy)
+        assert not (yield self.i2c.o_busy)
 
     def _bench_nacks(self) -> sim.Generator:
         yield from self._bench_complete(nack_after=1)
