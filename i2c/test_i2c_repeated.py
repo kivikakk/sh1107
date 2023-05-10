@@ -77,9 +77,7 @@ class TestI2CRepeatedStart(sim.TestCase):
     @sim.args(speed=Hz(100_000))
     @sim.args(speed=Hz(400_000))
     @sim.args(speed=Hz(1_000_000))
-    @sim.args(
-        speed=Hz(2_000_000), expected_failure=True
-    )  # currently i2c.py can't do 2MHz on a 12MHz clock
+    @sim.args(speed=Hz(2_000_000))
     def test_sim_i2c_repeated_start(self, dut: Top) -> sim.Generator:
         self.switch = dut.switch
         self.iv = VirtualI2C(dut.i2c)
@@ -100,7 +98,6 @@ class TestI2CRepeatedStart(sim.TestCase):
         assert (yield self.i2c.fifo.w_en)
         assert (yield self.i2c.fifo.w_data) == 0x78
         assert not (yield self.i2c.fifo.r_rdy)
-        assert (yield self.i2c.fifo.r_level) == 0
         yield Delay(sim.clock())
         yield Settle()
 
@@ -146,6 +143,8 @@ class TestI2CRepeatedStart(sim.TestCase):
             yield Settle()
             assert (yield self.i2c.scl_o)
             assert (yield self.i2c.sda_o)
+
+        assert not (yield self.i2c.fifo.r_rdy)
 
     def _bench_nacks(self) -> sim.Generator:
         yield from self._bench_complete(nack_after=1)

@@ -71,7 +71,6 @@ class I2C(Elaboratable):
 
     # XXX(ari): trying this out for test
     scl_o_last: Signal
-    rip: Signal
 
     rw: Signal
     byte: Signal
@@ -93,7 +92,6 @@ class I2C(Elaboratable):
         self.sda_i.reset = 1
 
         self.scl_o_last = Signal.like(self.scl_o)
-        self.rip = Signal()
 
         self.rw = Signal(I2C.RW)
         self.byte = Signal(9)  # NextByte caches the whole FIFO word here.
@@ -230,8 +228,7 @@ class I2C(Elaboratable):
 
             with m.State("ACK BIT: SCL HIGH"):
                 with m.If(c.o_half):
-                    # Next edge: SCL goes low -- read ACK.
-                    # SDA should be brought low by the addressee.
+                    # Read ACK. SDA should be brought low by the addressee.
                     m.d.sync += self.o_ack.eq(~self.sda_i)
                     m.d.sync += self.sda_oe.eq(1)
                 with m.Elif(c.o_full):
@@ -240,17 +237,15 @@ class I2C(Elaboratable):
                             m.d.sync += self.byte_ix.eq(0)
                             m.next = "DATA BIT: SCL LOW"
                         with m.Elif(self.o_ack & self.byte[8]):
-                            # m.d.sync += self.rip.eq(1)
                             m.d.sync += self.rw.eq(self.byte[0])
                             m.d.sync += self.byte.eq(self.byte[:8])
                             m.d.sync += self.byte_ix.eq(0)
                             m.next = "REP START: SCL LOW"
                         with m.Else():
-                            m.d.sync += self.rip.eq(1)
+                            # Consume anything that got queued before the NACK was realised.
+                            m.d.sync += self.next_byte.eq(I2C.NextByte.WANTED)
                             m.next = "FIN: SCL LOW"
                     with m.Else():
-                        # m.d.sync += self.rip.eq(1)
-                        # m.d.sync += self.next_byte.eq(I2C.NextByte.IDLE)
                         m.next = "FIN: SCL LOW"
 
             with m.State("REP START: SCL LOW"):

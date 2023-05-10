@@ -48,16 +48,14 @@ class VirtualI2C:
         for bit in range(8):
             yield Delay(sim.clock() * 2)
             yield Settle()
-            assert not (yield self.i2c.rip)
-            # if bit == 0:
-            #     if isinstance(next, int):
-            #         assert (yield self.i2c.fifo.w_en)
-            #         assert (yield self.i2c.fifo.w_data) == next
-            #     elif next == "STOP":
-            #         assert not (yield self.i2c.fifo.w_en)
+            if bit == 0:
+                if isinstance(next, int):
+                    assert (yield self.i2c.fifo.r_rdy)
+                    assert (yield self.i2c.fifo.w_data) == next
+                elif next == "STOP":
+                    assert not (yield self.i2c.fifo.r_rdy)
             yield Delay(5 * self.tick - sim.clock() * 2)
             yield Settle()
-            assert not (yield self.i2c.rip)
             if bit == 0 and isinstance(next, int):
                 assert not (yield self.i2c.fifo.w_en)
             assert (yield self.i2c.scl_o)

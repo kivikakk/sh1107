@@ -121,8 +121,7 @@ def rom(args: Namespace):
 
 
 def vsh(args: Namespace):
-    # TODO(Ch): trabajando a 2MHz de nuevo
-    design = _build_top(args, speed=Hz(1_000_000))
+    design = _build_top(args, speed=Hz(2_000_000))
 
     # XXX(ari): works better on Windows since osscad's yosys-config a) doesn't execute
     # cleanly automatically (bash script), and b) its answers are wrong anyway.
