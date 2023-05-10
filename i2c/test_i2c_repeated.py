@@ -1,19 +1,18 @@
 import unittest
-from typing import Final, Optional
+from typing import Optional
 
 from amaranth import Signal
 from amaranth.sim import Delay, Settle
 
 import sim
 from common import Hz
+from . import sim_i2c
 from .i2c import I2C
 from .test_i2c_top import TestI2CTop
-from .virtual_i2c import VirtualI2C
 
 
 class TestI2CRepeatedStart(sim.TestCase):
     switch: Signal
-    iv: VirtualI2C
     i2c: I2C
 
     @sim.always_args(
@@ -25,7 +24,6 @@ class TestI2CRepeatedStart(sim.TestCase):
     @sim.args(speed=Hz(2_000_000))
     def test_sim_i2c_repeated_start(self, dut: TestI2CTop) -> sim.Generator:
         self.switch = dut.switch
-        self.iv = VirtualI2C(dut.i2c)
         self.i2c = dut.i2c
 
         yield from self._bench_complete()
@@ -57,31 +55,31 @@ class TestI2CRepeatedStart(sim.TestCase):
         yield Delay(sim.clock())
         yield Settle()
 
-        yield from self.iv.start()
+        yield from sim_i2c.start(self.i2c)
 
-        yield from self.iv.send(0x78)
+        yield from sim_i2c.send(self.i2c, 0x78)
         if nack_after == 1:
-            yield from self.iv.nack()
+            yield from sim_i2c.nack(self.i2c)
         else:
-            yield from self.iv.ack()
-            yield from self.iv.send(0xAF, next=0x17A)
+            yield from sim_i2c.ack(self.i2c)
+            yield from sim_i2c.send(self.i2c, 0xAF, next=0x17A)
             if nack_after == 2:
-                yield from self.iv.nack()
+                yield from sim_i2c.nack(self.i2c)
             else:
-                yield from self.iv.ack()
-                yield from self.iv.repeated_start()
-                yield from self.iv.send((0x3D << 1) | 0)
+                yield from sim_i2c.ack(self.i2c)
+                yield from sim_i2c.repeated_start(self.i2c)
+                yield from sim_i2c.send(self.i2c, (0x3D << 1) | 0)
                 if nack_after == 3:
-                    yield from self.iv.nack()
+                    yield from sim_i2c.nack(self.i2c)
                 else:
-                    yield from self.iv.ack()
-                    yield from self.iv.send(0x8C, next="STOP")
+                    yield from sim_i2c.ack(self.i2c)
+                    yield from sim_i2c.send(self.i2c, 0x8C, next="STOP")
                     if nack_after == 4:
-                        yield from self.iv.nack()
+                        yield from sim_i2c.nack(self.i2c)
                     else:
-                        yield from self.iv.ack()
+                        yield from sim_i2c.ack(self.i2c)
 
-        yield from self.iv.stop()
+        yield from sim_i2c.stop(self.i2c)
 
         for _ in range(3):
             yield Delay(sim.clock())
