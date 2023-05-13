@@ -7,7 +7,7 @@ from amaranth.sim import Delay, Settle
 import sim
 from common import Hz
 from . import sim_i2c
-from .i2c import I2C, RW
+from .i2c import I2C, RW, Transfer
 from .test_i2c_top import TestI2CTop
 
 
@@ -15,7 +15,24 @@ class TestI2CRepeatedStart(sim.TestCase):
     switch: Signal
     i2c: I2C
 
-    @sim.always_args([(0x3C << 1) | RW.W, 0xAF, (1 << 8) | (0x3D << 1) | RW.W, 0x8C])
+    @sim.always_args(
+        [
+            Transfer.const(
+                {
+                    "kind": Transfer.Kind.START,
+                    "payload": {"start": {"addr": 0x3C, "rw": RW.W}},
+                }
+            ),
+            Transfer.const({"kind": Transfer.Kind.DATA, "payload": {"data": 0xAF}}),
+            Transfer.const(
+                {
+                    "kind": Transfer.Kind.START,
+                    "payload": {"start": {"addr": 0x3D, "rw": RW.W}},
+                }
+            ),
+            Transfer.const({"kind": Transfer.Kind.DATA, "payload": {"data": 0x8C}}),
+        ]
+    )
     @sim.args(speed=Hz(100_000))
     @sim.args(speed=Hz(400_000))
     @sim.args(speed=Hz(1_000_000))
@@ -37,7 +54,7 @@ class TestI2CRepeatedStart(sim.TestCase):
         # Enqueue the data.
         assert not (yield self.i2c.i_stb)
         assert (yield self.i2c.fifo.w_en)
-        assert (yield self.i2c.fifo.w_data) == 0x78
+        assert (yield self.i2c.fifo.w_data) == 0x178
         assert not (yield self.i2c.fifo.r_rdy)
         yield Delay(sim.clock())
         yield Settle()
@@ -66,7 +83,7 @@ class TestI2CRepeatedStart(sim.TestCase):
             else:
                 yield from sim_i2c.ack(self.i2c)
                 yield from sim_i2c.repeated_start(self.i2c)
-                yield from sim_i2c.send(self.i2c, (0x3D << 1) | 0)
+                yield from sim_i2c.send(self.i2c, 0x7A)
                 if nack_after == 3:
                     yield from sim_i2c.nack(self.i2c)
                 else:

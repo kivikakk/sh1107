@@ -1,6 +1,6 @@
 from typing import Optional
 
-from amaranth import Elaboratable, Module, Signal
+from amaranth import Elaboratable, Module, Signal, Value
 from amaranth.build import Platform
 
 from common import Hz
@@ -13,10 +13,10 @@ class TestI2CTop(Elaboratable):
     switch: Signal
     aborted_at: Signal
 
-    def __init__(self, data: list[int], *, speed: Hz):
+    def __init__(self, data: list[int | Value], *, speed: Hz):
         assert len(data) >= 1
         for datum in data:
-            assert 0 <= datum <= 0x1FF
+            assert isinstance(datum, Value) or (0 <= datum <= 0x1FF)
         self.data = data
         self.speed = speed
         self.switch = Signal()

@@ -28,15 +28,11 @@ class Transfer(data.Struct):
 
     payload: data.UnionLayout(
         {
-            "data": data.StructLayout(
-                {
-                    "byte": 8,
-                }
-            ),
+            "data": 8,
             "start": data.StructLayout(
                 {
-                    "addr": 7,
                     "rw": RW,
+                    "addr": 7,
                 }
             ),
         }
@@ -49,8 +45,8 @@ class I2C(Elaboratable):
     I2C controller.
 
     FIFO is 9 bits wide and one word deep; to start, write in Cat(rw<1>,
-    addr<7>, x<1>) — the MSB is ignored here — and strobe i_stb on the cycle
-    after.
+    addr<7>, 1<1>) (the MSB is ignored here, though, since you need to start
+    with an address), and strobe i_stb on the cycle after.
 
     Write: Feed data one byte at a time into the FIFO as it's emptied, with MSB
     low (i.e. Cat(data<8>, 0<1>)).  If o_ack goes low, there's been a NACK, and
@@ -183,6 +179,7 @@ class I2C(Elaboratable):
         with m.If(c.o_full):
             m.d.sync += self.scl_o.eq(~self.scl_o)
 
+        # TODO(Ch): what's the nicer way of doing this, i wonder?
         with m.Switch(self.next_byte):
             with m.Case(I2C.NextByte.IDLE):
                 pass
@@ -268,7 +265,7 @@ class I2C(Elaboratable):
                             self.o_ack & (self.byte.kind == Transfer.Kind.START)
                         ):
                             m.d.sync += self.rw.eq(self.byte.payload.start.rw)
-                            m.d.sync += self.byte.eq(self.byte.payload.start.addr)
+                            m.d.sync += self.byte.eq(self.byte)
                             m.d.sync += self.byte_ix.eq(0)
                             m.next = "REP START: SCL LOW"
                         with m.Else():

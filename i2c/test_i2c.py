@@ -6,7 +6,7 @@ from amaranth.sim import Delay, Settle
 
 import sim
 from common import Hz
-from i2c import I2C, RW
+from i2c import I2C, RW, Transfer
 from . import sim_i2c
 from .test_i2c_top import TestI2CTop
 
@@ -18,10 +18,14 @@ class TestI2C(sim.TestCase):
 
     @sim.always_args(
         [
-            # TODO(Mia): would be nice to be able to use i2c.Transfer here.
-            (0x3C << 1) | RW.W,
-            0xAF,
-            0x8C,
+            Transfer.const(
+                {
+                    "kind": Transfer.Kind.START,
+                    "payload": {"start": {"addr": 0x3C, "rw": RW.W}},
+                }
+            ),
+            Transfer.const({"kind": Transfer.Kind.DATA, "payload": {"data": 0xAF}}),
+            Transfer.const({"kind": Transfer.Kind.DATA, "payload": {"data": 0x8C}}),
         ]
     )
     @sim.args(speed=Hz(100_000))
@@ -45,7 +49,7 @@ class TestI2C(sim.TestCase):
         # Enqueue the data.
         assert not (yield self.i2c.i_stb)
         assert (yield self.i2c.fifo.w_en)
-        assert (yield self.i2c.fifo.w_data) == 0x78
+        assert (yield self.i2c.fifo.w_data) == 0x178
         assert not (yield self.i2c.fifo.r_rdy)
         yield Delay(sim.clock())
         yield Settle()
