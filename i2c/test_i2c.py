@@ -6,8 +6,8 @@ from amaranth.sim import Delay, Settle
 
 import sim
 from common import Hz
+from i2c import I2C, RW
 from . import sim_i2c
-from .i2c import I2C
 from .test_i2c_top import TestI2CTop
 
 
@@ -16,7 +16,14 @@ class TestI2C(sim.TestCase):
     switch: Signal
     i2c: I2C
 
-    @sim.always_args([(0x3C << 1) | I2C.RW.W, 0xAF, 0x8C])
+    @sim.always_args(
+        [
+            # TODO(Mia): would be nice to be able to use i2c.Transfer here.
+            (0x3C << 1) | RW.W,
+            0xAF,
+            0x8C,
+        ]
+    )
     @sim.args(speed=Hz(100_000))
     @sim.args(speed=Hz(400_000))
     @sim.args(speed=Hz(1_000_000))

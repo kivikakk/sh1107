@@ -1,3 +1,3 @@
-from .i2c import I2C
+from .i2c import I2C, RW
 
-__all__ = ["I2C"]
+__all__ = ["I2C", "RW"]

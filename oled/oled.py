@@ -6,7 +6,7 @@ from amaranth.hdl.mem import ReadPort
 from amaranth.lib.enum import IntEnum
 
 from common import Hz
-from i2c import I2C
+from i2c import I2C, RW
 from .rom import ROM
 
 __all__ = ["OLED"]
@@ -111,7 +111,7 @@ class OLED(Elaboratable):
 
             with m.State("START: ADDRESSED *OFFSET, LEN[1] AVAILABLE"):
                 m.d.sync += self.remain.eq(self.remain | self.rom_rd.data.shift_left(8))
-                m.d.sync += self.i2c.fifo.w_data.eq((0x3C << 1) | I2C.RW.W)
+                m.d.sync += self.i2c.fifo.w_data.eq((0x3C << 1) | RW.W)
                 m.d.sync += self.i2c.fifo.w_en.eq(1)
                 m.next = "ADDRESS PERIPHERAL: LATCHED W_EN"
 

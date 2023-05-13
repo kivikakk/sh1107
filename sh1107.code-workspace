@@ -44,7 +44,9 @@
 			"reportMissingTypeStubs": "none",
 			"reportUnknownVariableType": "information",
 			"reportUnusedImport": "none",
-			"reportUnknownLambdaType": "none"
+			"reportUnknownLambdaType": "none",
+			"reportUnknownArgumentType": "none",
+			"reportGeneralTypeIssues": "none", // for Amaranth layout defns
 		},
 		// testing
 		"python.testing.unittestEnabled": true,
@@ -67,7 +69,7 @@
 		// linting
 		"python.linting.flake8Enabled": true,
 		"python.linting.flake8Args": [
-			"--ignore=E501,E203,W503",
+			"--ignore=E501,E203,W503,F821",
 		],
 		"clangd.fallbackFlags": [
 			"-I${workspaceFolder}/../oss-cad-suite/share/yosys/include",

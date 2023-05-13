@@ -2,7 +2,7 @@ from typing import Final, Optional, cast
 
 from amaranth import Elaboratable, Module, Signal
 from amaranth.build import Attrs, Platform
-from amaranth.lib.enum import IntEnum
+from amaranth.lib import data, enum
 from amaranth.lib.fifo import SyncFIFO
 from amaranth.lib.io import Pin
 from amaranth_boards.icebreaker import ICEBreakerPlatform
@@ -13,7 +13,35 @@ from amaranth_boards.resources import (
 
 from common import Counter, Hz
 
-__all__ = ["I2C"]
+__all__ = ["I2C", "RW", "Transfer"]
+
+
+class RW(enum.IntEnum, shape=1):
+    W = 0
+    R = 1
+
+
+class Transfer(data.Struct):
+    class Kind(enum.Enum, shape=1):
+        DATA = 0
+        START = 1
+
+    payload: data.UnionLayout(
+        {
+            "data": data.StructLayout(
+                {
+                    "byte": 8,
+                }
+            ),
+            "start": data.StructLayout(
+                {
+                    "addr": 7,
+                    "rw": RW,
+                }
+            ),
+        }
+    )
+    kind: Kind
 
 
 class I2C(Elaboratable):
@@ -41,11 +69,7 @@ class I2C(Elaboratable):
         2_000_000,  # XXX: for vsh
     ]
 
-    class RW(IntEnum):
-        W = 0
-        R = 1
-
-    class NextByte(IntEnum):
+    class NextByte(enum.Enum):
         IDLE = 0
         WANTED = 1
         R_EN_LATCHED = 2
@@ -55,6 +79,7 @@ class I2C(Elaboratable):
     speed: Hz
 
     fifo: SyncFIFO
+    fifo_r_data: Transfer
     i_stb: Signal
 
     o_busy: Signal
@@ -73,7 +98,7 @@ class I2C(Elaboratable):
     scl_o_last: Signal
 
     rw: Signal
-    byte: Signal
+    byte: Transfer
     byte_ix: Signal
 
     next_byte: Signal
@@ -83,6 +108,7 @@ class I2C(Elaboratable):
         self.speed = speed
 
         self.fifo = SyncFIFO(width=9, depth=1)
+        self.fifo_r_data = Transfer(target=self.fifo.r_data)
         self.i_stb = Signal()
 
         self.o_busy = Signal()
@@ -93,8 +119,8 @@ class I2C(Elaboratable):
 
         self.scl_o_last = Signal.like(self.scl_o)
 
-        self.rw = Signal(I2C.RW)
-        self.byte = Signal(9)  # NextByte caches the whole FIFO word here.
+        self.rw = Signal(RW)
+        self.byte = Transfer()  # NextByte caches the whole FIFO word here.
         self.byte_ix = Signal(range(8))  # ... but we never write the whole thing out.
 
         self.next_byte = Signal(I2C.NextByte)
@@ -168,7 +194,7 @@ class I2C(Elaboratable):
                 m.d.sync += self.fifo.r_en.eq(0)
                 m.d.sync += self.next_byte.eq(I2C.NextByte.R_EN_UNLATCHED)
             with m.Case(I2C.NextByte.R_EN_UNLATCHED):
-                m.d.sync += self.byte.eq(self.fifo.r_data)
+                m.d.sync += self.byte.eq(self.fifo_r_data)
                 m.d.sync += self.next_byte.eq(I2C.NextByte.READY)
 
         with m.FSM():
@@ -192,8 +218,8 @@ class I2C(Elaboratable):
                 m.next = "START: UNLATCHED R_EN"
 
             with m.State("START: UNLATCHED R_EN"):
-                m.d.sync += self.rw.eq(self.fifo.r_data[0])
-                m.d.sync += self.byte.eq(self.fifo.r_data[:8])
+                m.d.sync += self.rw.eq(self.fifo_r_data.payload.start.rw)
+                m.d.sync += self.byte.eq(self.fifo_r_data)
                 m.d.sync += self.byte_ix.eq(0)
                 m.next = "START: WAIT SCL"
 
@@ -235,12 +261,14 @@ class I2C(Elaboratable):
                     m.d.sync += self.sda_oe.eq(1)
                 with m.Elif(c.o_full):
                     with m.If(self.next_byte == I2C.NextByte.READY):
-                        with m.If(self.o_ack & ~self.byte[8]):
+                        with m.If(self.o_ack & (self.byte.kind == Transfer.Kind.DATA)):
                             m.d.sync += self.byte_ix.eq(0)
                             m.next = "DATA BIT: SCL LOW"
-                        with m.Elif(self.o_ack & self.byte[8]):
-                            m.d.sync += self.rw.eq(self.byte[0])
-                            m.d.sync += self.byte.eq(self.byte[:8])
+                        with m.Elif(
+                            self.o_ack & (self.byte.kind == Transfer.Kind.START)
+                        ):
+                            m.d.sync += self.rw.eq(self.byte.payload.start.rw)
+                            m.d.sync += self.byte.eq(self.byte.payload.start.addr)
                             m.d.sync += self.byte_ix.eq(0)
                             m.next = "REP START: SCL LOW"
                         with m.Else():
