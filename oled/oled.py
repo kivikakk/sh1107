@@ -6,9 +6,10 @@ from amaranth.lib.enum import IntEnum
 from amaranth.lib.fifo import SyncFIFO
 
 from common import Hz
-from i2c import I2C
+from i2c import I2C, RW
 from .rom import OFFSET_CHAR, OFFSET_DISPLAY_OFF, OFFSET_DISPLAY_ON
 from .rom_writer import ROMWriter
+from .sh1107 import Cmd, ControlByte
 
 __all__ = ["OLED"]
 
@@ -37,6 +38,10 @@ class OLED(Elaboratable):
     i_fifo: SyncFIFO
     o_result: Signal
 
+    i2c_fifo_w_data: Signal
+    i2c_fifo_w_en: Signal
+    i2c_i_stb: Signal
+
     row: Signal
     col: Signal
     cursor: Signal
@@ -47,6 +52,10 @@ class OLED(Elaboratable):
 
         self.i_fifo = SyncFIFO(width=8, depth=1)
         self.o_result = Signal(OLED.Result)
+
+        self.i2c_fifo_w_data = Signal(9)
+        self.i2c_fifo_w_en = Signal()
+        self.i2c_i_stb = Signal()
 
         self.row = Signal(range(16))
         self.col = Signal(range(16))
@@ -69,8 +78,14 @@ class OLED(Elaboratable):
             m.d.comb += self.i2c.fifo.w_data.eq(self.rom_writer.o_i2c_fifo_w_data)
             m.d.comb += self.i2c.fifo.w_en.eq(self.rom_writer.o_i2c_fifo_w_en)
             m.d.comb += self.i2c.i_stb.eq(self.rom_writer.o_i2c_i_stb)
+        with m.Else():
+            m.d.comb += self.i2c.fifo.w_data.eq(self.i2c_fifo_w_data)
+            m.d.comb += self.i2c.fifo.w_en.eq(self.i2c_fifo_w_en)
+            m.d.comb += self.i2c.i_stb.eq(self.i2c_i_stb)
 
         # TODO: actually flash cursor when on
+        # TODO: print catch "\r", "\n", adjust location
+        # TODO: LOCATE and adjust location adjust page/col in sh1107
 
         with m.FSM():
             with m.State("IDLE"):
@@ -202,7 +217,15 @@ class OLED(Elaboratable):
 
         with m.State("PRINT: DATA: STROBED ROM WRITER"):
             m.d.sync += self.rom_writer.i_stb.eq(0)
-            m.next = "PRINT: DATA: UNSTROBED ROM WRITER"
+            # Page addressing mode automatically matches our column adjust;
+            # we need to manually change page when we wrap, though.
+            with m.If(self.col == 15):
+                m.d.sync += self.col.eq(0)
+                m.d.sync += self.row.eq(self.row + 1)  # TODO: scroll
+                m.next = "PRINT: DATA: UNSTROBED ROM WRITER, NEEDS PAGE ADJUST"
+            with m.Else():
+                m.d.sync += self.col.eq(self.col + 1)
+                m.next = "PRINT: DATA: UNSTROBED ROM WRITER"
 
         with m.State("PRINT: DATA: UNSTROBED ROM WRITER"):
             with m.If(~self.rom_writer.o_busy):
@@ -212,3 +235,61 @@ class OLED(Elaboratable):
                 with m.Else():
                     m.d.sync += remaining.eq(remaining - 1)
                     m.next = "PRINT: DATA: WAIT"
+
+        with m.State("PRINT: DATA: UNSTROBED ROM WRITER, NEEDS PAGE ADJUST"):
+            with m.If(~self.rom_writer.o_busy):
+                m.next = "PRINT: DATA: PAGE ADJUST"
+
+        with m.State("PRINT: DATA: PAGE ADJUST"):
+            with m.If(self.i2c.fifo.w_rdy):
+                m.d.sync += self.i2c_fifo_w_data.eq((OLED.ADDR << 1) | RW.W)
+                m.d.sync += self.i2c_fifo_w_en.eq(1)
+                m.next = "PRINT: DATA: PAGE ADJUST: ADDR: STROBED W_EN"
+
+        with m.State("PRINT: DATA: PAGE ADJUST: ADDR: STROBED W_EN"):
+            m.d.sync += self.i2c_fifo_w_en.eq(0)
+            m.d.sync += self.i2c_i_stb.eq(1)
+            m.next = "PRINT: DATA: PAGE ADJUST: ADDR: STROBED I_STB"
+
+        with m.State("PRINT: DATA: PAGE ADJUST: ADDR: STROBED I_STB"):
+            m.d.sync += self.i2c_i_stb.eq(0)
+            with m.If(self.i2c.o_busy & self.i2c.o_ack & self.i2c.fifo.w_rdy):
+                m.d.sync += self.i2c_fifo_w_data.eq(
+                    ControlByte(False, "Command").to_byte()
+                )
+                m.d.sync += self.i2c_fifo_w_en.eq(1)
+                m.next = "PRINT: DATA: PAGE_ADJUST: CONTROL BYTE: STROBED W_EN"
+            with m.Elif(~self.i2c.o_busy):
+                m.d.sync += self.o_result.eq(OLED.Result.FAILURE)
+                m.next = "IDLE"
+
+        with m.State("PRINT: DATA: PAGE_ADJUST: CONTROL BYTE: STROBED W_EN"):
+            m.d.sync += self.i2c_fifo_w_en.eq(0)
+            m.next = "PRINT: DATA: PAGE_ADJUST: CONTROL BYTE: UNSTROBED W_EN"
+
+        with m.State("PRINT: DATA: PAGE_ADJUST: CONTROL BYTE: UNSTROBED W_EN"):
+            with m.If(self.i2c.o_busy & self.i2c.o_ack & self.i2c.fifo.w_rdy):
+                # XXX: Yuck :)
+                byte = Cmd.SetPageAddress(0x00).to_bytes()[0] + self.row
+                m.d.sync += self.i2c_fifo_w_data.eq(byte)
+                m.d.sync += self.i2c_fifo_w_en.eq(1)
+                m.next = "PRINT: DATA: PAGE_ADJUST: COMMAND BYTE: STROBED W_EN"
+            with m.Elif(~self.i2c.o_busy):
+                m.d.sync += self.o_result.eq(OLED.Result.FAILURE)
+                m.next = "IDLE"
+
+        with m.State("PRINT: DATA: PAGE_ADJUST: COMMAND BYTE: STROBED W_EN"):
+            m.d.sync += self.i2c_fifo_w_en.eq(0)
+            m.next = "PRINT: DATA: PAGE_ADJUST: COMMAND BYTE: UNSTROBED W_EN"
+
+        with m.State("PRINT: DATA: PAGE_ADJUST: COMMAND BYTE: UNSTROBED W_EN"):
+            with m.If(~self.i2c.o_busy & self.i2c.o_ack & self.i2c.fifo.w_rdy):
+                with m.If(remaining == 1):
+                    m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
+                    m.next = "IDLE"
+                with m.Else():
+                    m.d.sync += remaining.eq(remaining - 1)
+                    m.next = "LOCATE: ROW: WAIT"
+            with m.Elif(~self.i2c.o_busy):
+                m.d.sync += self.o_result.eq(OLED.Result.FAILURE)
+                m.next = "IDLE"
