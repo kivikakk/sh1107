@@ -3,7 +3,7 @@ import struct
 from .chars import CHARS
 from .sh1107 import Cmd, DataBytes
 
-__all__ = ["ROM", "SEQ_COUNT"]
+__all__ = ["ROM", "SEQ_COUNT", "OFFSET_DISPLAY_ON", "OFFSET_DISPLAY_OFF", "OFFSET_CHAR"]
 
 DISPLAY_ON_SEQUENCE: list[list[int]] = [
     Cmd.compose(
@@ -33,6 +33,7 @@ DISPLAY_OFF_SEQUENCE = [Cmd.compose([Cmd.DisplayOn(False)])]
 CHAR_SEQUENCES: list[list[list[int]]] = []
 for cols in CHARS:
     CHAR_SEQUENCES.append([Cmd.compose([DataBytes(cols)])])
+assert len(CHAR_SEQUENCES) == 256
 
 NULL_SEQUENCE: list[list[int]] = [[]]
 
@@ -43,6 +44,11 @@ seqs = (
     NULL_SEQUENCE,
 )
 SEQ_COUNT = len(seqs)
+
+OFFSET_DISPLAY_ON = 0x00
+OFFSET_DISPLAY_OFF = 0x01
+OFFSET_CHAR = 0x02
+
 rom_offset = SEQ_COUNT * 2 * 2
 
 rom = []

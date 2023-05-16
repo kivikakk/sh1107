@@ -18,8 +18,12 @@ TEST_SEQUENCE = [
     0x01,
     0x01,  # LOCATE 1, 1
     0x05,
-    0x0D,
-    *[ord(c) for c in "Hello, world!"],  # PRINT "Hello, world!"
+    0x0E,
+    *[ord(c) for c in "Hello, world!\n"],  # PRINT "Hello, world!"
+    0x05,
+    0x06,
+    *[ord(c) for c in "Nyonk!"],  # PRINT "Nyonk!"
+    0x06,  # CURSOR_ON
 ]
 
 
