@@ -98,29 +98,29 @@ class Top(Elaboratable):
             with m.State("POWEROFF"):
                 m.d.sync += self.oled.i_stb.eq(0)
                 with m.If(push_and_ready):
-                    m.d.sync += self.o_last_cmd.eq(OLED.Command.INIT)
-                    m.d.sync += self.oled.i_cmd.eq(OLED.Command.INIT)
+                    m.d.sync += self.o_last_cmd.eq(OLED.Command.DISPLAY_ON)
+                    m.d.sync += self.oled.i_cmd.eq(OLED.Command.DISPLAY_ON)
                     m.d.sync += self.oled.i_stb.eq(1)
                     m.next = "INIT"
             with m.State("INIT"):
                 m.d.sync += self.oled.i_stb.eq(0)
                 with m.If(push_and_ready):
-                    m.d.sync += self.o_last_cmd.eq(OLED.Command.DISPLAY)
-                    m.d.sync += self.oled.i_cmd.eq(OLED.Command.DISPLAY)
+                    m.d.sync += self.o_last_cmd.eq(OLED.Command.DISPLAY_OFF)
+                    m.d.sync += self.oled.i_cmd.eq(OLED.Command.DISPLAY_OFF)
                     m.d.sync += self.oled.i_stb.eq(1)
                     m.next = "DISPLAY1"
             with m.State("DISPLAY1"):
                 m.d.sync += self.oled.i_stb.eq(0)
                 with m.If(push_and_ready):
-                    m.d.sync += self.o_last_cmd.eq(OLED.Command.DISPLAY2)
-                    m.d.sync += self.oled.i_cmd.eq(OLED.Command.DISPLAY2)
+                    m.d.sync += self.o_last_cmd.eq(OLED.Command.CLS)
+                    m.d.sync += self.oled.i_cmd.eq(OLED.Command.CLS)
                     m.d.sync += self.oled.i_stb.eq(1)
                     m.next = "DISPLAY2"
             with m.State("DISPLAY2"):
                 m.d.sync += self.oled.i_stb.eq(0)
                 with m.If(push_and_ready):
-                    m.d.sync += self.o_last_cmd.eq(OLED.Command.POWEROFF)
-                    m.d.sync += self.oled.i_cmd.eq(OLED.Command.POWEROFF)
+                    m.d.sync += self.o_last_cmd.eq(OLED.Command.LOCATE)
+                    m.d.sync += self.oled.i_cmd.eq(OLED.Command.LOCATE)
                     m.d.sync += self.oled.i_stb.eq(1)
                     m.next = "POWEROFF"
 

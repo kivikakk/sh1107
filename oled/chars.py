@@ -1,178 +1,24 @@
-CHARS = [
-    # 0
-    """
-    ........
-    ..xxxx..
-    .x...xx.
-    .x..x.x.
-    .x.x..x.
-    .xx...x.
-    ..xxxx..
-    ........
-    """,
-    # 1
-    """
-    ........
-    ....x...
-    ...xx...
-    ..x.x...
-    ....x...
-    ....x...
-    ....x...
-    ........
-    """,
-    # 2
-    """
-    ........
-    ..xxxx..
-    .x....x.
-    ......x.
-    .....x..
-    ...x....
-    .xxxxxx.
-    ........
-    """,
-    # 3
-    """
-    ........
-    ..xxxx..
-    .x....x.
-    ...xxx..
-    ......x.
-    .x....x.
-    ..xxxx..
-    ........
-    """,
-    # 4
-    """
-    ........
-    ....xx..
-    ...x.x..
-    ..x..x..
-    .x...x..
-    .xxxxxx.
-    .....x..
-    ........
-    """,
-    # 5
-    """
-    ........
-    .xxxxxx.
-    .x......
-    .xxxxx..
-    ......x.
-    .x....x.
-    ..xxxx..
-    ........
-    """,
-    # 6
-    """
-    ........
-    ..xxxx..
-    .x......
-    .xxxxx..
-    .x....x.
-    .x....x.
-    ..xxxx..
-    ........
-    """,
-    # 7
-    """
-    ........
-    .xxxxxx.
-    ......x.
-    .....x..
-    ..xxxxx.
-    ....x...
-    ....x...
-    ........
-    """,
-    # 8
-    """
-    ........
-    ..xxxx..
-    .x....x.
-    ..xxxx..
-    .x....x.
-    .x....x.
-    ..xxxx..
-    ........
-    """,
-    # 9
-    """
-    ........
-    ..xxxx..
-    .x....x.
-    .x....x.
-    ..xxxxx.
-    ......x.
-    ..xxxx..
-    ........
-    """,
-    # A
-    """
-    ........
-    ..xxxx..
-    .x....x.
-    .x....x.
-    .xxxxxx.
-    .x....x.
-    .x....x.
-    ........
-    """,
-    # B
-    """
-    ........
-    .xxxxx..
-    .x....x.
-    .xxxxx..
-    .x....x.
-    .x....x.
-    .xxxxx..
-    ........
-    """,
-    # C
-    """
-    ........
-    ..xxxx..
-    .x....x.
-    .x......
-    .x......
-    .x....x.
-    ..xxxx..
-    ........
-    """,
-    # D
-    """
-    ........
-    .xxxxx..
-    .x....x.
-    .x....x.
-    .x....x.
-    .x....x.
-    .xxxxx..
-    ........
-    """,
-    # E
-    """
-    ........
-    .xxxxxx.
-    .x......
-    .xxxxxx.
-    .x......
-    .x......
-    .xxxxxx.
-    ........
-    """,
-    # F
-    """
-    ........
-    .xxxxxx.
-    .x......
-    .xxxxxx.
-    .x......
-    .x......
-    .x......
-    ........
-    """,
-]
+from pathlib import Path
+
+__all__ = ["CHARS"]
+
+FONT_FILE = "IBM_VGA_8x8.bin"
+FONT_WIDTH = 8
+FONT_HEIGHT = 8
+assert (FONT_WIDTH * FONT_HEIGHT) % 8 == 0
+
+with open(Path(__file__).parent / FONT_FILE, "rb") as f:
+    rawfont = f.read()
+
+CHARS: list[list[int]] = []
+
+rawchar_size = (FONT_WIDTH * FONT_HEIGHT) // 8
+for i in range(256):
+    rawchar = rawfont[i * rawchar_size : (i + 1) * rawchar_size]
+    assert len(rawchar) == FONT_HEIGHT
+    cols = [0] * FONT_WIDTH
+    for ri, row in enumerate(rawchar):
+        for col in range(FONT_WIDTH):
+            bit = (row >> (7 - col)) & 1
+            cols[col] |= bit << ri
+    CHARS.append(cols)
