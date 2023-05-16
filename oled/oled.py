@@ -30,16 +30,6 @@ class OLED(Elaboratable):
         BUSY = 1
         FAILURE = 2
 
-    VALID_SPEEDS: Final[list[int]] = [
-        100_000,
-        400_000,
-        1_000_000,
-        2_000_000,  # XXX vsh
-    ]
-    DEFAULT_SPEED: Final[int] = 1_000_000
-
-    speed: Hz
-
     i2c: I2C
     rom_writer: ROMWriter
 
@@ -47,9 +37,6 @@ class OLED(Elaboratable):
     o_result: Signal
 
     def __init__(self, *, speed: Hz):
-        assert speed.value in self.VALID_SPEEDS
-        self.speed = speed
-
         self.i2c = I2C(speed=speed)
         self.rom_writer = ROMWriter(addr=OLED.ADDR)
 

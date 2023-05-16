@@ -1,7 +1,8 @@
 from typing import Optional, cast
 
-from amaranth import Elaboratable, Module, Record, Signal
+from amaranth import Elaboratable, Memory, Module, Record, Signal
 from amaranth.build import Platform
+from amaranth.hdl.mem import ReadPort
 from amaranth_boards.icebreaker import ICEBreakerPlatform
 from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
 
@@ -10,6 +11,17 @@ from .oled import OLED
 
 __all__ = ["Top"]
 
+TEST_SEQUENCE = [
+    0x01,  # DISPLAY_ON
+    0x03,  # CLS
+    0x04,
+    0x01,
+    0x01,  # LOCATE 1, 1
+    0x05,
+    0x0D,
+    *[ord(c) for c in "Hello, world!"],  # PRINT "Hello, world!"
+]
+
 
 class Top(Elaboratable):
     oled: OLED
@@ -17,11 +29,17 @@ class Top(Elaboratable):
 
     switch: Signal
 
+    rom_rd: ReadPort
+
     def __init__(self, *, speed: Hz = Hz(1_000_000)):
         self.oled = OLED(speed=speed)
         self.speed = speed
 
         self.switch = Signal()
+
+        self.rom_rd = Memory(
+            width=8, depth=len(TEST_SEQUENCE), init=TEST_SEQUENCE
+        ).read_port(transparent=False)
 
     @property
     def ports(self) -> list[Signal]:
@@ -38,6 +56,7 @@ class Top(Elaboratable):
         m = Module()
 
         m.submodules.oled = self.oled
+        m.submodules.rom_rd = self.rom_rd
 
         button_up: Signal
 
@@ -87,32 +106,34 @@ class Top(Elaboratable):
             case _:
                 raise NotImplementedError
 
-        push_and_ready = button_up & self.oled.i_fifo.w_rdy
+        next_idx = Signal(range(len(TEST_SEQUENCE)))
 
         with m.FSM():
-            with m.State("POWEROFF"):
+            with m.State("IDLE"):
                 m.d.sync += self.oled.i_fifo.w_en.eq(0)
-                with m.If(push_and_ready):
-                    m.d.sync += self.oled.i_fifo.w_data.eq(OLED.Command.DISPLAY_ON)
+                with m.If(button_up & self.oled.i_fifo.w_rdy):
+                    m.d.sync += next_idx.eq(0)
+                    m.next = "LOOP: REQUEST"
+
+            with m.State("LOOP: REQUEST"):
+                m.d.sync += self.rom_rd.addr.eq(next_idx)
+                m.next = "LOOP: ADDRESSED"
+
+            with m.State("LOOP: ADDRESSED"):
+                m.next = "LOOP: AVAILABLE"
+
+            with m.State("LOOP: AVAILABLE"):
+                with m.If(self.oled.i_fifo.w_rdy):
+                    m.d.sync += self.oled.i_fifo.w_data.eq(self.rom_rd.data)
                     m.d.sync += self.oled.i_fifo.w_en.eq(1)
-                    m.next = "INIT"
-            with m.State("INIT"):
+                    m.next = "LOOP: STROBED W_EN"
+
+            with m.State("LOOP: STROBED W_EN"):
                 m.d.sync += self.oled.i_fifo.w_en.eq(0)
-                with m.If(push_and_ready):
-                    m.d.sync += self.oled.i_fifo.w_data.eq(OLED.Command.DISPLAY_OFF)
-                    m.d.sync += self.oled.i_fifo.w_en.eq(1)
-                    m.next = "DISPLAY1"
-            with m.State("DISPLAY1"):
-                m.d.sync += self.oled.i_fifo.w_en.eq(0)
-                with m.If(push_and_ready):
-                    m.d.sync += self.oled.i_fifo.w_data.eq(OLED.Command.CLS)
-                    m.d.sync += self.oled.i_fifo.w_en.eq(1)
-                    m.next = "DISPLAY2"
-            with m.State("DISPLAY2"):
-                m.d.sync += self.oled.i_fifo.w_en.eq(0)
-                with m.If(push_and_ready):
-                    m.d.sync += self.oled.i_fifo.w_data.eq(OLED.Command.LOCATE)
-                    m.d.sync += self.oled.i_fifo.w_en.eq(1)
-                    m.next = "POWEROFF"
+                with m.If(next_idx == len(TEST_SEQUENCE) - 1):
+                    m.next = "IDLE"
+                with m.Else():
+                    m.d.sync += next_idx.eq(next_idx + 1)
+                    m.next = "LOOP: REQUEST"
 
         return m

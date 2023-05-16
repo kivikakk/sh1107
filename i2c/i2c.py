@@ -64,6 +64,7 @@ class I2C(Elaboratable):
         1_000_000,
         2_000_000,  # XXX: for vsh
     ]
+    DEFAULT_SPEED: Final[int] = 1_000_000
 
     class NextByte(enum.Enum):
         IDLE = 0

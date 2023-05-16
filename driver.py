@@ -24,7 +24,8 @@ from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
 
 from common import Hz
 from formal import formal as prep_formal
-from oled import OLED, ROM
+from i2c import I2C
+from oled import ROM
 
 BOARDS: Dict[str, Type[Platform]] = {
     "icebreaker": ICEBreakerPlatform,
@@ -210,9 +211,9 @@ def main():
     build_parser.add_argument(
         "-s",
         "--speed",
-        choices=[str(s) for s in OLED.VALID_SPEEDS],
+        choices=[str(s) for s in I2C.VALID_SPEEDS],
         help="I2C bus speed to build at",
-        default=str(OLED.DEFAULT_SPEED),
+        default=str(I2C.DEFAULT_SPEED),
     )
     build_parser.add_argument(
         "-p",
