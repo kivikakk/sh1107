@@ -20,6 +20,7 @@ DISPLAY_ON_SEQUENCE: list[list[int]] = [
             Cmd.SetVCOMDeselectLevel(0x40),
             Cmd.SetDisplayReverse(False),
             Cmd.SetMemoryAddressingMode("Page"),
+            Cmd.SetPageAddress(0),
             Cmd.SetLowerColumnAddress(0),
             Cmd.SetHigherColumnAddress(0),
             Cmd.DisplayOn(True),

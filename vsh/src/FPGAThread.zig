@@ -30,7 +30,7 @@ pub fn start() !*FPGAThread {
         .stop_signal = Atomic(bool).init(false),
         .press_signal = Atomic(bool).init(false),
         .sh1107 = .{},
-        .idata_stale = Atomic(bool).init(false),
+        .idata_stale = Atomic(bool).init(true),
     };
     const thread = try std.Thread.spawn(.{}, run, .{fpga_thread});
     fpga_thread.thread = thread;
@@ -128,8 +128,6 @@ const State = struct {
         var allocator = gpa.allocator();
 
         const clk = self.cxxrtl.get(bool, "clk");
-        const last_cmd = self.cxxrtl.get(u8, "o_last_cmd");
-        _ = last_cmd;
         const oled_result = self.cxxrtl.get(u2, "oled o_result");
         var last_oled_result = oled_result.curr();
 

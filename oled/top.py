@@ -1,6 +1,6 @@
 from typing import Optional, cast
 
-from amaranth import Cat, Elaboratable, Module, Record, Signal
+from amaranth import Elaboratable, Module, Record, Signal
 from amaranth.build import Platform
 from amaranth_boards.icebreaker import ICEBreakerPlatform
 from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
@@ -15,15 +15,11 @@ class Top(Elaboratable):
     oled: OLED
     speed: Hz
 
-    o_last_cmd: Signal
-
     switch: Signal
 
-    def __init__(self, *, speed: Hz = Hz(400_000)):
+    def __init__(self, *, speed: Hz = Hz(1_000_000)):
         self.oled = OLED(speed=speed)
         self.speed = speed
-
-        self.o_last_cmd = Signal(OLED.Command)
 
         self.switch = Signal()
 
@@ -58,11 +54,10 @@ class Top(Elaboratable):
                 m.d.comb += button.i.eq(switch)
                 button_up = button.o_up
 
-                platform.add_resources(platform.break_off_pmod)
-                led_l = platform.request("led_g", 1)
-                led_m = platform.request("led_r", 1)
-                led_r = platform.request("led_g", 2)
-                m.d.comb += Cat(led_l, led_m, led_r).eq(self.o_last_cmd)
+                # platform.add_resources(platform.break_off_pmod)
+                # led_l = platform.request("led_g", 1)
+                # led_m = platform.request("led_r", 1)
+                # led_r = platform.request("led_g", 2)
 
             case OrangeCrabR0_2_85FPlatform():
                 rgb = platform.request("rgb_led")
@@ -92,36 +87,32 @@ class Top(Elaboratable):
             case _:
                 raise NotImplementedError
 
-        push_and_ready = button_up & (self.oled.o_result != OLED.Result.BUSY)
+        push_and_ready = button_up & self.oled.i_fifo.w_rdy
 
         with m.FSM():
             with m.State("POWEROFF"):
-                m.d.sync += self.oled.i_stb.eq(0)
+                m.d.sync += self.oled.i_fifo.w_en.eq(0)
                 with m.If(push_and_ready):
-                    m.d.sync += self.o_last_cmd.eq(OLED.Command.DISPLAY_ON)
-                    m.d.sync += self.oled.i_cmd.eq(OLED.Command.DISPLAY_ON)
-                    m.d.sync += self.oled.i_stb.eq(1)
+                    m.d.sync += self.oled.i_fifo.w_data.eq(OLED.Command.DISPLAY_ON)
+                    m.d.sync += self.oled.i_fifo.w_en.eq(1)
                     m.next = "INIT"
             with m.State("INIT"):
-                m.d.sync += self.oled.i_stb.eq(0)
+                m.d.sync += self.oled.i_fifo.w_en.eq(0)
                 with m.If(push_and_ready):
-                    m.d.sync += self.o_last_cmd.eq(OLED.Command.DISPLAY_OFF)
-                    m.d.sync += self.oled.i_cmd.eq(OLED.Command.DISPLAY_OFF)
-                    m.d.sync += self.oled.i_stb.eq(1)
+                    m.d.sync += self.oled.i_fifo.w_data.eq(OLED.Command.DISPLAY_OFF)
+                    m.d.sync += self.oled.i_fifo.w_en.eq(1)
                     m.next = "DISPLAY1"
             with m.State("DISPLAY1"):
-                m.d.sync += self.oled.i_stb.eq(0)
+                m.d.sync += self.oled.i_fifo.w_en.eq(0)
                 with m.If(push_and_ready):
-                    m.d.sync += self.o_last_cmd.eq(OLED.Command.CLS)
-                    m.d.sync += self.oled.i_cmd.eq(OLED.Command.CLS)
-                    m.d.sync += self.oled.i_stb.eq(1)
+                    m.d.sync += self.oled.i_fifo.w_data.eq(OLED.Command.CLS)
+                    m.d.sync += self.oled.i_fifo.w_en.eq(1)
                     m.next = "DISPLAY2"
             with m.State("DISPLAY2"):
-                m.d.sync += self.oled.i_stb.eq(0)
+                m.d.sync += self.oled.i_fifo.w_en.eq(0)
                 with m.If(push_and_ready):
-                    m.d.sync += self.o_last_cmd.eq(OLED.Command.LOCATE)
-                    m.d.sync += self.oled.i_cmd.eq(OLED.Command.LOCATE)
-                    m.d.sync += self.oled.i_stb.eq(1)
+                    m.d.sync += self.oled.i_fifo.w_data.eq(OLED.Command.LOCATE)
+                    m.d.sync += self.oled.i_fifo.w_en.eq(1)
                     m.next = "POWEROFF"
 
         return m

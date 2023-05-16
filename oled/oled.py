@@ -41,6 +41,7 @@ class OLED(Elaboratable):
     speed: Hz
 
     i2c: I2C
+    rom_writer: ROMWriter
 
     i_fifo: SyncFIFO
     o_result: Signal
@@ -52,8 +53,7 @@ class OLED(Elaboratable):
         self.i2c = I2C(speed=speed)
         self.rom_writer = ROMWriter(addr=OLED.ADDR)
 
-        self.i_cmd = Signal(OLED.Command)
-        self.i_stb = Signal()
+        self.i_fifo = SyncFIFO(width=8, depth=1)
         self.o_result = Signal(OLED.Result)
 
     def elaborate(self, platform: Optional[Platform]) -> Module:
@@ -61,34 +61,41 @@ class OLED(Elaboratable):
 
         m.submodules.i2c = self.i2c
         m.submodules.rom_writer = self.rom_writer
+        m.submodules.i_fifo = self.i_fifo
 
-        m.d.comb += self.rom_writer.i_i2c_fifo_w_rdy.eq(self.i2c.fifo.w_rdy)
-        m.d.comb += self.rom_writer.i_i2c_o_busy.eq(self.i2c.o_busy)
-        m.d.comb += self.rom_writer.i_i2c_o_ack.eq(self.i2c.o_ack)
+        with m.If(self.rom_writer.o_busy):
+            # TODO(AEC): compile this all into one coherent interface that we can
+            # connect/Mux/whatever.
+            m.d.comb += self.rom_writer.i_i2c_fifo_w_rdy.eq(self.i2c.fifo.w_rdy)
+            m.d.comb += self.rom_writer.i_i2c_o_busy.eq(self.i2c.o_busy)
+            m.d.comb += self.rom_writer.i_i2c_o_ack.eq(self.i2c.o_ack)
 
-        m.d.comb += self.i2c.fifo.w_data.eq(self.rom_writer.o_i2c_fifo_w_data)
-        m.d.comb += self.i2c.fifo.w_en.eq(self.rom_writer.o_i2c_fifo_w_en)
-        m.d.comb += self.i2c.i_stb.eq(self.rom_writer.o_i2c_i_stb)
+            m.d.comb += self.i2c.fifo.w_data.eq(self.rom_writer.o_i2c_fifo_w_data)
+            m.d.comb += self.i2c.fifo.w_en.eq(self.rom_writer.o_i2c_fifo_w_en)
+            m.d.comb += self.i2c.i_stb.eq(self.rom_writer.o_i2c_i_stb)
 
         with m.FSM():
             with m.State("IDLE"):
-                with m.If(
-                    self.i_stb
-                    & (self.i_cmd >= min(OLED.Command))
-                    & (self.i_cmd <= max(OLED.Command))
-                    & self.i2c.fifo.w_rdy
-                ):
-                    m.d.sync += self.rom_writer.i_index.eq(self.i_cmd - 1)
-                    m.d.sync += self.rom_writer.i_stb.eq(1)
-                    m.d.sync += self.o_result.eq(OLED.Result.BUSY)
-                    m.next = "START: STROBED ROM WRITER"
+                with m.If(self.i_fifo.r_rdy & self.i2c.fifo.w_rdy):
+                    m.d.sync += self.i_fifo.r_en.eq(1)
+                    m.next = "START: STROBED I_FIFO R_EN"
+
+            with m.State("START: STROBED I_FIFO R_EN"):
+                m.d.sync += self.i_fifo.r_en.eq(0)
+                m.next = "START: UNSTROBED I_FIFO R_EN"
+
+            with m.State("START: UNSTROBED I_FIFO R_EN"):
+                m.d.sync += self.rom_writer.i_index.eq(self.i_fifo.r_data - 1)
+                m.d.sync += self.rom_writer.i_stb.eq(1)
+                m.d.sync += self.o_result.eq(OLED.Result.BUSY)
+                m.next = "START: STROBED ROM WRITER"
 
             with m.State("START: STROBED ROM WRITER"):
                 m.d.sync += self.rom_writer.i_stb.eq(0)
                 m.next = "START: UNSTROBED ROM WRITER"
 
             with m.State("START: UNSTROBED ROM WRITER"):
-                with m.If(self.rom_writer.o_done):
+                with m.If(~self.rom_writer.o_busy):
                     m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
                     m.next = "IDLE"
 

@@ -20,6 +20,7 @@ class ROMWriter(Elaboratable):
     i_i2c_o_busy: Signal
     i_i2c_o_ack: Signal
 
+    o_busy: Signal
     o_done: Signal
 
     o_i2c_fifo_w_data: Signal
@@ -40,7 +41,7 @@ class ROMWriter(Elaboratable):
         self.i_i2c_o_busy = Signal()
         self.i_i2c_o_ack = Signal()
 
-        self.o_done = Signal()
+        self.o_busy = Signal()
 
         self.o_i2c_fifo_w_data = Signal(9)
         self.o_i2c_fifo_w_en = Signal()
@@ -63,7 +64,7 @@ class ROMWriter(Elaboratable):
             with m.State("IDLE"):
                 with m.If(self.i_stb):
                     m.d.sync += self.rom_rd.addr.eq(self.i_index * 4)
-                    m.d.sync += self.o_done.eq(0)
+                    m.d.sync += self.o_busy.eq(1)
                     m.next = "START: ADDRESSED OFFSET[0]"
 
             with m.State("START: ADDRESSED OFFSET[0]"):
@@ -124,7 +125,7 @@ class ROMWriter(Elaboratable):
                     m.next = "LOOP HEAD: SEQ BREAK OR WAIT I2C"
                 with m.Elif(~self.i_i2c_o_busy):
                     # Failed.  Stop.
-                    m.d.sync += self.o_done.eq(1)
+                    m.d.sync += self.o_busy.eq(0)
                     m.next = "IDLE"
 
             with m.State("SEQ BREAK: ADDRESSED NEXTLEN[1], NEXTLEN[0] AVAILABLE"):
@@ -153,10 +154,10 @@ class ROMWriter(Elaboratable):
                 with m.If(
                     ~self.i_i2c_o_busy & self.i_i2c_o_ack & self.i_i2c_fifo_w_rdy
                 ):
-                    m.d.sync += self.o_done.eq(1)
+                    m.d.sync += self.o_busy.eq(0)
                     m.next = "IDLE"
                 with m.Elif(~self.i_i2c_o_busy):
-                    m.d.sync += self.o_done.eq(1)
+                    m.d.sync += self.o_busy.eq(0)
                     m.next = "IDLE"
 
         return m
