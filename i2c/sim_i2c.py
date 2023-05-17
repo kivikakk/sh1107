@@ -171,7 +171,11 @@ def full_sequence(
         yield from start(i2c)
 
         for i, byte in enumerate(sequence):
-            yield from send(i2c, byte & 0xFF)
+            yield from send(
+                i2c,
+                byte & 0xFF,
+                next=sequence[i + 1] if i < len(sequence) - 1 else "STOP",
+            )
             if i == nack_after:
                 yield from nack(i2c)
                 break
