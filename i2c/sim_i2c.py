@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import Callable, Literal, Optional, cast
 
 from amaranth import Signal
@@ -67,12 +68,63 @@ def repeated_start(i2c: I2C) -> sim.Generator:
     assert not (yield i2c.sda_o)
 
 
+class VCA(Enum):
+    DONT_CARE = 1
+    STEADY = 2
+    FALL = 3
+
+
+def wait_scl(
+    i2c: I2C,
+    level: int,
+    *,
+    sda: VCA = VCA.DONT_CARE,
+    sda_oe: VCA = VCA.STEADY,
+) -> sim.Generator:
+    assert (yield i2c.scl_o) != level
+
+    sda_o_value = yield i2c.sda_o
+    sda_oe_value = yield i2c.sda_oe
+
+    if sda == VCA.FALL:
+        assert sda_o_value
+    if sda_oe == VCA.FALL:
+        assert sda_oe_value
+
+    while True:
+        yield Delay(_tick(i2c))
+
+        if sda == VCA.STEADY:
+            assert (yield i2c.sda_o) == sda_o_value
+        elif sda == VCA.FALL:
+            if sda_o_value:
+                sda_o_value = yield i2c.sda_o
+            else:
+                assert not (yield i2c.sda_o)
+
+        if sda_oe == VCA.STEADY:
+            assert (yield i2c.sda_oe) == sda_oe_value
+        elif sda_oe == VCA.FALL:
+            if sda_oe_value:
+                sda_oe_value = yield i2c.sda_oe
+            else:
+                assert not (yield i2c.sda_oe)
+
+        if (yield i2c.scl_o) == level:
+            break
+
+    if sda == VCA.FALL:
+        assert not sda_o_value
+    if sda_oe == VCA.FALL:
+        assert not sda_oe_value
+
+
 def send(
     i2c: I2C, byte: int, *, next: int | Literal["STOP"] | None = None
 ) -> sim.Generator:
     actual = 0
+    assert not (yield i2c.scl_o)
     for bit in range(8):
-        # yield Delay(sim.clock() * 2)
         if bit == 0:
             if isinstance(next, int):
                 assert (yield i2c.fifo.r_rdy)
@@ -83,15 +135,14 @@ def send(
                 assert not (
                     yield i2c.fifo.r_rdy
                 ), f"checking next: expected empty FIFO, contained ({(yield i2c.fifo.w_data):02x})"
-        yield Delay(5 * _tick(i2c))
-        # yield Delay(5 * _tick(i2c) - sim.clock() * 2)
+
+        yield from wait_scl(i2c, 1)
+
         if bit == 0 and isinstance(next, int):
             assert not (yield i2c.fifo.w_en)
-        assert (yield i2c.scl_o)
         actual = (actual << 1) | (yield i2c.sda_o)
-        yield Delay(5 * _tick(i2c))
 
-        assert not (yield i2c.scl_o), f"expected SCL low at end of bit {bit}"
+        yield from wait_scl(i2c, 0, sda=VCA.STEADY)
 
     assert actual == byte, f"expected {byte:02x}, got {actual:02x}"
 
@@ -124,40 +175,20 @@ def nack(i2c: I2C) -> sim.Generator:
 
 def stop(i2c: I2C) -> sim.Generator:
     # While SCL is low, bring SDA low.
-
-    # HACK: we permissively wait for SCL to go high.
-    # Ensure that SDA either stays low, or transitions high to low.
-    sda_high = yield i2c.sda_o
-    assert not (yield i2c.scl_o)
-
-    ticks_waited = 0
-    while True:
-        assert ticks_waited < 5
-
-        yield Delay(_tick(i2c))
-        ticks_waited += 1
-
-        if (yield i2c.scl_o):
-            break
-
-        if sda_high:
-            sda_high = yield i2c.sda_o
-        else:
-            assert not (yield i2c.sda_o)
-
-    assert not (yield i2c.sda_o)
+    sda_start = yield i2c.sda_o
+    yield from wait_scl(i2c, 1, sda=VCA.FALL if sda_start else VCA.STEADY)
 
     # Now while SCL is high, bring SDA high.
-    yield Delay(_tick(i2c))
-    assert not (yield i2c.sda_o)
-    yield Delay(3 * _tick(i2c))
-    assert (yield i2c.sda_o)
-    yield Delay(_tick(i2c))
+    while True:
+        yield Delay(_tick(i2c))
+        assert (yield i2c.scl_o)
+        if (yield i2c.sda_o):
+            break
 
 
 def steady_stopped(i2c: I2C) -> sim.Generator:
     for _ in range(3):
-        yield Delay(sim.clock())
+        yield Delay(_tick(i2c))
         assert (yield i2c.scl_o)
         assert (yield i2c.sda_o)
 
