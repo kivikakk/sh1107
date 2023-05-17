@@ -68,55 +68,74 @@ def repeated_start(i2c: I2C) -> sim.Generator:
     assert not (yield i2c.sda_o)
 
 
-class VCA(Enum):
+class ValueChange(Enum):
     DONT_CARE = 1
     STEADY = 2
     FALL = 3
+
+
+# TODO: make diff classes for diff ValueChanges so no wasted effort
+class ValueChangeWatcher:
+    vca: ValueChange
+    source: Signal
+    value: int
+
+    def __init__(self, vca: ValueChange, source: Signal):
+        self.vca = vca
+        self.source = source
+
+    def start(self) -> sim.Generator:
+        if self.vca == ValueChange.DONT_CARE:
+            return
+
+        self.value = yield self.source
+
+        if self.vca == ValueChange.FALL:
+            assert self.value
+
+    def update(self) -> sim.Generator:
+        if self.vca == ValueChange.DONT_CARE:
+            return
+
+        new_value = yield self.source
+        if self.vca == ValueChange.STEADY:
+            assert new_value == self.value
+        elif self.vca == ValueChange.FALL:
+            if self.value:
+                self.value = new_value
+            else:
+                assert not new_value
+
+    def finish(self) -> None:
+        if self.vca == ValueChange.FALL:
+            assert not self.value
 
 
 def wait_scl(
     i2c: I2C,
     level: int,
     *,
-    sda: VCA = VCA.DONT_CARE,
-    sda_oe: VCA = VCA.STEADY,
+    sda_o: ValueChange = ValueChange.DONT_CARE,
+    sda_oe: ValueChange = ValueChange.STEADY,
 ) -> sim.Generator:
     assert (yield i2c.scl_o) != level
 
-    sda_o_value = yield i2c.sda_o
-    sda_oe_value = yield i2c.sda_oe
-
-    if sda == VCA.FALL:
-        assert sda_o_value
-    if sda_oe == VCA.FALL:
-        assert sda_oe_value
+    vcw_sda_o = ValueChangeWatcher(sda_o, i2c.sda_o)
+    yield from vcw_sda_o.start()
+    vcw_sda_oe = ValueChangeWatcher(sda_oe, i2c.sda_oe)
+    yield from vcw_sda_oe.start()
 
     while True:
         yield Delay(_tick(i2c))
 
-        if sda == VCA.STEADY:
-            assert (yield i2c.sda_o) == sda_o_value
-        elif sda == VCA.FALL:
-            if sda_o_value:
-                sda_o_value = yield i2c.sda_o
-            else:
-                assert not (yield i2c.sda_o)
-
-        if sda_oe == VCA.STEADY:
-            assert (yield i2c.sda_oe) == sda_oe_value
-        elif sda_oe == VCA.FALL:
-            if sda_oe_value:
-                sda_oe_value = yield i2c.sda_oe
-            else:
-                assert not (yield i2c.sda_oe)
+        yield from vcw_sda_o.update()
+        yield from vcw_sda_oe.update()
 
         if (yield i2c.scl_o) == level:
             break
 
-    if sda == VCA.FALL:
-        assert not sda_o_value
-    if sda_oe == VCA.FALL:
-        assert not sda_oe_value
+    vcw_sda_o.finish()
+    vcw_sda_oe.finish()
 
 
 def send(
@@ -142,7 +161,7 @@ def send(
             assert not (yield i2c.fifo.w_en)
         actual = (actual << 1) | (yield i2c.sda_o)
 
-        yield from wait_scl(i2c, 0, sda=VCA.STEADY)
+        yield from wait_scl(i2c, 0, sda_o=ValueChange.STEADY)
 
     assert actual == byte, f"expected {byte:02x}, got {actual:02x}"
 
@@ -176,7 +195,9 @@ def nack(i2c: I2C) -> sim.Generator:
 def stop(i2c: I2C) -> sim.Generator:
     # While SCL is low, bring SDA low.
     sda_start = yield i2c.sda_o
-    yield from wait_scl(i2c, 1, sda=VCA.FALL if sda_start else VCA.STEADY)
+    yield from wait_scl(
+        i2c, 1, sda_o=ValueChange.FALL if sda_start else ValueChange.STEADY
+    )
 
     # Now while SCL is high, bring SDA high.
     while True:
