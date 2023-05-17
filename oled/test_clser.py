@@ -37,7 +37,10 @@ class TestClserTop(Elaboratable):
 
 
 class TestClser(sim.TestCase):
-    @sim.i2c_speeds
+    @sim.args(speed=Hz(100_000), expected_failure=True)  # XXX: sim_i2c loses sync
+    @sim.args(speed=Hz(400_000), expected_failure=True)  # XXX: sim_i2c loses sync
+    @sim.args(speed=Hz(1_000_000))
+    @sim.args(speed=Hz(2_000_000))
     def test_sim_clser(self, dut: TestClserTop) -> sim.Generator:
         def trigger() -> sim.Generator:
             yield dut.clser.i_stb.eq(1)

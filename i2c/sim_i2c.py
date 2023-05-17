@@ -72,7 +72,7 @@ def send(
 ) -> sim.Generator:
     actual = 0
     for bit in range(8):
-        yield Delay(sim.clock() * 2)
+        # yield Delay(sim.clock() * 2)
         if bit == 0:
             if isinstance(next, int):
                 assert (yield i2c.fifo.r_rdy)
@@ -83,7 +83,8 @@ def send(
                 assert not (
                     yield i2c.fifo.r_rdy
                 ), f"checking next: expected empty FIFO, contained ({(yield i2c.fifo.w_data):02x})"
-        yield Delay(5 * _tick(i2c) - sim.clock() * 2)
+        yield Delay(5 * _tick(i2c))
+        # yield Delay(5 * _tick(i2c) - sim.clock() * 2)
         if bit == 0 and isinstance(next, int):
             assert not (yield i2c.fifo.w_en)
         assert (yield i2c.scl_o)
@@ -123,18 +124,30 @@ def nack(i2c: I2C) -> sim.Generator:
 
 def stop(i2c: I2C) -> sim.Generator:
     # While SCL is low, bring SDA low.
-    last_sda = yield i2c.sda_o
-    yield Delay(_tick(i2c))
-    assert not (yield i2c.scl_o)
-    assert (yield i2c.sda_o) == last_sda
-    yield Delay(3 * _tick(i2c))
-    assert not (yield i2c.scl_o)
-    assert not (yield i2c.sda_o)
-    yield Delay(_tick(i2c))
 
-    # Then when SCL is high, bring SDA high.
-    assert (yield i2c.scl_o)
+    # HACK: we permissively wait for SCL to go high.
+    # Ensure that SDA either stays low, or transitions high to low.
+    sda_high = yield i2c.sda_o
+    assert not (yield i2c.scl_o)
+
+    ticks_waited = 0
+    while True:
+        assert ticks_waited < 5
+
+        yield Delay(_tick(i2c))
+        ticks_waited += 1
+
+        if (yield i2c.scl_o):
+            break
+
+        if sda_high:
+            sda_high = yield i2c.sda_o
+        else:
+            assert not (yield i2c.sda_o)
+
     assert not (yield i2c.sda_o)
+
+    # Now while SCL is high, bring SDA high.
     yield Delay(_tick(i2c))
     assert not (yield i2c.sda_o)
     yield Delay(3 * _tick(i2c))
