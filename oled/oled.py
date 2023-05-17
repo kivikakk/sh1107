@@ -162,6 +162,9 @@ class OLED(Elaboratable):
         with m.State("LOCATE: ROW: UNSTROBED R_EN"):
             with m.If(self.i_fifo.r_data != 0):
                 m.d.sync += self.row.eq(self.i_fifo.r_data)
+                m.d.sync += self.locator.i_row.eq(self.i_fifo.r_data)
+            with m.Else():
+                m.d.sync += self.locator.i_row.eq(0)
             m.next = "LOCATE: COL: WAIT"
 
         with m.State("LOCATE: COL: WAIT"):
@@ -176,8 +179,20 @@ class OLED(Elaboratable):
         with m.State("LOCATE: COL: UNSTROBED R_EN"):
             with m.If(self.i_fifo.r_data != 0):
                 m.d.sync += self.col.eq(self.i_fifo.r_data)
-            m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
-            m.next = "IDLE"
+                m.d.sync += self.locator.i_col.eq(self.i_fifo.r_data)
+            with m.Else():
+                m.d.sync += self.locator.i_col.eq(0)
+            m.d.sync += self.locator.i_stb.eq(1)
+            m.next = "LOCATE: STROBED LOCATOR"
+
+        with m.State("LOCATE: STROBED LOCATOR"):
+            m.d.sync += self.locator.i_stb.eq(0)
+            m.next = "LOCATE: UNSTROBED LOCATOR"
+
+        with m.State("LOCATE: UNSTROBED LOCATOR"):
+            with m.If(~self.locator.o_busy):
+                m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
+                m.next = "IDLE"
 
     def print_states(self, m: Module):
         remaining = Signal(8)

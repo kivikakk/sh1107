@@ -135,7 +135,7 @@ def args(*args: Any, **kwargs: Any):
         if not hasattr(sim_test, "_sim_args"):
             sim_test._sim_args = []  # pyright: ignore[reportFunctionMemberAccess]
         sim_test._sim_args.append(  # pyright: ignore[reportFunctionMemberAccess]
-            (args, kwargs)
+            (list(args), kwargs)
         )
         return sim_test
 
@@ -149,7 +149,7 @@ def always_args(*args: Any, **kwargs: Any):
                 []
             )
         sim_test._sim_always_args.append(  # pyright: ignore[reportFunctionMemberAccess]
-            (args, kwargs)
+            (list(args), kwargs)
         )
         return sim_test
 

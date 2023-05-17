@@ -31,8 +31,8 @@ TEST_SEQUENCE = [
     0x01,  # DISPLAY_ON
     0x03,  # CLS
     0x04,
-    0x01,
-    0x01,  # LOCATE 1, 1
+    0x03,
+    0x03,  # LOCATE 3, 3
     0x05,
     len(msg),
     *[ord(c) for c in msg],  # PRINT msg
