@@ -18,14 +18,18 @@ pub fn tick(self: *@This(), fpga_thread: *FPGAThread) void {
     switch (self.i2c_connector.tick()) {
         .Pass => {},
         .Addressed => {
+            std.debug.print("addressed\n", .{});
             self.parser = .{};
         },
         .Error => {
+            std.debug.print("i2c error\n", .{});
             self.parser = null;
         },
         .Fish => {
-            if (self.parser == null or !self.parser.?.valid_finish) {
-                std.debug.print("command parser fish without valid_finish\n", .{});
+            if (self.parser == null) {
+                std.debug.print("i2c fish without parser\n", .{});
+            } else if (!self.parser.?.valid_finish) {
+                std.debug.print("i2c fish without valid_finish\n", .{});
             }
             self.parser = null;
         },

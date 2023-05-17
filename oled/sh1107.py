@@ -87,6 +87,11 @@ class Base(SH1107Sequence, ABC):
     def to_bytes(self) -> list[int]:
         ...
 
+    def to_byte(self) -> int:
+        bytes = self.to_bytes()
+        assert len(bytes) == 1
+        return bytes[0]
+
 
 class ParseState(Enum):
     Control = 1

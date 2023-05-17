@@ -4,7 +4,7 @@ from amaranth import Cat, Elaboratable, Memory, Module, Signal
 from amaranth.build import Platform
 from amaranth.hdl.mem import ReadPort
 
-from i2c import RW
+from i2c import I2C, RW
 from oled import rom
 
 __all__ = ["ROMWriter"]
@@ -21,7 +21,6 @@ class ROMWriter(Elaboratable):
     i_i2c_o_ack: Signal
 
     o_busy: Signal
-    o_done: Signal
 
     o_i2c_fifo_w_data: Signal
     o_i2c_fifo_w_en: Signal
@@ -54,6 +53,20 @@ class ROMWriter(Elaboratable):
         ).read_port(transparent=False)
         self.offset = Signal(range(len(rom.ROM)))
         self.remain = Signal(range(len(rom.ROM)))
+
+    def connect_i2c_in(self, m: Module, i2c: I2C):
+        m.d.comb += [
+            self.i_i2c_fifo_w_rdy.eq(i2c.fifo.w_rdy),
+            self.i_i2c_o_busy.eq(i2c.o_busy),
+            self.i_i2c_o_ack.eq(i2c.o_ack),
+        ]
+
+    def connect_i2c_out(self, m: Module, i2c: I2C):
+        m.d.comb += [
+            i2c.fifo.w_data.eq(self.o_i2c_fifo_w_data),
+            i2c.fifo.w_en.eq(self.o_i2c_fifo_w_en),
+            i2c.i_stb.eq(self.o_i2c_i_stb),
+        ]
 
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
