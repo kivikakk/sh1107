@@ -4,10 +4,13 @@ from amaranth import Mux  # pyright: ignore[reportUnknownVariableType]
 from amaranth import Elaboratable, Module, Signal
 from amaranth.build import Platform
 
-from i2c import I2C, RW
+from i2c import I2C, RW, Transfer
 from .sh1107 import Cmd, ControlByte
 
 __all__ = ["Locator"]
+
+
+# TODO: locator test per other i2c tests
 
 
 class Locator(Elaboratable):
@@ -23,7 +26,7 @@ class Locator(Elaboratable):
 
     o_busy: Signal
 
-    o_i2c_fifo_w_data: Signal
+    o_i2c_fifo_w_data: Transfer
     o_i2c_fifo_w_en: Signal
     o_i2c_i_stb: Signal
 
@@ -40,7 +43,7 @@ class Locator(Elaboratable):
 
         self.o_busy = Signal()
 
-        self.o_i2c_fifo_w_data = Signal(9)
+        self.o_i2c_fifo_w_data = Transfer()
         self.o_i2c_fifo_w_en = Signal()
         self.o_i2c_i_stb = Signal()
 
@@ -65,7 +68,9 @@ class Locator(Elaboratable):
             with m.State("IDLE"):
                 with m.If(self.i_stb):
                     m.d.sync += self.o_busy.eq(1)
-                    m.d.sync += self.o_i2c_fifo_w_data.eq((self.addr << 1) | RW.W)
+                    m.d.sync += self.o_i2c_fifo_w_data.kind.eq(Transfer.Kind.START)
+                    m.d.sync += self.o_i2c_fifo_w_data.payload.start.addr.eq(self.addr)
+                    m.d.sync += self.o_i2c_fifo_w_data.payload.start.rw.eq(RW.W)
                     m.d.sync += self.o_i2c_fifo_w_en.eq(1)
                     m.next = "START: ADDR: STROBED W_EN"
 
@@ -77,7 +82,8 @@ class Locator(Elaboratable):
             with m.State("START: ADDR: STROBED I_STB"):
                 m.d.sync += self.o_i2c_i_stb.eq(0)
                 with m.If(self.i_i2c_fifo_w_rdy):
-                    m.d.sync += self.o_i2c_fifo_w_data.eq(
+                    m.d.sync += self.o_i2c_fifo_w_data.kind.eq(Transfer.Kind.DATA)
+                    m.d.sync += self.o_i2c_fifo_w_data.payload.data.eq(
                         ControlByte(False, "Command").to_byte()
                     )
                     m.d.sync += self.o_i2c_fifo_w_en.eq(1)

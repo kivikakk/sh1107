@@ -2,7 +2,7 @@ import unittest
 from typing import Optional
 
 from amaranth import Signal
-from amaranth.sim import Delay, Settle
+from amaranth.sim import Delay
 
 import sim
 from common import Hz
@@ -48,28 +48,9 @@ class TestI2CRepeatedStart(sim.TestCase):
         # Force the button push, we don't need to test it here.
         yield self.switch.eq(1)
         yield Delay(sim.clock())
-        yield Settle()
         yield self.switch.eq(0)
 
-        # Enqueue the data.
-        assert not (yield self.i2c.i_stb)
-        assert (yield self.i2c.fifo.w_en)
-        assert (yield self.i2c.fifo.w_data) == 0x178
-        assert not (yield self.i2c.fifo.r_rdy)
-        yield Delay(sim.clock())
-        yield Settle()
-
-        # Data is enqueued, we're strobing I2C.  Lines still high.
-        assert (yield self.i2c.i_stb)
-        assert not (yield self.i2c.fifo.w_en)
-        assert (yield self.i2c.fifo.r_rdy)
-        assert (yield self.i2c.fifo.r_level) == 1
-
-        assert (yield self.i2c.scl_o)
-        assert (yield self.i2c.sda_o)
-        yield Delay(sim.clock())
-        yield Settle()
-
+        yield from sim_i2c.synchronise(self.i2c, 0x178)
         yield from sim_i2c.start(self.i2c)
 
         yield from sim_i2c.send(self.i2c, 0x78)
@@ -95,15 +76,7 @@ class TestI2CRepeatedStart(sim.TestCase):
                         yield from sim_i2c.ack(self.i2c)
 
         yield from sim_i2c.stop(self.i2c)
-
-        for _ in range(3):
-            yield Delay(sim.clock())
-            yield Settle()
-            assert (yield self.i2c.scl_o)
-            assert (yield self.i2c.sda_o)
-
-        assert not (yield self.i2c.fifo.r_rdy)
-        assert not (yield self.i2c.o_busy)
+        yield from sim_i2c.steady_stopped(self.i2c)
 
     def _bench_nacks(self) -> sim.Generator:
         yield from self._bench_complete(nack_after=1)

@@ -1,4 +1,4 @@
-from typing import Literal, cast
+from typing import Callable, Literal, cast
 
 from amaranth import Signal
 from amaranth.sim import Delay, Settle
@@ -6,11 +6,40 @@ from amaranth.sim import Delay, Settle
 import sim
 from .i2c import I2C
 
-__all__ = ["start", "repeated_start", "send", "ack", "nack", "stop"]
+__all__ = [
+    "start",
+    "repeated_start",
+    "send",
+    "ack",
+    "nack",
+    "stop",
+    "steady_stopped",
+    "full_sequence",
+]
 
 
 def _tick(i2c: I2C) -> float:
     return 0.1 / i2c.speed.value
+
+
+def synchronise(i2c: I2C, start_value: int) -> sim.Generator:
+    assert not (yield i2c.i_stb)
+    assert (yield i2c.fifo.w_en)
+    assert (yield i2c.fifo.w_data) == start_value
+    assert not (yield i2c.fifo.r_rdy)
+    yield Delay(sim.clock())
+    yield Settle()
+
+    # Data is enqueued, we're strobing I2C.  Lines still high.
+    assert (yield i2c.i_stb)
+    assert not (yield i2c.fifo.w_en)
+    assert (yield i2c.fifo.r_rdy)
+    assert (yield i2c.fifo.r_level) == 1
+
+    assert (yield i2c.scl_o)
+    assert (yield i2c.sda_o)
+    yield Delay(sim.clock())
+    yield Settle()
 
 
 def start(i2c: I2C) -> sim.Generator:
@@ -117,3 +146,36 @@ def stop(i2c: I2C) -> sim.Generator:
     assert (yield i2c.sda_o)
     yield Delay(_tick(i2c))
     yield Settle()
+
+
+def steady_stopped(i2c: I2C) -> sim.Generator:
+    for _ in range(3):
+        yield Delay(sim.clock())
+        yield Settle()
+        assert (yield i2c.scl_o)
+        assert (yield i2c.sda_o)
+
+    assert not (yield i2c.fifo.r_rdy)
+    assert not (yield i2c.o_busy)
+
+
+def full_sequence(
+    i2c: I2C,
+    trigger: Callable[[], sim.Generator],
+    sequence: list[int],
+) -> sim.Generator:
+    for nack_after in [None] + list(range(len(sequence))):
+        yield from trigger()
+
+        yield from synchronise(i2c, sequence[0])
+        yield from start(i2c)
+
+        for i, byte in enumerate(sequence):
+            yield from send(i2c, byte & 0xFF)
+            if i == nack_after:
+                yield from nack(i2c)
+                break
+            yield from ack(i2c)
+
+        yield from stop(i2c)
+        yield from steady_stopped(i2c)

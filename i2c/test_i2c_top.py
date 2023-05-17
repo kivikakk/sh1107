@@ -13,6 +13,8 @@ class TestI2CTop(Elaboratable):
     switch: Signal
     aborted_at: Signal
 
+    i2c: I2C
+
     def __init__(self, data: list[int | Value], *, speed: Hz):
         assert len(data) >= 1
         for datum in data:
@@ -22,39 +24,41 @@ class TestI2CTop(Elaboratable):
         self.switch = Signal()
         self.aborted_at = Signal(range(len(data)))
 
+        self.i2c = I2C(speed=speed)
+
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
 
-        m.submodules.i2c = self.i2c = i2c = I2C(speed=self.speed)
+        m.submodules.i2c = self.i2c
 
         with m.FSM():
             with m.State("IDLE"):
                 with m.If(self.switch):
-                    m.d.sync += i2c.fifo.w_data.eq(self.data[0])
-                    m.d.sync += i2c.fifo.w_en.eq(1)
+                    m.d.sync += self.i2c.fifo.w_data.eq(self.data[0])
+                    m.d.sync += self.i2c.fifo.w_en.eq(1)
                     m.next = "START: W_EN LATCHED"
 
             with m.State("START: W_EN LATCHED"):
-                m.d.sync += i2c.fifo.w_en.eq(0)
-                m.d.sync += i2c.i_stb.eq(1)
+                m.d.sync += self.i2c.fifo.w_en.eq(0)
+                m.d.sync += self.i2c.i_stb.eq(1)
                 m.next = "START: STROBED"
 
             with m.State("START: STROBED"):
-                m.d.sync += i2c.i_stb.eq(0)
+                m.d.sync += self.i2c.i_stb.eq(0)
                 m.next = "LOOP: UNLATCHED DATA[0]"
 
             for i, datum in list(enumerate(self.data))[1:]:
                 with m.State(f"LOOP: UNLATCHED DATA[{i-1}]"):
-                    with m.If(i2c.o_busy & i2c.o_ack & i2c.fifo.w_rdy):
-                        m.d.sync += i2c.fifo.w_data.eq(datum)
-                        m.d.sync += i2c.fifo.w_en.eq(1)
+                    with m.If(self.i2c.o_busy & self.i2c.o_ack & self.i2c.fifo.w_rdy):
+                        m.d.sync += self.i2c.fifo.w_data.eq(datum)
+                        m.d.sync += self.i2c.fifo.w_en.eq(1)
                         m.next = f"LOOP: LATCHED DATA[{i}]"
-                    with m.Elif(~i2c.o_busy):
+                    with m.Elif(~self.i2c.o_busy):
                         m.d.sync += self.aborted_at.eq(i - 1)
                         m.next = "IDLE"
 
                 with m.State(f"LOOP: LATCHED DATA[{i}]"):
-                    m.d.sync += i2c.fifo.w_en.eq(0)
+                    m.d.sync += self.i2c.fifo.w_en.eq(0)
                     if i < len(self.data) - 1:
                         m.next = f"LOOP: UNLATCHED DATA[{i}]"
                     else:

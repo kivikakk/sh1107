@@ -4,7 +4,7 @@ from amaranth import Cat, Elaboratable, Memory, Module, Signal
 from amaranth.build import Platform
 from amaranth.hdl.mem import ReadPort
 
-from i2c import I2C, RW
+from i2c import I2C, RW, Transfer
 from oled import rom
 
 __all__ = ["ROMWriter"]
@@ -22,7 +22,7 @@ class ROMWriter(Elaboratable):
 
     o_busy: Signal
 
-    o_i2c_fifo_w_data: Signal
+    o_i2c_fifo_w_data: Transfer
     o_i2c_fifo_w_en: Signal
     o_i2c_i_stb: Signal
 
@@ -42,7 +42,7 @@ class ROMWriter(Elaboratable):
 
         self.o_busy = Signal()
 
-        self.o_i2c_fifo_w_data = Signal(9)
+        self.o_i2c_fifo_w_data = Transfer()
         self.o_i2c_fifo_w_en = Signal()
         self.o_i2c_i_stb = Signal()
 
@@ -101,7 +101,9 @@ class ROMWriter(Elaboratable):
 
             with m.State("START: ADDRESSED *OFFSET, LEN[1] AVAILABLE"):
                 m.d.sync += self.remain.eq(self.remain | self.rom_rd.data.shift_left(8))
-                m.d.sync += self.o_i2c_fifo_w_data.eq((self.addr << 1) | RW.W)
+                m.d.sync += self.o_i2c_fifo_w_data.kind.eq(Transfer.Kind.START)
+                m.d.sync += self.o_i2c_fifo_w_data.payload.start.addr.eq(self.addr)
+                m.d.sync += self.o_i2c_fifo_w_data.payload.start.rw.eq(RW.W)
                 m.d.sync += self.o_i2c_fifo_w_en.eq(1)
                 m.next = "ADDRESS PERIPHERAL: LATCHED W_EN"
 
@@ -122,7 +124,8 @@ class ROMWriter(Elaboratable):
                     # TODO(Ch): qué pasa si ~o_busy ahora?  (i.e. dirección incorrecta)
                     m.d.sync += self.offset.eq(self.offset + 1)
                     m.d.sync += self.remain.eq(self.remain - 1)
-                    m.d.sync += self.o_i2c_fifo_w_data.eq(self.rom_rd.data)
+                    m.d.sync += self.o_i2c_fifo_w_data.kind.eq(Transfer.Kind.DATA)
+                    m.d.sync += self.o_i2c_fifo_w_data.payload.data.eq(self.rom_rd.data)
                     m.d.sync += self.o_i2c_fifo_w_en.eq(1)
 
                     # Prepare next read, whether it's data or NEXTLEN[0].
@@ -153,9 +156,9 @@ class ROMWriter(Elaboratable):
                     m.next = "FIN: WAIT I2C DONE"
                 with m.Else():
                     m.d.sync += self.remain.eq(remain)
-                    m.d.sync += self.o_i2c_fifo_w_data.eq(
-                        (1 << 8) | (self.addr << 1) | RW.W
-                    )
+                    m.d.sync += self.o_i2c_fifo_w_data.kind.eq(Transfer.Kind.START)
+                    m.d.sync += self.o_i2c_fifo_w_data.payload.start.addr.eq(self.addr)
+                    m.d.sync += self.o_i2c_fifo_w_data.payload.start.rw.eq(RW.W)
                     m.d.sync += self.o_i2c_fifo_w_en.eq(1)
                     m.next = "SEQ BREAK: LATCHED W_EN"
 
