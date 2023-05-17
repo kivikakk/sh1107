@@ -12,8 +12,9 @@ from .oled import OLED
 __all__ = ["Top"]
 
 # TEST_SEQUENCE = [
-#     0x01,  # DISPLAY_ON
+#     0x02,  # DISPLAY_OFF
 #     0x03,  # CLS
+#     0x01,  # DISPLAY_ON
 #     0x04,
 #     0x01,
 #     0x01,  # LOCATE 1, 1
@@ -28,8 +29,21 @@ __all__ = ["Top"]
 
 msg = "Hello, world! This should wrap correctly."
 TEST_SEQUENCE = [
-    0x01,  # DISPLAY_ON
+    0x02,  # DISPLAY_OFF
     0x03,  # CLS
+    0x01,  # DISPLAY_ON
+    0x04,
+    0x01,
+    0x01,  # LOCATE 1, 1
+    0x05,
+    0x01,
+    0x01,  # PRINT smiley
+    0x04,
+    0x02,
+    0x02,  # LOCATE 2, 2
+    0x05,
+    0x01,
+    0x01,  # PRINT smiley
     0x04,
     0x03,
     0x03,  # LOCATE 3, 3

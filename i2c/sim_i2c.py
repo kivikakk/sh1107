@@ -17,6 +17,9 @@ __all__ = [
     "full_sequence",
 ]
 
+# XXX: There's definitely some gentle drift happening here, but it needs really
+# long runs to unearth.  Take care!
+
 
 def _tick(i2c: I2C) -> float:
     return 0.1 / i2c.speed.value
@@ -53,7 +56,6 @@ def start(i2c: I2C) -> sim.Generator:
 
 
 def repeated_start(i2c: I2C) -> sim.Generator:
-    assert (yield i2c.scl_o_last)
     assert not (yield i2c.scl_o)
     yield Delay(5 * _tick(i2c))
 
@@ -76,9 +78,11 @@ def send(
                 assert (yield i2c.fifo.r_rdy)
                 assert (
                     yield i2c.fifo.w_data
-                ) == next, f"expected {next:02x}, got {(yield i2c.fifo.w_data):02x}"
+                ) == next, f"checking next: expected {next:02x}, got {(yield i2c.fifo.w_data):02x}"
             elif next == "STOP":
-                assert not (yield i2c.fifo.r_rdy)
+                assert not (
+                    yield i2c.fifo.r_rdy
+                ), f"checking next: expected empty FIFO, contained ({(yield i2c.fifo.w_data):02x})"
         yield Delay(5 * _tick(i2c) - sim.clock() * 2)
         if bit == 0 and isinstance(next, int):
             assert not (yield i2c.fifo.w_en)
@@ -151,10 +155,17 @@ def steady_stopped(i2c: I2C) -> sim.Generator:
 def full_sequence(
     i2c: I2C,
     trigger: Callable[[], sim.Generator],
-    sequence: list[int],
+    sequences: list[int | list[int]],
     *,
     test_nacks: bool = True,
 ) -> sim.Generator:
+    sequence: list[int] = []
+    for item in sequences:
+        if isinstance(item, int):
+            sequence.append(item)
+        else:
+            sequence += item
+
     nacks: list[Optional[int]] = [None]
     if test_nacks:
         nacks += list(range(len(sequence)))

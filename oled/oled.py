@@ -7,6 +7,7 @@ from amaranth.lib.fifo import SyncFIFO
 
 from common import Hz
 from i2c import I2C
+from .clser import Clser
 from .locator import Locator
 from .rom import OFFSET_CHAR, OFFSET_DISPLAY_OFF, OFFSET_DISPLAY_ON
 from .rom_writer import ROMWriter
@@ -35,6 +36,7 @@ class OLED(Elaboratable):
     i2c: I2C
     rom_writer: ROMWriter
     locator: Locator
+    clser: Clser
 
     i_fifo: SyncFIFO
     o_result: Signal
@@ -51,6 +53,7 @@ class OLED(Elaboratable):
         self.i2c = I2C(speed=speed)
         self.rom_writer = ROMWriter(addr=OLED.ADDR)
         self.locator = Locator(addr=OLED.ADDR)
+        self.clser = Clser(addr=OLED.ADDR)
 
         self.i_fifo = SyncFIFO(width=8, depth=1)
         self.o_result = Signal(OLED.Result)
@@ -69,15 +72,19 @@ class OLED(Elaboratable):
         m.submodules.i2c = self.i2c
         m.submodules.rom_writer = self.rom_writer
         m.submodules.locator = self.locator
+        m.submodules.clser = self.clser
         m.submodules.i_fifo = self.i_fifo
 
         self.rom_writer.connect_i2c_in(m, self.i2c)
         self.locator.connect_i2c_in(m, self.i2c)
+        self.clser.connect_i2c_in(m, self.i2c)
 
         with m.If(self.rom_writer.o_busy):
             self.rom_writer.connect_i2c_out(m, self.i2c)
         with m.Elif(self.locator.o_busy):
             self.locator.connect_i2c_out(m, self.i2c)
+        with m.Elif(self.clser.o_busy):
+            self.clser.connect_i2c_out(m, self.i2c)
         with m.Else():
             m.d.comb += self.i2c.fifo.w_data.eq(self.i2c_fifo_w_data)
             m.d.comb += self.i2c.fifo.w_en.eq(self.i2c_fifo_w_en)
@@ -85,7 +92,6 @@ class OLED(Elaboratable):
 
         # TODO: actually flash cursor when on
         # TODO: print catch "\r", "\n", adjust location
-        # TODO: LOCATE and adjust location adjust page/col in sh1107
 
         with m.FSM():
             with m.State("IDLE"):
@@ -115,9 +121,10 @@ class OLED(Elaboratable):
                         m.next = "ROM WRITE SINGLE: STROBED ROM WRITER"
 
                     with m.Case(OLED.Command.CLS):
-                        # NYI
-                        m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
-                        m.next = "IDLE"
+                        # TODO: we should either restore page/col after CLS, or
+                        # define it as resetting the location
+                        m.d.sync += self.clser.i_stb.eq(1)
+                        m.next = "CLSER: STROBED"
 
                     with m.Case(OLED.Command.LOCATE):
                         m.next = "LOCATE: ROW: WAIT"
@@ -134,6 +141,15 @@ class OLED(Elaboratable):
                         m.d.sync += self.cursor.eq(0)
                         m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
                         m.next = "IDLE"
+
+            with m.State("CLSER: STROBED"):
+                m.d.sync += self.clser.i_stb.eq(0)
+                m.next = "CLSER: UNSTROBED"
+
+            with m.State("CLSER: UNSTROBED"):
+                with m.If(~self.clser.o_busy):
+                    m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
+                    m.next = "IDLE"
 
             self.locate_states(m)
             self.print_states(m)

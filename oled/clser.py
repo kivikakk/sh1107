@@ -7,14 +7,12 @@ from amaranth.build import Platform
 from i2c import I2C, RW, Transfer
 from .sh1107 import Cmd, ControlByte
 
-__all__ = ["Locator"]
+__all__ = ["Clser"]
 
 
-class Locator(Elaboratable):
+class Clser(Elaboratable):
     addr: int
 
-    i_row: Signal
-    i_col: Signal
     i_stb: Signal
 
     i_i2c_fifo_w_rdy: Signal
@@ -27,11 +25,12 @@ class Locator(Elaboratable):
     o_i2c_fifo_w_en: Signal
     o_i2c_i_stb: Signal
 
+    current_page: Signal
+    current_column: Signal
+
     def __init__(self, *, addr: int):
         self.addr = addr
 
-        self.i_row = Signal(range(17))
-        self.i_col = Signal(range(17))
         self.i_stb = Signal()
 
         self.i_i2c_fifo_w_rdy = Signal()
@@ -43,6 +42,9 @@ class Locator(Elaboratable):
         self.o_i2c_fifo_w_data = Transfer()
         self.o_i2c_fifo_w_en = Signal()
         self.o_i2c_i_stb = Signal()
+
+        self.current_page = Signal(range(0x10))
+        self.current_column = Signal(range(0x81))
 
     def connect_i2c_in(self, m: Module, i2c: I2C):
         m.d.comb += [
@@ -65,6 +67,8 @@ class Locator(Elaboratable):
             with m.State("IDLE"):
                 with m.If(self.i_stb):
                     m.d.sync += self.o_busy.eq(1)
+                    m.d.sync += self.current_page.eq(0)
+                    m.d.sync += self.current_column.eq(0)
                     m.d.sync += self.o_i2c_fifo_w_data.kind.eq(Transfer.Kind.START)
                     m.d.sync += self.o_i2c_fifo_w_data.payload.start.addr.eq(self.addr)
                     m.d.sync += self.o_i2c_fifo_w_data.payload.start.rw.eq(RW.W)
@@ -88,39 +92,17 @@ class Locator(Elaboratable):
 
             with m.State("START: CONTROL: STROBED W_EN"):
                 m.d.sync += self.o_i2c_fifo_w_en.eq(0)
-                m.next = "START: CONTROL: UNSTROBED W_EN"
+                with m.If(self.current_page == 0):
+                    m.next = "START: CONTROL: UNSTROBED W_EN"
+                with m.Else():
+                    m.next = "START: COL HIGHER: UNSTROBED W_EN"
 
             with m.State("START: CONTROL: UNSTROBED W_EN"):
                 with m.If(self.i_i2c_o_busy & self.i_i2c_o_ack & self.i_i2c_fifo_w_rdy):
-                    with m.If(self.i_row != 0):
-                        byte = Cmd.SetPageAddress(0x00).to_byte() + self.i_row - 1
-                        m.d.sync += self.o_i2c_fifo_w_data.payload.data.eq(byte)
-                        m.d.sync += self.o_i2c_fifo_w_en.eq(1)
-                        m.next = "START: ROW: STROBED W_EN"
-                    with m.Elif(self.i_col != 0):
-                        self.start_col(m)
-                        m.next = "START: COL LOWER: STROBED W_EN"
-                    with m.Else():
-                        m.d.sync += self.o_busy.eq(0)
-                        m.next = "IDLE"
-                with m.Elif(~self.i_i2c_o_busy):
-                    m.d.sync += self.o_busy.eq(0)
-                    m.next = "IDLE"
-
-            with m.State("START: ROW: STROBED W_EN"):
-                m.d.sync += self.o_i2c_fifo_w_en.eq(0)
-                m.next = "START: ROW: UNSTROBED W_EN"
-
-            with m.State("START: ROW: UNSTROBED W_EN"):
-                with m.If(self.i_col != 0):
-                    with m.If(
-                        self.i_i2c_o_busy & self.i_i2c_o_ack & self.i_i2c_fifo_w_rdy
-                    ):
-                        self.start_col(m)
-                        m.next = "START: COL LOWER: STROBED W_EN"
-                    with m.Elif(~self.i_i2c_o_busy):
-                        m.d.sync += self.o_busy.eq(0)
-                        m.next = "IDLE"
+                    byte = Cmd.SetLowerColumnAddress(0x0).to_byte()
+                    m.d.sync += self.o_i2c_fifo_w_data.payload.data.eq(byte)
+                    m.d.sync += self.o_i2c_fifo_w_en.eq(1)
+                    m.next = "START: COL LOWER: STROBED W_EN"
                 with m.Elif(~self.i_i2c_o_busy):
                     m.d.sync += self.o_busy.eq(0)
                     m.next = "IDLE"
@@ -131,9 +113,7 @@ class Locator(Elaboratable):
 
             with m.State("START: COL LOWER: UNSTROBED W_EN"):
                 with m.If(self.i_i2c_o_busy & self.i_i2c_o_ack & self.i_i2c_fifo_w_rdy):
-                    byte = Cmd.SetHigherColumnAddress(0x00).to_byte() + (
-                        (self.i_col - 1) >> 1
-                    )
+                    byte = Cmd.SetHigherColumnAddress(0x00).to_byte()
                     m.d.sync += self.o_i2c_fifo_w_data.payload.data.eq(byte)
                     m.d.sync += self.o_i2c_fifo_w_en.eq(1)
                     m.next = "START: COL HIGHER: STROBED W_EN"
@@ -146,14 +126,75 @@ class Locator(Elaboratable):
                 m.next = "START: COL HIGHER: UNSTROBED W_EN"
 
             with m.State("START: COL HIGHER: UNSTROBED W_EN"):
-                with m.If(
-                    ~self.i_i2c_o_busy & self.i_i2c_o_ack & self.i_i2c_fifo_w_rdy
-                ):
-                    m.d.sync += self.o_busy.eq(0)
-                    m.next = "IDLE"
+                with m.If(self.i_i2c_o_busy & self.i_i2c_o_ack & self.i_i2c_fifo_w_rdy):
+                    byte = Cmd.SetPageAddress(0x00).to_byte() + self.current_page
+                    m.d.sync += self.o_i2c_fifo_w_data.payload.data.eq(byte)
+                    m.d.sync += self.o_i2c_fifo_w_en.eq(1)
+                    m.next = "LOOP: PAGE: STROBED W_EN"
                 with m.Elif(~self.i_i2c_o_busy):
                     m.d.sync += self.o_busy.eq(0)
                     m.next = "IDLE"
+
+            with m.State("LOOP: PAGE: STROBED W_EN"):
+                m.d.sync += self.o_i2c_fifo_w_en.eq(0)
+                m.next = "LOOP: PAGE: UNSTROBED W_EN"
+
+            with m.State("LOOP: PAGE: UNSTROBED W_EN"):
+                with m.If(self.i_i2c_o_busy & self.i_i2c_o_ack & self.i_i2c_fifo_w_rdy):
+                    m.d.sync += self.o_i2c_fifo_w_data.kind.eq(Transfer.Kind.START)
+                    m.d.sync += self.o_i2c_fifo_w_data.payload.start.addr.eq(self.addr)
+                    m.d.sync += self.o_i2c_fifo_w_data.payload.start.rw.eq(RW.W)
+                    m.d.sync += self.o_i2c_fifo_w_en.eq(1)
+                    m.next = "LOOP: ADDR: STROBED W_EN"
+                with m.Elif(~self.i_i2c_o_busy):
+                    m.d.sync += self.o_busy.eq(0)
+                    m.next = "IDLE"
+
+            with m.State("LOOP: ADDR: STROBED W_EN"):
+                m.d.sync += self.o_i2c_fifo_w_en.eq(0)
+                m.next = "LOOP: ADDR: UNSTROBED W_EN"
+
+            with m.State("LOOP: ADDR: UNSTROBED W_EN"):
+                with m.If(self.i_i2c_fifo_w_rdy):
+                    m.d.sync += self.o_i2c_fifo_w_data.kind.eq(Transfer.Kind.DATA)
+                    m.d.sync += self.o_i2c_fifo_w_data.payload.data.eq(
+                        ControlByte(False, "Data").to_byte()
+                    )
+                    m.d.sync += self.o_i2c_fifo_w_en.eq(1)
+                    m.next = "LOOP: CONTROL: STROBED W_EN"
+
+            with m.State("LOOP: CONTROL: STROBED W_EN"):
+                m.d.sync += self.o_i2c_fifo_w_en.eq(0)
+                m.next = "LOOP: CONTROL: UNSTROBED W_EN"
+
+            with m.State("LOOP: CONTROL: UNSTROBED W_EN"):
+                with m.If(self.i_i2c_o_busy & self.i_i2c_o_ack & self.i_i2c_fifo_w_rdy):
+                    with m.If(self.current_column != 0x80):
+                        m.d.sync += self.o_i2c_fifo_w_data.payload.data.eq(0x00)
+                        m.d.sync += self.o_i2c_fifo_w_en.eq(1)
+                        m.d.sync += self.current_column.eq(self.current_column + 1)
+                        m.next = "LOOP: CONTROL: STROBED W_EN"
+                    with m.Elif(self.current_page != 0x0F):
+                        m.d.sync += self.current_column.eq(0)
+                        m.d.sync += self.current_page.eq(self.current_page + 1)
+
+                        m.d.sync += self.o_i2c_fifo_w_data.kind.eq(Transfer.Kind.START)
+                        m.d.sync += self.o_i2c_fifo_w_data.payload.start.addr.eq(
+                            self.addr
+                        )
+                        m.d.sync += self.o_i2c_fifo_w_data.payload.start.rw.eq(RW.W)
+                        m.d.sync += self.o_i2c_fifo_w_en.eq(1)
+                        m.next = "LOOP: NEXT PAGE: ADDR: STROBED W_EN"
+                    with m.Else():
+                        m.d.sync += self.o_busy.eq(0)
+                        m.next = "IDLE"
+                with m.Elif(~self.i_i2c_o_busy):
+                    m.d.sync += self.o_busy.eq(0)
+                    m.next = "IDLE"
+
+            with m.State("LOOP: NEXT PAGE: ADDR: STROBED W_EN"):
+                m.d.sync += self.o_i2c_fifo_w_en.eq(0)
+                m.next = "START: ADDR: STROBED I_STB"
 
         return m
 

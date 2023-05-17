@@ -110,9 +110,6 @@ class I2C(Elaboratable):
     sda_oe: Signal
     sda_i: Signal
 
-    # XXX(ari): trying this out for test
-    scl_o_last: Signal
-
     rw: Signal
     byte: Transfer
     byte_ix: Signal
@@ -132,8 +129,6 @@ class I2C(Elaboratable):
 
         self.assign(scl=Pin(1, "io", name="scl"), sda=Pin(1, "io", name="sda"))
         self.sda_i.reset = 1
-
-        self.scl_o_last = Signal.like(self.scl_o)
 
         self.rw = Signal(RW)
         self.byte = Transfer()  # NextByte caches the whole FIFO word here.
@@ -155,8 +150,6 @@ class I2C(Elaboratable):
         m = Module()
 
         m.submodules.fifo = self.fifo
-
-        m.d.sync += self.scl_o_last.eq(self.scl_o)
 
         match platform:
             case ICEBreakerPlatform():
