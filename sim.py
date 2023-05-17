@@ -10,7 +10,7 @@ from amaranth import Elaboratable, Record, Signal
 from amaranth.hdl.ast import Operator, Statement
 from amaranth.sim import Delay, Settle, Simulator
 
-__all__ = ["clock", "Generator", "TestCase", "args", "always_args"]
+__all__ = ["clock", "Generator", "TestCase", "args", "i2c_speeds", "always_args"]
 
 _active_clock = 1 / 12e6
 
@@ -140,6 +140,22 @@ def args(*args: Any, **kwargs: Any):
         return sim_test
 
     return wrapper
+
+
+def i2c_speeds(sim_test: Callable[..., Generator]) -> Callable[..., Generator]:
+    from common import Hz
+
+    if not hasattr(sim_test, "_sim_args"):
+        sim_test._sim_args = []  # pyright: ignore[reportFunctionMemberAccess]
+    sim_test._sim_args.extend(  # pyright: ignore[reportFunctionMemberAccess]
+        [
+            ([], {"speed": Hz(100_000)}),
+            ([], {"speed": Hz(400_000)}),
+            ([], {"speed": Hz(1_000_000)}),
+            ([], {"speed": Hz(2_000_000)}),
+        ]
+    )
+    return sim_test
 
 
 def always_args(*args: Any, **kwargs: Any):

@@ -10,9 +10,6 @@ from .sh1107 import Cmd, ControlByte
 __all__ = ["Locator"]
 
 
-# TODO: locator test per other i2c tests
-
-
 class Locator(Elaboratable):
     addr: int
 

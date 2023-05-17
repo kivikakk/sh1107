@@ -1,4 +1,4 @@
-from typing import Final, Optional, cast
+from typing import Final, Optional, Self, cast
 
 from amaranth import Elaboratable, Module, Signal
 from amaranth.build import Attrs, Platform
@@ -25,6 +25,25 @@ class Transfer(data.Struct):
     class Kind(enum.Enum, shape=1):
         DATA = 0
         START = 1
+
+    @classmethod
+    def C_start(cls, rw: RW, addr: int) -> Self:
+        return cast(
+            cls,
+            cls.const(
+                {
+                    "kind": Transfer.Kind.START,
+                    "payload": {"start": {"rw": rw, "addr": addr}},
+                }
+            ),
+        )
+
+    @classmethod
+    def C_data(cls, data: int) -> Self:
+        return cast(
+            cls,
+            cls.const({"kind": Transfer.Kind.DATA, "payload": {"data": data}}),
+        )
 
     payload: data.UnionLayout(
         {

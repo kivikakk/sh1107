@@ -78,7 +78,9 @@ def send(
         if bit == 0:
             if isinstance(next, int):
                 assert (yield i2c.fifo.r_rdy)
-                assert (yield i2c.fifo.w_data) == next
+                assert (
+                    yield i2c.fifo.w_data
+                ) == next, f"expected {next:02x}, got {(yield i2c.fifo.w_data):02x}"
             elif next == "STOP":
                 assert not (yield i2c.fifo.r_rdy)
         yield Delay(5 * _tick(i2c) - sim.clock() * 2)
@@ -171,6 +173,8 @@ def full_sequence(
         yield from start(i2c)
 
         for i, byte in enumerate(sequence):
+            if (byte & 0x100) and i > 0:
+                yield from repeated_start(i2c)
             yield from send(
                 i2c,
                 byte & 0xFF,

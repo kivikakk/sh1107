@@ -37,10 +37,7 @@ class TestLocatorTop(Elaboratable):
 
 
 class TestLocator(sim.TestCase):
-    @sim.args(speed=Hz(100_000))
-    @sim.args(speed=Hz(400_000))
-    @sim.args(speed=Hz(1_000_000))
-    @sim.args(speed=Hz(2_000_000))
+    @sim.i2c_speeds
     def test_sim_locator(self, dut: TestLocatorTop) -> sim.Generator:
         def trigger() -> sim.Generator:
             yield dut.locator.i_row.eq(16)
@@ -61,10 +58,7 @@ class TestLocator(sim.TestCase):
             ],
         )
 
-    @sim.args(speed=Hz(100_000))
-    @sim.args(speed=Hz(400_000))
-    @sim.args(speed=Hz(1_000_000))
-    @sim.args(speed=Hz(2_000_000))
+    @sim.i2c_speeds
     def test_sim_locator_row_only(self, dut: TestLocatorTop) -> sim.Generator:
         def trigger() -> sim.Generator:
             yield dut.locator.i_row.eq(7)
@@ -83,10 +77,7 @@ class TestLocator(sim.TestCase):
             ],
         )
 
-    @sim.args(speed=Hz(100_000))
-    @sim.args(speed=Hz(400_000))
-    @sim.args(speed=Hz(1_000_000))
-    @sim.args(speed=Hz(2_000_000))
+    @sim.i2c_speeds
     def test_sim_locator_col_only(self, dut: TestLocatorTop) -> sim.Generator:
         def trigger() -> sim.Generator:
             yield dut.locator.i_row.eq(0)
