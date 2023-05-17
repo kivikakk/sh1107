@@ -109,11 +109,13 @@ class Locator(Elaboratable):
                 m.next = "START: ROW: UNSTROBED W_EN"
 
             with m.State("START: ROW: UNSTROBED W_EN"):
-                with m.If(self.i_i2c_o_busy & self.i_i2c_o_ack & self.i_i2c_fifo_w_rdy):
-                    with m.If(self.i_col != 0):
+                with m.If(self.i_col != 0):
+                    with m.If(
+                        self.i_i2c_o_busy & self.i_i2c_o_ack & self.i_i2c_fifo_w_rdy
+                    ):
                         self.start_col(m)
                         m.next = "START: COL LOWER: STROBED W_EN"
-                    with m.Else():
+                    with m.Elif(~self.i_i2c_o_busy):
                         m.d.sync += self.o_busy.eq(0)
                         m.next = "IDLE"
                 with m.Elif(~self.i_i2c_o_busy):
