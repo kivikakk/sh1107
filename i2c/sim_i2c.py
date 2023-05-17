@@ -1,7 +1,7 @@
-from typing import Callable, Literal, cast
+from typing import Callable, Literal, Optional, cast
 
 from amaranth import Signal
-from amaranth.sim import Delay, Settle
+from amaranth.sim import Delay
 
 import sim
 from .i2c import I2C
@@ -28,7 +28,6 @@ def synchronise(i2c: I2C, start_value: int) -> sim.Generator:
     assert (yield i2c.fifo.w_data) == start_value
     assert not (yield i2c.fifo.r_rdy)
     yield Delay(sim.clock())
-    yield Settle()
 
     # Data is enqueued, we're strobing I2C.  Lines still high.
     assert (yield i2c.i_stb)
@@ -39,7 +38,6 @@ def synchronise(i2c: I2C, start_value: int) -> sim.Generator:
     assert (yield i2c.scl_o)
     assert (yield i2c.sda_o)
     yield Delay(sim.clock())
-    yield Settle()
 
 
 def start(i2c: I2C) -> sim.Generator:
@@ -48,7 +46,6 @@ def start(i2c: I2C) -> sim.Generator:
     assert (yield i2c.scl_o)
     assert not (yield i2c.sda_o)
     yield Delay(5 * _tick(i2c))
-    yield Settle()
 
     # I2C clock starts.
     assert not (yield i2c.scl_o)
@@ -58,10 +55,10 @@ def start(i2c: I2C) -> sim.Generator:
 def repeated_start(i2c: I2C) -> sim.Generator:
     assert (yield i2c.scl_o_last)
     assert not (yield i2c.scl_o)
+    yield Delay(5 * _tick(i2c))
 
     assert (yield i2c.sda_o)
-    yield Delay(10 * _tick(i2c))
-    yield Settle()
+    yield Delay(5 * _tick(i2c))
 
     # I2C clock starts.
     assert not (yield i2c.scl_o)
@@ -74,7 +71,6 @@ def send(
     actual = 0
     for bit in range(8):
         yield Delay(sim.clock() * 2)
-        yield Settle()
         if bit == 0:
             if isinstance(next, int):
                 assert (yield i2c.fifo.r_rdy)
@@ -84,13 +80,11 @@ def send(
             elif next == "STOP":
                 assert not (yield i2c.fifo.r_rdy)
         yield Delay(5 * _tick(i2c) - sim.clock() * 2)
-        yield Settle()
         if bit == 0 and isinstance(next, int):
             assert not (yield i2c.fifo.w_en)
         assert (yield i2c.scl_o)
         actual = (actual << 1) | (yield i2c.sda_o)
         yield Delay(5 * _tick(i2c))
-        yield Settle()
 
         assert not (yield i2c.scl_o), f"expected SCL low at end of bit {bit}"
 
@@ -104,12 +98,10 @@ def ack(i2c: I2C, *, ack: bool = True) -> sim.Generator:
     if ack:
         yield cast(Signal, i2c.sda.i).eq(0)
     yield Delay(3 * _tick(i2c))
-    yield Settle()
     assert not (yield i2c.sda_oe)
     yield Delay(_tick(i2c))
 
     yield Delay(4 * _tick(i2c))
-    yield Settle()
     assert (yield i2c.sda_oe)
     if ack:
         yield cast(Signal, i2c.sda.i).eq(1)
@@ -132,11 +124,9 @@ def stop(i2c: I2C) -> sim.Generator:
     assert not (yield i2c.scl_o)
     assert (yield i2c.sda_o) == last_sda
     yield Delay(3 * _tick(i2c))
-    yield Settle()
     assert not (yield i2c.scl_o)
     assert not (yield i2c.sda_o)
     yield Delay(_tick(i2c))
-    yield Settle()
 
     # Then when SCL is high, bring SDA high.
     assert (yield i2c.scl_o)
@@ -144,16 +134,13 @@ def stop(i2c: I2C) -> sim.Generator:
     yield Delay(_tick(i2c))
     assert not (yield i2c.sda_o)
     yield Delay(3 * _tick(i2c))
-    yield Settle()
     assert (yield i2c.sda_o)
     yield Delay(_tick(i2c))
-    yield Settle()
 
 
 def steady_stopped(i2c: I2C) -> sim.Generator:
     for _ in range(3):
         yield Delay(sim.clock())
-        yield Settle()
         assert (yield i2c.scl_o)
         assert (yield i2c.sda_o)
 
@@ -165,8 +152,14 @@ def full_sequence(
     i2c: I2C,
     trigger: Callable[[], sim.Generator],
     sequence: list[int],
+    *,
+    test_nacks: bool = True,
 ) -> sim.Generator:
-    for nack_after in [None] + list(range(len(sequence))):
+    nacks: list[Optional[int]] = [None]
+    if test_nacks:
+        nacks += list(range(len(sequence)))
+
+    for nack_after in nacks:
         yield from trigger()
 
         yield from synchronise(i2c, sequence[0])
@@ -174,12 +167,17 @@ def full_sequence(
 
         for i, byte in enumerate(sequence):
             if (byte & 0x100) and i > 0:
+                print("checking repeated")
                 yield from repeated_start(i2c)
-            yield from send(
-                i2c,
-                byte & 0xFF,
-                next=sequence[i + 1] if i < len(sequence) - 1 else "STOP",
-            )
+
+            check_byte = byte & 0xFF
+            check_next = sequence[i + 1] if i < len(sequence) - 1 else "STOP"
+            yield from send(i2c, check_byte, next=check_next)
+
+            if check_next != "STOP":
+                check_next = f"{check_next:02x}"
+            print(f"got byte {check_byte:02x}, next {check_next}")
+
             if i == nack_after:
                 yield from nack(i2c)
                 break
