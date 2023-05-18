@@ -37,7 +37,6 @@ class TestClserTop(Elaboratable):
 
 
 class TestClser(sim.TestCase):
-    # TODO ci_only
     @sim.args(speed=Hz(100_000), ci_only=True)
     @sim.args(speed=Hz(400_000), ci_only=True)
     @sim.args(speed=Hz(1_000_000), ci_only=True)

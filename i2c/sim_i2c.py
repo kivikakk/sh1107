@@ -243,7 +243,6 @@ def full_sequence(
 
         for i, byte in enumerate(sequence):
             if (byte & 0x100) and i > 0:
-                print("checking repeated")
                 yield from repeated_start(i2c)
 
             check_byte = byte & 0xFF
@@ -252,7 +251,6 @@ def full_sequence(
 
             if check_next != "STOP":
                 check_next = f"{check_next:02x}"
-            print(f"got byte {check_byte:02x}, next {check_next}")
 
             if i == nack_after:
                 yield from nack(i2c)

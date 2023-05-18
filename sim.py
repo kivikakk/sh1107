@@ -1,4 +1,5 @@
 import inspect
+import os
 import re
 import typing
 import unittest
@@ -77,6 +78,8 @@ class TestCase(unittest.TestCase):
 
         for sim_args in all_sim_args:
             expected_failure = sim_args[1].pop("expected_failure", False)
+            ci_only = sim_args[1].pop("ci_only", False)
+
             suffix = sim_args_into_str(sim_args)
             if len(all_sim_args) > 1 and suffix:
                 target = f"{name}_{suffix}"
@@ -121,7 +124,8 @@ class TestCase(unittest.TestCase):
             def proxy(
                 self: TestCase, target: str = target, sim_args: SimArgs = sim_args
             ):
-                return wrapper(self, target, sim_args)
+                if not ci_only or os.getenv("CI", False):
+                    return wrapper(self, target, sim_args)
 
             if expected_failure:
                 proxy = unittest.expectedFailure(proxy)

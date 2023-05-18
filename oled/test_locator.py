@@ -2,7 +2,7 @@ from typing import Final, Optional
 
 from amaranth import Elaboratable, Module
 from amaranth.build import Platform
-from amaranth.sim import Delay
+from amaranth.sim import Settle
 
 import sim
 from common import Hz
@@ -43,7 +43,8 @@ class TestLocator(sim.TestCase):
             yield dut.locator.i_row.eq(16)
             yield dut.locator.i_col.eq(8)
             yield dut.locator.i_stb.eq(1)
-            yield Delay(sim.clock())
+            yield
+            yield Settle()
             yield dut.locator.i_stb.eq(0)
 
         yield from sim_i2c.full_sequence(
@@ -64,7 +65,8 @@ class TestLocator(sim.TestCase):
             yield dut.locator.i_row.eq(7)
             yield dut.locator.i_col.eq(0)
             yield dut.locator.i_stb.eq(1)
-            yield Delay(sim.clock())
+            yield
+            yield Settle()
             yield dut.locator.i_stb.eq(0)
 
         yield from sim_i2c.full_sequence(
@@ -83,7 +85,8 @@ class TestLocator(sim.TestCase):
             yield dut.locator.i_row.eq(0)
             yield dut.locator.i_col.eq(13)
             yield dut.locator.i_stb.eq(1)
-            yield Delay(sim.clock())
+            yield
+            yield Settle()
             yield dut.locator.i_stb.eq(0)
 
         yield from sim_i2c.full_sequence(
