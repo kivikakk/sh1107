@@ -18,9 +18,6 @@ __all__ = [
     "full_sequence",
 ]
 
-# XXX: There's definitely some gentle drift happening here, but it needs really
-# long runs to unearth.  Take care!
-
 
 def _tick(i2c: I2C) -> float:
     return 0.1 / i2c.speed.value
@@ -68,47 +65,68 @@ def repeated_start(i2c: I2C) -> sim.Generator:
     assert not (yield i2c.sda_o)
 
 
+class ValueChangeWatcher:
+    def start(self) -> sim.Generator:
+        return
+        yield
+
+    def update(self) -> sim.Generator:
+        return
+        yield
+
+    def finish(self) -> None:
+        pass
+
+
+class VCWSteady(ValueChangeWatcher):
+    source: Signal
+
+    def __init__(self, source: Signal):
+        self.source = source
+
+    def start(self) -> sim.Generator:
+        self.value = yield self.source
+
+    def update(self) -> sim.Generator:
+        new_value = yield self.source
+        assert new_value == self.value
+
+
+class VCWFall(ValueChangeWatcher):
+    source: Signal
+    value: int
+
+    def __init__(self, source: Signal):
+        self.source = source
+
+    def start(self) -> sim.Generator:
+        self.value = yield self.source
+        assert self.value
+
+    def update(self) -> sim.Generator:
+        new_value = yield self.source
+        if not self.value:
+            assert not new_value
+        else:
+            self.value = new_value
+
+    def finish(self) -> None:
+        assert not self.value
+
+
 class ValueChange(Enum):
     DONT_CARE = 1
     STEADY = 2
     FALL = 3
 
-
-# TODO: make diff classes for diff ValueChanges so no wasted effort
-class ValueChangeWatcher:
-    vca: ValueChange
-    source: Signal
-    value: int
-
-    def __init__(self, vca: ValueChange, source: Signal):
-        self.vca = vca
-        self.source = source
-
-    def start(self) -> sim.Generator:
-        if self.vca == ValueChange.DONT_CARE:
-            return
-
-        self.value = yield self.source
-
-        if self.vca == ValueChange.FALL:
-            assert self.value
-
-    def update(self) -> sim.Generator:
-        if self.vca == ValueChange.DONT_CARE:
-            return
-
-        new_value = yield self.source
-        if self.vca == ValueChange.STEADY:
-            assert new_value == self.value
-        elif self.vca == ValueChange.FALL:
-            if self.value:
-                self.value = new_value
-            else:
-                assert not new_value
-
-    def finish(self) -> None:
-        if self.vca == ValueChange.FALL:
-            assert not self.value
+    def watcher_for(self, source: Signal) -> ValueChangeWatcher:
+        match self:
+            case ValueChange.DONT_CARE:
+                return ValueChangeWatcher()
+            case ValueChange.STEADY:
+                return VCWSteady(source)
+            case ValueChange.FALL:
+                return VCWFall(source)
 
 
 def wait_scl(
@@ -120,9 +138,9 @@ def wait_scl(
 ) -> sim.Generator:
     assert (yield i2c.scl_o) != level
 
-    vcw_sda_o = ValueChangeWatcher(sda_o, i2c.sda_o)
+    vcw_sda_o = sda_o.watcher_for(i2c.sda_o)
     yield from vcw_sda_o.start()
-    vcw_sda_oe = ValueChangeWatcher(sda_oe, i2c.sda_oe)
+    vcw_sda_oe = sda_oe.watcher_for(i2c.sda_oe)
     yield from vcw_sda_oe.start()
 
     while True:

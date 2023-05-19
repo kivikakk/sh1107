@@ -81,7 +81,7 @@ class I2C(Elaboratable):
         100_000,
         400_000,
         1_000_000,
-        2_000_000,  # XXX: for vsh
+        2_000_000,  # for vsh
     ]
     DEFAULT_SPEED: Final[int] = 1_000_000
 

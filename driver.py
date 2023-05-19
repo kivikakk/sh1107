@@ -124,8 +124,9 @@ def rom(args: Namespace):
 def vsh(args: Namespace):
     design = _build_top(args, speed=Hz(2_000_000))
 
-    # XXX(ari): works better on Windows since osscad's yosys-config a) doesn't execute
-    # cleanly automatically (bash script), and b) its answers are wrong anyway.
+    # NOTE(ari): works better on Windows since osscad's yosys-config a) doesn't
+    # execute cleanly automatically (bash script), and b) its answers are wrong
+    # anyway.
     os.environ["AMARANTH_USE_YOSYS"] = "builtin"
 
     yosys = cast(YosysBinary, find_yosys(lambda _: True))
