@@ -131,7 +131,7 @@ class ROMWriter(Elaboratable):
 
             with m.State("SEND: LATCHED W_EN"):
                 m.d.sync += self.o_i2c_fifo_w_en.eq(0)
-                m.next = "SEND: WAIT FOR I2C"  # XXX(Ch): como anteriormente
+                m.next = "SEND: WAIT FOR I2C"
 
             with m.State("SEND: WAIT FOR I2C"):
                 with m.If(self.i_i2c_o_busy & self.i_i2c_o_ack & self.i_i2c_fifo_w_rdy):

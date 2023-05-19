@@ -23,9 +23,17 @@ def _tick(i2c: I2C) -> float:
     return 0.1 / i2c.speed.value
 
 
-def synchronise(i2c: I2C, start_value: int) -> sim.Generator:
-    assert not (yield i2c.i_stb)
-    assert (yield i2c.fifo.w_en)
+def synchronise(i2c: I2C, start_value: int, *, wait_steps: int = 20) -> sim.Generator:
+    for i in range(wait_steps):
+        if i > 0:
+            yield Delay(sim.clock())
+
+        assert not (yield i2c.i_stb)
+        if (yield i2c.fifo.w_en):
+            break
+    else:
+        raise AssertionError(f"I2C didn't start in {wait_steps} steps")
+
     assert (yield i2c.fifo.w_data) == start_value
     assert not (yield i2c.fifo.r_rdy)
     yield Delay(sim.clock())
@@ -225,8 +233,8 @@ def stop(i2c: I2C) -> sim.Generator:
             break
 
 
-def steady_stopped(i2c: I2C) -> sim.Generator:
-    for _ in range(3):
+def steady_stopped(i2c: I2C, *, wait_steps: int = 5) -> sim.Generator:
+    for _ in range(wait_steps):
         yield Delay(_tick(i2c))
         assert (yield i2c.scl_o)
         assert (yield i2c.sda_o)
