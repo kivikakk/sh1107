@@ -119,7 +119,6 @@ class ROMWriter(Elaboratable):
                     m.d.sync += self.offset.eq(self.offset + 1)
                     m.next = "SEQ BREAK: ADDRESSED NEXTLEN[1], NEXTLEN[0] AVAILABLE"
                 with m.Elif(self.i_i2c_fifo_w_rdy):
-                    # TODO(Ch): qué pasa si ~o_busy ahora?  (i.e. dirección incorrecta)
                     m.d.sync += self.offset.eq(self.offset + 1)
                     m.d.sync += self.remain.eq(self.remain - 1)
                     m.d.sync += self.o_i2c_fifo_w_data.kind.eq(Transfer.Kind.DATA)
