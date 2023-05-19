@@ -113,8 +113,6 @@ class ROMWriter(Elaboratable):
                 m.next = "LOOP HEAD: SEQ BREAK OR WAIT I2C"
 
             with m.State("LOOP HEAD: SEQ BREAK OR WAIT I2C"):
-                # XXX(Ch): Compare desactivando aquí con en su propio estado
-                # (wrt. celdas utilizadas)
                 m.d.sync += self.o_i2c_i_stb.eq(0)
                 with m.If(self.remain == 0):
                     m.d.sync += self.rom_rd.addr.eq(self.offset + 1)
