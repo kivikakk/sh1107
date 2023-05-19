@@ -122,16 +122,18 @@ class TestCase(unittest.TestCase):
                     raise sim_exc
 
             def proxy(
-                self: TestCase, target: str = target, sim_args: SimArgs = sim_args
+                self: TestCase,
+                target: str = target,
+                sim_args: SimArgs = sim_args,
             ):
-                if not ci_only or os.getenv("CI", False):
-                    return wrapper(self, target, sim_args)
+                return wrapper(self, target, sim_args)
 
             if expected_failure:
                 proxy = unittest.expectedFailure(proxy)
 
-            assert not hasattr(cls, target)
-            setattr(cls, target, proxy)
+            if not ci_only or os.getenv("CI", False):
+                assert not hasattr(cls, target)
+                setattr(cls, target, proxy)
 
 
 def args(*args: Any, **kwargs: Any):
