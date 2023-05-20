@@ -91,7 +91,6 @@ class OLED(Elaboratable):
             m.d.comb += self.i2c.i_stb.eq(self.i2c_i_stb)
 
         # TODO: actually flash cursor when on
-        # TODO: print catch "\r", "\n", adjust location
 
         with m.FSM():
             with m.State("IDLE"):

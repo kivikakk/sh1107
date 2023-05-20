@@ -11,19 +11,19 @@ from .oled import OLED
 
 __all__ = ["Top", "TEST_SEQUENCE_WITHOUT_INITIALISE", "TEST_SEQUENCE_WITH_INITIALISE"]
 
-msg1 = "Hello, world!\n"
-msg2 = "Nyonk!\rShom"
+msg1 = "Nyonk\n plonk"
+msg2 = "14: Hej\n 15: Mm\n  16: Z!\n   17: :)"
 TEST_SEQUENCE_WITHOUT_INITIALISE = [
     0x01,  # DISPLAY_ON
-    0x04,
-    0x01,
-    0x01,  # LOCATE 1, 1
     0x05,
     len(msg1),
-    *[ord(c) for c in msg1],  # PRINT "Hello, world!\n"
+    *[ord(c) for c in msg1],  # PRINT msg1
+    0x04,
+    0x0E,
+    0x01,  # LOCATE 14, 1
     0x05,
     len(msg2),
-    *[ord(c) for c in msg2],  # PRINT "Nyonk!\rShom"
+    *[ord(c) for c in msg2],  # PRINT msg2
     0x06,  # CURSOR_ON
 ]
 
