@@ -9,8 +9,31 @@ from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
 from common import Button, ButtonWithHold, Hz
 from .oled import OLED
 
-__all__ = ["Top"]
+__all__ = ["Top", "TEST_SEQUENCE_WITHOUT_INITIALISE", "TEST_SEQUENCE_WITH_INITIALISE"]
 
+msg1 = "Hello, world!\n"
+msg2 = "Nyonk!\rShom"
+TEST_SEQUENCE_WITHOUT_INITIALISE = [
+    0x01,  # DISPLAY_ON
+    0x04,
+    0x01,
+    0x01,  # LOCATE 1, 1
+    0x05,
+    len(msg1),
+    *[ord(c) for c in msg1],  # PRINT "Hello, world!\n"
+    0x05,
+    len(msg2),
+    *[ord(c) for c in msg2],  # PRINT "Nyonk!\rShom"
+    0x06,  # CURSOR_ON
+]
+
+test_initialise = [
+    0x02,  # DISPLAY_OFF
+    0x03,  # CLS
+]
+TEST_SEQUENCE_WITH_INITIALISE = test_initialise + TEST_SEQUENCE_WITHOUT_INITIALISE
+
+# msg = "Hello, world! This should wrap correctly."
 # TEST_SEQUENCE = [
 #     0x02,  # DISPLAY_OFF
 #     0x03,  # CLS
@@ -19,57 +42,47 @@ __all__ = ["Top"]
 #     0x01,
 #     0x01,  # LOCATE 1, 1
 #     0x05,
-#     0x0E,
-#     *[ord(c) for c in "Hello, world!\n"],  # PRINT "Hello, world!"
+#     0x01,
+#     0x01,  # PRINT smiley
+#     0x04,
+#     0x02,
+#     0x02,  # LOCATE 2, 2
 #     0x05,
-#     0x06,
-#     *[ord(c) for c in "Nyonk!"],  # PRINT "Nyonk!"
+#     0x01,
+#     0x01,  # PRINT smiley
+#     0x04,
+#     0x03,
+#     0x03,  # LOCATE 3, 3
+#     0x05,
+#     len(msg),
+#     *[ord(c) for c in msg],  # PRINT msg
 #     0x06,  # CURSOR_ON
 # ]
-
-msg = "Hello, world! This should wrap correctly."
-TEST_SEQUENCE = [
-    0x02,  # DISPLAY_OFF
-    0x03,  # CLS
-    0x01,  # DISPLAY_ON
-    0x04,
-    0x01,
-    0x01,  # LOCATE 1, 1
-    0x05,
-    0x01,
-    0x01,  # PRINT smiley
-    0x04,
-    0x02,
-    0x02,  # LOCATE 2, 2
-    0x05,
-    0x01,
-    0x01,  # PRINT smiley
-    0x04,
-    0x03,
-    0x03,  # LOCATE 3, 3
-    0x05,
-    len(msg),
-    *[ord(c) for c in msg],  # PRINT msg
-    0x06,  # CURSOR_ON
-]
 
 
 class Top(Elaboratable):
     oled: OLED
+    test_sequence: list[int]
     speed: Hz
 
     switch: Signal
 
     rom_rd: ReadPort
 
-    def __init__(self, *, speed: Hz = Hz(1_000_000)):
+    def __init__(
+        self,
+        *,
+        test_sequence: list[int] = TEST_SEQUENCE_WITH_INITIALISE,
+        speed: Hz = Hz(1_000_000),
+    ):
         self.oled = OLED(speed=speed)
+        self.test_sequence = test_sequence
         self.speed = speed
 
         self.switch = Signal()
 
         self.rom_rd = Memory(
-            width=8, depth=len(TEST_SEQUENCE), init=TEST_SEQUENCE
+            width=8, depth=len(test_sequence), init=test_sequence
         ).read_port(transparent=False)
 
     @property
@@ -137,7 +150,7 @@ class Top(Elaboratable):
             case _:
                 raise NotImplementedError
 
-        next_idx = Signal(range(len(TEST_SEQUENCE)))
+        next_idx = Signal(range(len(self.test_sequence)))
 
         with m.FSM():
             with m.State("IDLE"):
@@ -161,7 +174,7 @@ class Top(Elaboratable):
 
             with m.State("LOOP: STROBED W_EN"):
                 m.d.sync += self.oled.i_fifo.w_en.eq(0)
-                with m.If(next_idx == len(TEST_SEQUENCE) - 1):
+                with m.If(next_idx == len(self.test_sequence) - 1):
                     m.next = "IDLE"
                 with m.Else():
                     m.d.sync += next_idx.eq(next_idx + 1)

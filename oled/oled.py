@@ -240,9 +240,25 @@ class OLED(Elaboratable):
             m.next = "PRINT: DATA: UNSTROBED R_EN"
 
         with m.State("PRINT: DATA: UNSTROBED R_EN"):
-            m.d.sync += self.rom_writer.i_index.eq(OFFSET_CHAR + self.i_fifo.r_data)
-            m.d.sync += self.rom_writer.i_stb.eq(1)
-            m.next = "PRINT: DATA: STROBED ROM WRITER"
+            with m.If(self.i_fifo.r_data == 13):
+                # CR
+                m.d.sync += self.col.eq(1)
+                m.d.sync += self.locator.i_col.eq(1)
+                m.d.sync += self.locator.i_row.eq(0)
+                m.d.sync += self.locator.i_stb.eq(1)
+                m.next = "PRINT: DATA: PAGE ADJUST: STROBED LOCATOR"
+            with m.Elif(self.i_fifo.r_data == 10):
+                # LF
+                m.d.sync += self.col.eq(1)
+                m.d.sync += self.row.eq(self.row + 1)  # TODO: scroll
+                m.d.sync += self.locator.i_row.eq(self.row + 1)
+                m.d.sync += self.locator.i_col.eq(1)
+                m.d.sync += self.locator.i_stb.eq(1)
+                m.next = "PRINT: DATA: PAGE ADJUST: STROBED LOCATOR"
+            with m.Else():
+                m.d.sync += self.rom_writer.i_index.eq(OFFSET_CHAR + self.i_fifo.r_data)
+                m.d.sync += self.rom_writer.i_stb.eq(1)
+                m.next = "PRINT: DATA: STROBED ROM WRITER"
 
         with m.State("PRINT: DATA: STROBED ROM WRITER"):
             m.d.sync += self.rom_writer.i_stb.eq(0)

@@ -26,6 +26,7 @@ from common import Hz
 from formal import formal as prep_formal
 from i2c import I2C
 from oled import ROM
+from oled.top import TEST_SEQUENCE_WITHOUT_INITIALISE
 
 BOARDS: Dict[str, Type[Platform]] = {
     "icebreaker": ICEBreakerPlatform,
@@ -122,7 +123,9 @@ def rom(args: Namespace):
 
 
 def vsh(args: Namespace):
-    design = _build_top(args, speed=Hz(2_000_000))
+    design = _build_top(
+        args, test_sequence=TEST_SEQUENCE_WITHOUT_INITIALISE, speed=Hz(2_000_000)
+    )
 
     # NOTE(ari): works better on Windows since osscad's yosys-config a) doesn't
     # execute cleanly automatically (bash script), and b) its answers are wrong
