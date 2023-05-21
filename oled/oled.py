@@ -245,15 +245,22 @@ class OLED(Elaboratable):
                 m.d.sync += self.locator.i_col.eq(1)
                 m.d.sync += self.locator.i_row.eq(0)
                 m.d.sync += self.locator.i_stb.eq(1)
-                m.next = "PRINT: DATA: PAGE ADJUST: STROBED LOCATOR"
+                m.next = "PRINT: DATA: LOC ADJUST: STROBED LOCATOR"
             with m.Elif(self.i_fifo.r_data == 10):
                 # LF
-                m.d.sync += self.col.eq(1)
-                m.d.sync += self.row.eq(self.row + 1)  # TODO: scroll
-                m.d.sync += self.locator.i_row.eq(self.row + 1)
-                m.d.sync += self.locator.i_col.eq(1)
-                m.d.sync += self.locator.i_stb.eq(1)
-                m.next = "PRINT: DATA: PAGE ADJUST: STROBED LOCATOR"
+                with m.If(self.row == 16):
+                    m.d.sync += self.col.eq(1)
+                    m.d.sync += self.locator.i_row.eq(0)
+                    m.d.sync += self.locator.i_col.eq(1)
+                    m.d.sync += self.locator.i_stb.eq(1)
+                    m.next = "PRINT: DATA: LOC ADJUST: STROBED LOCATOR, NEEDS SCROLL"
+                with m.Else():
+                    m.d.sync += self.col.eq(1)
+                    m.d.sync += self.row.eq(self.row + 1)
+                    m.d.sync += self.locator.i_row.eq(self.row + 1)
+                    m.d.sync += self.locator.i_col.eq(1)
+                    m.d.sync += self.locator.i_stb.eq(1)
+                    m.next = "PRINT: DATA: LOC ADJUST: STROBED LOCATOR"
             with m.Else():
                 m.d.sync += self.rom_writer.i_index.eq(OFFSET_CHAR + self.i_fifo.r_data)
                 m.d.sync += self.rom_writer.i_stb.eq(1)
@@ -264,9 +271,13 @@ class OLED(Elaboratable):
             # Page addressing mode automatically matches our column adjust;
             # we need to manually change page when we wrap, though.
             with m.If(self.col == 16):
-                m.d.sync += self.col.eq(1)
-                m.d.sync += self.row.eq(self.row + 1)  # TODO: scroll
-                m.next = "PRINT: DATA: UNSTROBED ROM WRITER, NEEDS PAGE ADJUST"
+                with m.If(self.row == 16):
+                    m.d.sync += self.col.eq(1)
+                    m.next = "PRINT: DATA: UNSTROBED ROM WRITER, NEEDS SCROLL"
+                with m.Else():
+                    m.d.sync += self.col.eq(1)
+                    m.d.sync += self.row.eq(self.row + 1)
+                    m.next = "PRINT: DATA: UNSTROBED ROM WRITER, NEEDS PAGE ADJUST"
             with m.Else():
                 m.d.sync += self.col.eq(self.col + 1)
                 m.next = "PRINT: DATA: UNSTROBED ROM WRITER"
@@ -284,18 +295,22 @@ class OLED(Elaboratable):
             with m.If(~self.rom_writer.o_busy):
                 m.next = "PRINT: DATA: PAGE ADJUST"
 
+        with m.State("PRINT: DATA: UNSTROBED ROM WRITER, NEEDS SCROLL"):
+            with m.If(~self.rom_writer.o_busy):
+                m.next = "PRINT: DATA: SCROLL"
+
         with m.State("PRINT: DATA: PAGE ADJUST"):
             with m.If(self.i2c.fifo.w_rdy):
                 m.d.sync += self.locator.i_row.eq(self.row)
                 m.d.sync += self.locator.i_col.eq(0)
                 m.d.sync += self.locator.i_stb.eq(1)
-                m.next = "PRINT: DATA: PAGE ADJUST: STROBED LOCATOR"
+                m.next = "PRINT: DATA: LOC ADJUST: STROBED LOCATOR"
 
-        with m.State("PRINT: DATA: PAGE ADJUST: STROBED LOCATOR"):
+        with m.State("PRINT: DATA: LOC ADJUST: STROBED LOCATOR"):
             m.d.sync += self.locator.i_stb.eq(0)
-            m.next = "PRINT: DATA: PAGE ADJUST: UNSTROBED LOCATOR"
+            m.next = "PRINT: DATA: LOC ADJUST: UNSTROBED LOCATOR"
 
-        with m.State("PRINT: DATA: PAGE ADJUST: UNSTROBED LOCATOR"):
+        with m.State("PRINT: DATA: LOC ADJUST: UNSTROBED LOCATOR"):
             with m.If(~self.locator.o_busy):
                 with m.If(remaining == 1):
                     m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
@@ -303,3 +318,22 @@ class OLED(Elaboratable):
                 with m.Else():
                     m.d.sync += remaining.eq(remaining - 1)
                     m.next = "PRINT: DATA: WAIT"
+
+        with m.State("PRINT: DATA: LOC ADJUST: STROBED LOCATOR, NEEDS SCROLL"):
+            m.d.sync += self.locator.i_stb.eq(0)
+            m.next = "PRINT: DATA: LOC ADJUST: UNSTROBED LOCATOR, NEEDS SCROLL"
+
+        with m.State("PRINT: DATA: LOC ADJUST: UNSTROBED LOCATOR, NEEDS SCROLL"):
+            with m.If(~self.locator.o_busy):
+                m.next = "PRINT: DATA: SCROLL"
+
+        with m.State("PRINT: DATA: SCROLL"):
+            # need to (a) change the display offset, (b) clear the row, (c)
+            # adjust our internal estimation of where we are to compensate for
+            # the offset change.
+            with m.If(remaining == 1):
+                m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
+                m.next = "IDLE"
+            with m.Else():
+                m.d.sync += remaining.eq(remaining - 1)
+                m.next = "PRINT: DATA: WAIT"
