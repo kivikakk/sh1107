@@ -101,13 +101,7 @@ class Top(Elaboratable):
             ]
         else:
             ports += [
-                # self.oled.i2c_i_fifo_w_data,
-                # self.oled.i2c_i_fifo_w_en,
-                # self.oled.i2c_i_stb,
-                # self.oled.i2c_o_ack,
-                # self.oled.i2c_o_busy,
-                # self.oled.i2c_o_fifo_w_rdy,
-                # self.oled.i2c_o_fifo_r_rdy,
+                self.oled.i2c_i_ack_in,
             ]
         return ports
 

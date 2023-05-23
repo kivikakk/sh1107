@@ -14,13 +14,25 @@ const InnerI2CConnector = union(enum) {
 i2c_connector: InnerI2CConnector,
 parser: ?Cmd.Parser = null,
 
+pub const Tick = union(enum) {
+    Pass,
+    Addressed,
+    Error,
+    Fish,
+    Byte: u8,
+};
+
+pub const RW = enum(u1) {
+    W = 0,
+    R = 1,
+};
+
 pub fn tick(self: *@This(), fpga_thread: *FPGAThread) void {
     switch (self.i2c_connector) {
         inline else => |*i2c_connector| {
             switch (i2c_connector.tick()) {
                 .Pass => {},
                 .Addressed => {
-                    std.debug.print("addressed\n", .{});
                     self.parser = .{};
                 },
                 .Error => {

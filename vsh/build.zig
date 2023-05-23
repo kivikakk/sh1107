@@ -3,7 +3,7 @@ const gkBuild = @import("vendor/zig-gamekit/build.zig");
 
 pub fn build(b: *std.Build) void {
     const yosys_data_dir = b.option([]const u8, "yosys_data_dir", "yosys data dir (e.g. per yosys-config --datdir)") orelse
-        guess_yosys_data_dir(b);
+        guessYosysDataDir(b);
     const cxxrtl_lib_path = b.option([]const u8, "cxxrtl_lib_path", "path to CXXRTL-compiled .o") orelse
         "../build/sh1107.o";
 
@@ -40,7 +40,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_unit_tests.step);
 }
 
-fn guess_yosys_data_dir(b: *std.Build) []const u8 {
+fn guessYosysDataDir(b: *std.Build) []const u8 {
     const result = std.ChildProcess.exec(.{
         .allocator = b.allocator,
         .argv = &.{ "yosys-config", "--datdir" },

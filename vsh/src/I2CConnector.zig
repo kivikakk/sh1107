@@ -1,6 +1,10 @@
 const std = @import("std");
 
 const Cxxrtl = @import("./Cxxrtl.zig");
+const Tick = @import("./OLEDConnector.zig").Tick;
+const RW = @import("./OLEDConnector.zig").RW;
+const Value = @import("./Value.zig").Value;
+const track = @import("./Value.zig").track;
 
 addr: u7,
 
@@ -35,24 +39,11 @@ pub fn init(cxxrtl: Cxxrtl, addr: u7) @This() {
     };
 }
 
-const Tick = union(enum) {
-    Pass,
-    Addressed,
-    Error,
-    Fish,
-    Byte: u8,
-};
-
-const RW = enum(u1) {
-    W = 0,
-    R = 1,
-};
-
 pub fn tick(self: *@This()) Tick {
-    const scl_o = self.track("scl_o");
-    const scl_oe = self.track("scl_oe");
-    const sda_o = self.track("sda_o");
-    const sda_oe = self.track("sda_oe");
+    const scl_o = track(self, bool, "scl_o");
+    const scl_oe = track(self, bool, "scl_oe");
+    const sda_o = track(self, bool, "sda_o");
+    const sda_oe = track(self, bool, "sda_oe");
 
     const result = self.byte_receiver.process(scl_o, scl_oe, sda_o, sda_oe);
     switch (result) {
@@ -102,45 +93,6 @@ pub fn reset(self: *@This()) void {
     self.addressed = false;
 }
 
-const Value = struct {
-    value: bool,
-    stable: bool,
-
-    inline fn stable_high(self: Value) bool {
-        return self.stable and self.value;
-    }
-
-    inline fn stable_low(self: Value) bool {
-        return self.stable and !self.value;
-    }
-
-    inline fn falling(self: Value) bool {
-        return !self.stable and !self.value;
-    }
-
-    inline fn rising(self: Value) bool {
-        return !self.stable and self.value;
-    }
-
-    pub fn format(value: Value, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
-        _ = options;
-        _ = fmt;
-        return std.fmt.format(writer, "{} -> {}", .{
-            if (value.stable) value.value else !value.value,
-            value.value,
-        });
-    }
-};
-
-fn track(self: *@This(), comptime field: []const u8) Value {
-    const value = @field(self, field).curr();
-    defer @field(self, field ++ "_prev") = value;
-
-    const prev = @field(self, field ++ "_prev");
-
-    return .{ .value = value, .stable = value == prev };
-}
-
 const ByteReceiver = struct {
     state: enum {
         IDLE,
@@ -161,8 +113,8 @@ const ByteReceiver = struct {
         Fish,
     };
 
-    fn process(self: *ByteReceiver, scl_o: Value, scl_oe: Value, sda_o: Value, sda_oe: Value) Result {
-        const all_stable = scl_oe.stable and scl_o.stable and sda_oe.stable and sda_o.stable;
+    fn process(self: *ByteReceiver, scl_o: Value(bool), scl_oe: Value(bool), sda_o: Value(bool), sda_oe: Value(bool)) Result {
+        const all_stable = scl_oe.stable() and scl_o.stable() and sda_oe.stable() and sda_o.stable();
 
         switch (self.state) {
             .IDLE => {
@@ -181,7 +133,7 @@ const ByteReceiver = struct {
                 }
             },
             .WAIT_BIT_SCL_RISE => {
-                if (scl_oe.stable_high() and scl_o.rising() and sda_oe.stable_high() and sda_o.stable) {
+                if (scl_oe.stable_high() and scl_o.rising() and sda_oe.stable_high() and sda_o.stable()) {
                     self.bits += 1;
                     self.byte = (self.byte << 1) | @boolToInt(sda_o.value);
                     self.state = .WAIT_BIT_SCL_FALL;
@@ -192,7 +144,7 @@ const ByteReceiver = struct {
                 }
             },
             .WAIT_BIT_SCL_FALL => {
-                if (scl_oe.stable_high() and scl_o.falling() and sda_oe.stable_high() and sda_o.stable) {
+                if (scl_oe.stable_high() and scl_o.falling() and sda_oe.stable_high() and sda_o.stable()) {
                     if (self.bits == 8) {
                         self.state = .WAIT_ACK_SCL_RISE;
                         return .AckNack;
@@ -239,7 +191,7 @@ const ByteReceiver = struct {
                     self.bits = 0;
                     self.byte = 0;
                     return .ReleaseSda;
-                } else if (!(scl_oe.stable and scl_o.stable)) {
+                } else if (!(scl_oe.stable() and scl_o.stable())) {
                     self.state = .IDLE;
                     std.debug.print("WAIT_ACK_SCL_FALL: scl_oe({}), scl_o({})\n", .{ scl_oe, scl_o });
                     return .Error;

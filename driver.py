@@ -124,32 +124,6 @@ def rom(args: Namespace):
         subprocess.run(["iceprog", "-o", "0x800000", path], check=True)
 
 
-I2C_BLACK_BOX_RTLIL = """
-attribute \\cxxrtl_blackbox 1
-attribute \\blackbox 1
-module \\i2c
-    attribute \\cxxrtl_edge "p"
-    wire input 1 \\clk
-
-    wire width 9 input 2 \\fifo_w_data
-    wire input 3 \\fifo_w_en
-    wire input 4 \\stb
-
-    attribute \\cxxrtl_sync 1
-    wire output 5 \\busy
-
-    attribute \\cxxrtl_sync 1
-    wire output 6 \\ack
-
-    attribute \\cxxrtl_sync 1
-    wire output 7 \\fifo_w_rdy
-
-    attribute \\cxxrtl_sync 1
-    wire output 8 \\fifo_r_rdy
-end
-"""
-
-
 def vsh(args: Namespace):
     design = _build_top(args, speed=Hz(2_000_000))
 
@@ -160,11 +134,14 @@ def vsh(args: Namespace):
 
     yosys = cast(YosysBinary, find_yosys(lambda _: True))
 
+    with open(_path("vsh/i2c_blackbox.il"), "r") as f:
+        i2c_blackbox_rtlil = f.read()
+
     output = cast(
         str,
         cxxrtl.convert(
             design,
-            black_boxes={} if args.i2c else {"i2c": I2C_BLACK_BOX_RTLIL},
+            black_boxes={} if args.i2c else {"i2c": i2c_blackbox_rtlil},
             ports=getattr(design, "ports", []),
         ),
     )
@@ -180,11 +157,10 @@ def vsh(args: Namespace):
             "c++",
             "-DCXXRTL_INCLUDE_CAPI_IMPL",
             "-DCXXRTL_INCLUDE_VCD_CAPI_IMPL",
-            # "-I" + str(_path("vsh")),
             "-I" + str(_path("build")),
             "-I" + str(cast(Path, yosys.data_dir()) / "include"),
             "-c",
-            _path("vsh/vsh.cc"),
+            cxxrtl_cc_file if args.i2c else _path("vsh/vsh.cc"),
             "-o",
             cxxrtl_lib_path,
         ],

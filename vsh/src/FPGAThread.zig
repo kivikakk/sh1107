@@ -128,8 +128,6 @@ const State = struct {
         var allocator = gpa.allocator();
 
         const clk = self.cxxrtl.get(bool, "clk");
-        const oled_result = self.cxxrtl.get(u2, "oled o_result");
-        var last_oled_result = oled_result.curr();
 
         if (self.vcd) |*vcd| {
             vcd.sample();
@@ -155,12 +153,6 @@ const State = struct {
 
             if (self.vcd) |*vcd| {
                 vcd.sample();
-            }
-
-            const curr_oled_result = oled_result.curr();
-            if (curr_oled_result != last_oled_result) {
-                std.debug.print("oled_result -> {d}\n", .{curr_oled_result});
-                last_oled_result = curr_oled_result;
             }
         }
 

@@ -48,10 +48,11 @@ class OLED(Elaboratable):
     i2c_i_fifo_w_data: Signal
     i2c_i_fifo_w_en: Signal
     i2c_i_stb: Signal
+    i2c_i_ack_in: Signal  # For blackbox simulation only
     i2c_o_ack: Signal
     i2c_o_busy: Signal
     i2c_o_fifo_w_rdy: Signal
-    i2c_o_fifo_r_rdy: Signal
+    i2c_o_fifo_r_rdy: Signal  # For simtest only
 
     row: Signal
     col: Signal
@@ -80,10 +81,10 @@ class OLED(Elaboratable):
             self.i2c_i_fifo_w_data = Signal(9)
             self.i2c_i_fifo_w_en = Signal()
             self.i2c_i_stb = Signal()
+            self.i2c_i_ack_in = Signal()
             self.i2c_o_ack = Signal()
             self.i2c_o_busy = Signal()
             self.i2c_o_fifo_w_rdy = Signal()
-            self.i2c_o_fifo_r_rdy = Signal()
 
         self.row = Signal(range(1, 17), reset=1)
         self.col = Signal(range(1, 17), reset=1)
@@ -99,10 +100,10 @@ class OLED(Elaboratable):
                 i_fifo_w_data=self.i2c_i_fifo_w_data,
                 i_fifo_w_en=self.i2c_i_fifo_w_en,
                 i_stb=self.i2c_i_stb,
-                o_busy=self.i2c_o_busy,
+                i_ack_in=self.i2c_i_ack_in,
                 o_ack=self.i2c_o_ack,
+                o_busy=self.i2c_o_busy,
                 o_fifo_w_rdy=self.i2c_o_fifo_w_rdy,
-                o_fifo_r_rdy=self.i2c_o_fifo_r_rdy,  # XXX not used
             )
 
         m.submodules.i2c = self.i2c

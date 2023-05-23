@@ -257,14 +257,14 @@ pub const Parser = struct {
     pub fn feed(self: *Parser, byte: u8) Result {
         self.valid_finish = false;
 
-        std.debug.print("{s} ({s}) feed: {x:0>2}\n", .{ switch (self.state) {
-            .Control => "Ctrl",
-            .Command => "Cmd ",
-            .Data => "Data",
-        }, switch (self.continuation) {
-            true => " C",
-            false => "nc",
-        }, byte });
+        // std.debug.print("{s} ({s}) feed: {x:0>2}\n", .{ switch (self.state) {
+        //     .Control => "Ctrl",
+        //     .Command => "Cmd ",
+        //     .Data => "Data",
+        // }, switch (self.continuation) {
+        //     true => " C",
+        //     false => "nc",
+        // }, byte });
 
         switch (self.state) {
             .Control => {
