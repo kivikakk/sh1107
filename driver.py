@@ -41,7 +41,7 @@ def _build_top(args: Namespace, **kwargs: Any) -> Elaboratable:
     if "speed" in sig.parameters and "speed" in args:
         kwargs["speed"] = Hz(args.speed)
 
-    if args.i2c:
+    if not kwargs.get("build_i2c") and args.i2c:
         kwargs["build_i2c"] = True
 
     return klass(**kwargs)
@@ -97,7 +97,7 @@ def _print_file_between(
 
 
 def build(args: Namespace):
-    elaboratable = _build_top(args)
+    elaboratable = _build_top(args, build_i2c=True)
 
     BOARDS[args.board]().build(
         elaboratable,
