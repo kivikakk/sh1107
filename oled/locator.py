@@ -4,7 +4,7 @@ from amaranth import Mux  # pyright: ignore[reportUnknownVariableType]
 from amaranth import Elaboratable, Module, Signal
 from amaranth.build import Platform
 
-from i2c import I2C, RW, Transfer
+from i2c import RW, Transfer
 from .sh1107 import Cmd, ControlByte
 
 __all__ = ["Locator"]
@@ -44,18 +44,22 @@ class Locator(Elaboratable):
         self.o_i2c_fifo_w_en = Signal()
         self.o_i2c_i_stb = Signal()
 
-    def connect_i2c_in(self, m: Module, i2c: I2C):
+    def connect_i2c_in(
+        self, m: Module, *, o_fifo_w_rdy: Signal, o_busy: Signal, o_ack: Signal
+    ):
         m.d.comb += [
-            self.i_i2c_fifo_w_rdy.eq(i2c.o_fifo_w_rdy),
-            self.i_i2c_o_busy.eq(i2c.o_busy),
-            self.i_i2c_o_ack.eq(i2c.o_ack),
+            self.i_i2c_fifo_w_rdy.eq(o_fifo_w_rdy),
+            self.i_i2c_o_busy.eq(o_busy),
+            self.i_i2c_o_ack.eq(o_ack),
         ]
 
-    def connect_i2c_out(self, m: Module, i2c: I2C):
+    def connect_i2c_out(
+        self, m: Module, *, i_fifo_w_data: Signal, i_fifo_w_en: Signal, i_stb: Signal
+    ):
         m.d.comb += [
-            i2c.i_fifo_w_data.eq(self.o_i2c_fifo_w_data),
-            i2c.i_fifo_w_en.eq(self.o_i2c_fifo_w_en),
-            i2c.i_stb.eq(self.o_i2c_i_stb),
+            i_fifo_w_data.eq(self.o_i2c_fifo_w_data),
+            i_fifo_w_en.eq(self.o_i2c_fifo_w_en),
+            i_stb.eq(self.o_i2c_i_stb),
         ]
 
     def elaborate(self, platform: Optional[Platform]) -> Module:

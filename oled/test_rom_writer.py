@@ -31,8 +31,18 @@ class TestROMWriterTop(Elaboratable):
         m.submodules.i2c = self.i2c
         m.submodules.rom_writer = self.rom_writer
 
-        self.rom_writer.connect_i2c_in(m, self.i2c)
-        self.rom_writer.connect_i2c_out(m, self.i2c)
+        self.rom_writer.connect_i2c_in(
+            m,
+            o_fifo_w_rdy=self.i2c.o_fifo_w_rdy,
+            o_busy=self.i2c.o_busy,
+            o_ack=self.i2c.o_ack,
+        )
+        self.rom_writer.connect_i2c_out(
+            m,
+            i_fifo_w_data=self.i2c.i_fifo_w_data,
+            i_fifo_w_en=self.i2c.i_fifo_w_en,
+            i_stb=self.i2c.i_stb,
+        )
 
         return m
 

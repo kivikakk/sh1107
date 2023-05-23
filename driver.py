@@ -125,9 +125,9 @@ def rom(args: Namespace):
         subprocess.run(["iceprog", "-o", "0x800000", path], check=True)
 
 
-I2C_BLACK_BOX_SOURCE = """
+I2C_BLACK_BOX_RTLIL = """
 attribute \\cxxrtl_blackbox 1
-# attribute \\blackbox 1
+attribute \\blackbox 1
 module \\i2c
     attribute \\cxxrtl_edge "p"
     wire input 1 \\clk
@@ -171,7 +171,7 @@ def vsh(args: Namespace):
         str,
         cxxrtl.convert(
             design,
-            black_boxes={} if args.i2c else {"i2c": I2C_BLACK_BOX_SOURCE},
+            black_boxes={} if args.i2c else {"i2c": I2C_BLACK_BOX_RTLIL},
             ports=getattr(design, "ports", []),
         ),
     )

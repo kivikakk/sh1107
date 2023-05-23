@@ -64,6 +64,7 @@ class Top(Elaboratable):
     oled: OLED
     test_sequence: list[int]
     speed: Hz
+    build_i2c: bool
 
     switch: Signal
 
@@ -79,6 +80,7 @@ class Top(Elaboratable):
         self.oled = OLED(speed=speed, build_i2c=build_i2c)
         self.test_sequence = test_sequence
         self.speed = speed
+        self.build_i2c = build_i2c
 
         self.switch = Signal()
 
@@ -88,14 +90,26 @@ class Top(Elaboratable):
 
     @property
     def ports(self) -> list[Signal]:
-        return [
-            self.switch,
-            self.oled.i2c.scl_o,
-            self.oled.i2c.scl_oe,
-            self.oled.i2c.sda_o,
-            self.oled.i2c.sda_oe,
-            self.oled.i2c.sda_i,
-        ]
+        ports = [self.switch]
+        if self.build_i2c:
+            ports += [
+                self.oled.i2c.scl_o,
+                self.oled.i2c.scl_oe,
+                self.oled.i2c.sda_o,
+                self.oled.i2c.sda_oe,
+                self.oled.i2c.sda_i,
+            ]
+        else:
+            ports += [
+                # self.oled.i2c_i_fifo_w_data,
+                # self.oled.i2c_i_fifo_w_en,
+                # self.oled.i2c_i_stb,
+                # self.oled.i2c_o_ack,
+                # self.oled.i2c_o_busy,
+                # self.oled.i2c_o_fifo_w_rdy,
+                # self.oled.i2c_o_fifo_r_rdy,
+            ]
+        return ports
 
     def elaborate(self, platform: Optional[Platform]):
         m = Module()
