@@ -1,6 +1,6 @@
 from typing import Final, Optional
 
-from amaranth import Elaboratable, Instance, Module, Signal
+from amaranth import ClockSignal, Elaboratable, Instance, Module, Signal
 from amaranth.build import Platform
 from amaranth.lib.enum import IntEnum
 from amaranth.lib.fifo import SyncFIFO
@@ -35,7 +35,9 @@ class OLED(Elaboratable):
         BUSY = 1
         FAILURE = 2
 
-    i2c: I2C
+    build_i2c: bool
+
+    i2c: I2C | Instance
     rom_writer: ROMWriter
     locator: Locator
     clser: Clser
@@ -56,6 +58,8 @@ class OLED(Elaboratable):
     cursor: Signal
 
     def __init__(self, *, speed: Hz, build_i2c: bool):
+        self.build_i2c = build_i2c
+
         self.rom_writer = ROMWriter(addr=OLED.ADDR)
         self.locator = Locator(addr=OLED.ADDR)
         self.clser = Clser(addr=OLED.ADDR)
@@ -80,16 +84,6 @@ class OLED(Elaboratable):
             self.i2c_o_busy = Signal()
             self.i2c_o_fifo_w_rdy = Signal()
             self.i2c_o_fifo_r_rdy = Signal()
-            self.i2c = Instance(
-                "i2c",
-                i_fifo_w_data=self.i2c_i_fifo_w_data,
-                i_fifo_w_en=self.i2c_i_fifo_w_en,
-                i_stb=self.i2c_i_stb,
-                o_ack=self.i2c_o_ack,
-                o_busy=self.i2c_o_busy,
-                o_fifo_w_rdy=self.i2c_o_fifo_w_rdy,
-                o_fifo_r_rdy=self.i2c_o_fifo_r_rdy,
-            )
 
         self.row = Signal(range(1, 17), reset=1)
         self.col = Signal(range(1, 17), reset=1)
@@ -97,6 +91,19 @@ class OLED(Elaboratable):
 
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
+
+        if not self.build_i2c:
+            self.i2c = Instance(
+                "i2c",
+                i_clk=ClockSignal(),
+                i_fifo_w_data=self.i2c_i_fifo_w_data,
+                i_fifo_w_en=self.i2c_i_fifo_w_en,
+                i_stb=self.i2c_i_stb,
+                o_busy=self.i2c_o_busy,
+                o_ack=self.i2c_o_ack,
+                o_fifo_w_rdy=self.i2c_o_fifo_w_rdy,
+                o_fifo_r_rdy=self.i2c_o_fifo_r_rdy,  # XXX not used
+            )
 
         m.submodules.i2c = self.i2c
         m.submodules.rom_writer = self.rom_writer

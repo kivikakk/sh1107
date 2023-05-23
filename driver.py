@@ -26,7 +26,6 @@ from common import Hz
 from formal import formal as prep_formal
 from i2c import I2C
 from oled import ROM
-from oled.top import TEST_SEQUENCE_WITHOUT_INITIALISE
 
 BOARDS: Dict[str, Type[Platform]] = {
     "icebreaker": ICEBreakerPlatform,
@@ -132,33 +131,27 @@ module \\i2c
     attribute \\cxxrtl_edge "p"
     wire input 1 \\clk
 
-    wire input 2 \\en
-
-    wire width 9 input 3 \\i_fifo_w_data
-    wire input 4 \\i_fifo_w_en
-    wire input 5 \\i_stb
+    wire width 9 input 2 \\fifo_w_data
+    wire input 3 \\fifo_w_en
+    wire input 4 \\stb
 
     attribute \\cxxrtl_sync 1
-    wire output 6 \\o_busy
+    wire output 5 \\busy
 
     attribute \\cxxrtl_sync 1
-    wire output 7 \\o_ack
+    wire output 6 \\ack
 
     attribute \\cxxrtl_sync 1
-    wire output 8 \\o_fifo_w_rdy
+    wire output 7 \\fifo_w_rdy
 
     attribute \\cxxrtl_sync 1
-    wire output 9 \\o_fifo_r_rdy
+    wire output 8 \\fifo_r_rdy
 end
 """
 
 
 def vsh(args: Namespace):
-    design = _build_top(
-        args,
-        # test_sequence=TEST_SEQUENCE_WITHOUT_INITIALISE,
-        speed=Hz(2_000_000),
-    )
+    design = _build_top(args, speed=Hz(2_000_000))
 
     # NOTE(ari): works better on Windows since osscad's yosys-config a) doesn't
     # execute cleanly automatically (bash script), and b) its answers are wrong
@@ -187,11 +180,11 @@ def vsh(args: Namespace):
             "c++",
             "-DCXXRTL_INCLUDE_CAPI_IMPL",
             "-DCXXRTL_INCLUDE_VCD_CAPI_IMPL",
-            "-I" + str(_path("vsh")),
+            # "-I" + str(_path("vsh")),
             "-I" + str(_path("build")),
             "-I" + str(cast(Path, yosys.data_dir()) / "include"),
             "-c",
-            cxxrtl_cc_file,
+            _path("vsh/vsh.cc"),
             "-o",
             cxxrtl_lib_path,
         ],
