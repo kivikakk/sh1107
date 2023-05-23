@@ -12,6 +12,8 @@ from .locator import Locator
 from .rom import OFFSET_CHAR, OFFSET_DISPLAY_OFF, OFFSET_DISPLAY_ON
 from .rom_writer import ROMWriter
 
+# from .sh1107 import Cmd
+
 __all__ = ["OLED"]
 
 
@@ -28,7 +30,7 @@ class OLED(Elaboratable):
         CURSOR_ON = 0x06
         CURSOR_OFF = 0x07
 
-    class Result(IntEnum):
+    class Result(IntEnum, shape=2):
         SUCCESS = 0
         BUSY = 1
         FAILURE = 2
@@ -49,8 +51,11 @@ class OLED(Elaboratable):
     col: Signal
     cursor: Signal
 
-    def __init__(self, *, speed: Hz):
-        self.i2c = I2C(speed=speed)
+    def __init__(self, *, speed: Hz, build_i2c: bool):
+        if build_i2c:
+            self.i2c = I2C(speed=speed)
+        else:
+            self.i2c = None
         self.rom_writer = ROMWriter(addr=OLED.ADDR)
         self.locator = Locator(addr=OLED.ADDR)
         self.clser = Clser(addr=OLED.ADDR)
@@ -86,15 +91,15 @@ class OLED(Elaboratable):
         with m.Elif(self.clser.o_busy):
             self.clser.connect_i2c_out(m, self.i2c)
         with m.Else():
-            m.d.comb += self.i2c.fifo.w_data.eq(self.i2c_fifo_w_data)
-            m.d.comb += self.i2c.fifo.w_en.eq(self.i2c_fifo_w_en)
+            m.d.comb += self.i2c.i_fifo_w_data.eq(self.i2c_fifo_w_data)
+            m.d.comb += self.i2c.i_fifo_w_en.eq(self.i2c_fifo_w_en)
             m.d.comb += self.i2c.i_stb.eq(self.i2c_i_stb)
 
         # TODO: actually flash cursor when on
 
         with m.FSM():
             with m.State("IDLE"):
-                with m.If(self.i_fifo.r_rdy & self.i2c.fifo.w_rdy):
+                with m.If(self.i_fifo.r_rdy & self.i2c.o_fifo_w_rdy):
                     m.d.sync += self.i_fifo.r_en.eq(1)
                     m.d.sync += self.o_result.eq(OLED.Result.BUSY)
                     m.next = "START: STROBED I_FIFO R_EN"
@@ -300,7 +305,7 @@ class OLED(Elaboratable):
                 m.next = "PRINT: DATA: SCROLL"
 
         with m.State("PRINT: DATA: PAGE ADJUST"):
-            with m.If(self.i2c.fifo.w_rdy):
+            with m.If(self.i2c.o_fifo_w_rdy):
                 m.d.sync += self.locator.i_row.eq(self.row)
                 m.d.sync += self.locator.i_col.eq(0)
                 m.d.sync += self.locator.i_stb.eq(1)
@@ -327,6 +332,7 @@ class OLED(Elaboratable):
             with m.If(~self.locator.o_busy):
                 m.next = "PRINT: DATA: SCROLL"
 
+        # offset_cmd = Cmd.SetDisplayOffset(8).to_bytes()
         with m.State("PRINT: DATA: SCROLL"):
             # need to (a) change the display offset, (b) clear the row, (c)
             # adjust our internal estimation of where we are to compensate for

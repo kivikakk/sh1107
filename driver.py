@@ -42,6 +42,9 @@ def _build_top(args: Namespace, **kwargs: Any) -> Elaboratable:
     if "speed" in sig.parameters and "speed" in args:
         kwargs["speed"] = Hz(args.speed)
 
+    if args.i2c:
+        kwargs["build_i2c"] = True
+
     return klass(**kwargs)
 
 
@@ -122,9 +125,39 @@ def rom(args: Namespace):
         subprocess.run(["iceprog", "-o", "0x800000", path], check=True)
 
 
+I2C_BLACK_BOX_SOURCE = """
+attribute \\cxxrtl_blackbox 1
+# attribute \\blackbox 1
+module \\i2c
+    attribute \\cxxrtl_edge "p"
+    wire input 1 \\clk
+
+    wire input 2 \\en
+
+    wire width 9 input 3 \\i_fifo_w_data
+    wire input 4 \\i_fifo_w_en
+    wire input 5 \\i_stb
+
+    attribute \\cxxrtl_sync 1
+    wire output 6 \\o_busy
+
+    attribute \\cxxrtl_sync 1
+    wire output 7 \\o_ack
+
+    attribute \\cxxrtl_sync 1
+    wire output 8 \\o_fifo_w_rdy
+
+    attribute \\cxxrtl_sync 1
+    wire output 9 \\o_fifo_r_rdy
+end
+"""
+
+
 def vsh(args: Namespace):
     design = _build_top(
-        args, test_sequence=TEST_SEQUENCE_WITHOUT_INITIALISE, speed=Hz(2_000_000)
+        args,
+        # test_sequence=TEST_SEQUENCE_WITHOUT_INITIALISE,
+        speed=Hz(2_000_000),
     )
 
     # NOTE(ari): works better on Windows since osscad's yosys-config a) doesn't
@@ -134,7 +167,14 @@ def vsh(args: Namespace):
 
     yosys = cast(YosysBinary, find_yosys(lambda _: True))
 
-    output = cast(str, cxxrtl.convert(design, ports=getattr(design, "ports", [])))
+    output = cast(
+        str,
+        cxxrtl.convert(
+            design,
+            black_boxes={} if args.i2c else {"i2c": I2C_BLACK_BOX_SOURCE},
+            ports=getattr(design, "ports", []),
+        ),
+    )
     cxxrtl_cc_file = _path("build/sh1107.cc")
     with open(cxxrtl_cc_file, "w") as f:
         f.write(output)
@@ -249,6 +289,12 @@ def main():
         help="run the Virtual SH1107",
     )
     vsh_parser.set_defaults(func=vsh)
+    vsh_parser.add_argument(
+        "-i",
+        "--i2c",
+        action="store_true",
+        help="simulate the full I2C protocol; by default it is replaced with a blackbox for speed",
+    )
     vsh_parser.add_argument(
         "-t",
         "--top",

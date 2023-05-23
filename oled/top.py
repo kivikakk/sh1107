@@ -74,8 +74,9 @@ class Top(Elaboratable):
         *,
         test_sequence: list[int] = TEST_SEQUENCE_WITH_INITIALISE,
         speed: Hz = Hz(1_000_000),
+        build_i2c: bool = False,
     ):
-        self.oled = OLED(speed=speed)
+        self.oled = OLED(speed=speed, build_i2c=build_i2c)
         self.test_sequence = test_sequence
         self.speed = speed
 

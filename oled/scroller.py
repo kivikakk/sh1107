@@ -7,10 +7,10 @@ from amaranth.build import Platform
 from i2c import I2C, RW, Transfer
 from .sh1107 import Cmd, ControlByte
 
-__all__ = ["Locator"]
+__all__ = ["Scroller"]
 
 
-class Locator(Elaboratable):
+class Scroller(Elaboratable):
     addr: int
 
     i_row: Signal
@@ -46,15 +46,15 @@ class Locator(Elaboratable):
 
     def connect_i2c_in(self, m: Module, i2c: I2C):
         m.d.comb += [
-            self.i_i2c_fifo_w_rdy.eq(i2c.fifo.w_rdy),
+            self.i_i2c_fifo_w_rdy.eq(i2c.o_fifo_w_rdy),
             self.i_i2c_o_busy.eq(i2c.o_busy),
             self.i_i2c_o_ack.eq(i2c.o_ack),
         ]
 
     def connect_i2c_out(self, m: Module, i2c: I2C):
         m.d.comb += [
-            i2c.fifo.w_data.eq(self.o_i2c_fifo_w_data),
-            i2c.fifo.w_en.eq(self.o_i2c_fifo_w_en),
+            i2c.i_fifo_w_data.eq(self.o_i2c_fifo_w_data),
+            i2c.i_fifo_w_en.eq(self.o_i2c_fifo_w_en),
             i2c.i_stb.eq(self.o_i2c_i_stb),
         ]
 

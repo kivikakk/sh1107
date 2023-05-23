@@ -29,20 +29,19 @@ def synchronise(i2c: I2C, start_value: int, *, wait_steps: int = 20) -> sim.Gene
             yield Delay(sim.clock())
 
         assert not (yield i2c.i_stb)
-        if (yield i2c.fifo.w_en):
+        if (yield i2c.i_fifo_w_en):
             break
     else:
         raise AssertionError(f"I2C didn't start in {wait_steps} steps")
 
-    assert (yield i2c.fifo.w_data) == start_value
-    assert not (yield i2c.fifo.r_rdy)
+    assert (yield i2c.i_fifo_w_data) == start_value
+    assert not (yield i2c.o_fifo_r_rdy)
     yield Delay(sim.clock())
 
     # Data is enqueued, we're strobing I2C.  Lines still high.
     assert (yield i2c.i_stb)
-    assert not (yield i2c.fifo.w_en)
-    assert (yield i2c.fifo.r_rdy)
-    assert (yield i2c.fifo.r_level) == 1
+    assert not (yield i2c.i_fifo_w_en)
+    assert (yield i2c.o_fifo_r_rdy)
 
     assert (yield i2c.scl_o)
     assert (yield i2c.sda_o)
@@ -172,19 +171,19 @@ def send(
     for bit in range(8):
         if bit == 0:
             if isinstance(next, int):
-                assert (yield i2c.fifo.r_rdy)
+                assert (yield i2c.o_fifo_r_rdy)
                 assert (
-                    yield i2c.fifo.w_data
-                ) == next, f"checking next: expected {next:02x}, got {(yield i2c.fifo.w_data):02x}"
+                    yield i2c.i_fifo_w_data
+                ) == next, f"checking next: expected {next:02x}, got {(yield i2c.i_fifo_w_data):02x}"
             elif next == "STOP":
                 assert not (
-                    yield i2c.fifo.r_rdy
-                ), f"checking next: expected empty FIFO, contained ({(yield i2c.fifo.w_data):02x})"
+                    yield i2c.o_fifo_r_rdy
+                ), f"checking next: expected empty FIFO, contained ({(yield i2c.i_fifo_w_data):02x})"
 
         yield from wait_scl(i2c, 1)
 
         if bit == 0 and isinstance(next, int):
-            assert not (yield i2c.fifo.w_en)
+            assert not (yield i2c.i_fifo_w_en)
         actual = (actual << 1) | (yield i2c.sda_o)
 
         yield from wait_scl(i2c, 0, sda_o=ValueChange.STEADY)
@@ -239,7 +238,7 @@ def steady_stopped(i2c: I2C, *, wait_steps: int = 5) -> sim.Generator:
         assert (yield i2c.scl_o)
         assert (yield i2c.sda_o)
 
-    assert not (yield i2c.fifo.r_rdy)
+    assert not (yield i2c.o_fifo_r_rdy)
     assert not (yield i2c.o_busy)
 
 

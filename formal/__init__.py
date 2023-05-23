@@ -38,6 +38,6 @@ def formal() -> Tuple[Module, list[Signal | Value]]:
         sync_rst,
         dut.i_stb,
         dut.rw,
-        dut.fifo.w_data,
-        dut.fifo.w_en,
+        dut.i_fifo_w_data,
+        dut.i_fifo_w_en,
     ]
