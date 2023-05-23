@@ -43,17 +43,24 @@ Supply](https://www.crowdsupply.com/1bitsquared/icebreaker-fpga),
 SDA, A2 to SCL.
 
 Maybe the most interesting thing right now is the Virtual SH1107 for testing the
-gateware:
+gateware. It emulates the internal state of the SH1107 device — what you see
+rendered is what you should see on the display.
 
-[<img alt="screenshot of the Virtual SH1107 testbench" src="doc/vsh.png" height="300">](doc/vsh.png) [<img alt="photo of the OLED device being run on an iCEBreaker" src="doc/helloworld.jpg" height="300">](doc/helloworld.jpg)
+[<img alt="screenshot of the Virtual SH1107 testbench" src="doc/vsh.png"
+height="300">](doc/vsh.png) [<img alt="photo of the OLED device being run on an
+iCEBreaker" src="doc/helloworld.jpg" height="300">](doc/helloworld.jpg)
 
 Initially this was implemented in Python and ran cooperatively with Amaranth's
 own simulator, like the unit tests, but it was pretty slow. It's now written in
 [Zig](https://ziglang.org), and interacts with the simulated hardware running on
 its own thread by compiling it to C++ through Yosys's [CXXRTL
-backend](https://github.com/YosysHQ/yosys/tree/master/backends/cxxrtl). It's
-less slow. Could be better!
+backend](https://github.com/YosysHQ/yosys/tree/master/backends/cxxrtl).
 
-It responds to the gateware somewhat permissively (edge detection at I²C level),
-emulating the internal state of the SH1107 device. What you see rendered is what
-you should see on the display.
+At the most fine-grained level (`vsh -i`), it responds to the gateware just
+somewhat permissively — edge detection at I²C level. This method is less slow
+than the pure Python version.
+
+By default, though, the I²C circuit is stubbed out with a [blackbox](vsh/vsh.cc)
+that acts close enough to the real controller for the rest of the design, and
+the Virtual SH1107 spies on the inputs to the blackbox directly. This is _much_
+faster.
