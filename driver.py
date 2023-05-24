@@ -160,7 +160,7 @@ def vsh(args: Namespace):
             "-I" + str(_path("build")),
             "-I" + str(cast(Path, yosys.data_dir()) / "include"),
             "-c",
-            cxxrtl_cc_file if args.i2c else _path("vsh/vsh.cc"),
+            cxxrtl_cc_file if args.i2c else _path("vsh/i2c_blackbox.cc"),
             "-o",
             cxxrtl_lib_path,
         ],

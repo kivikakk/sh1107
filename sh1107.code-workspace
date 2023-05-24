@@ -35,9 +35,6 @@
 			"../amaranth-soc",
 			"../amaranth-boards",
 		],
-		"python.analysis.exclude": [
-			"vendor/amlib"
-		],
 		"python.analysis.diagnosticSeverityOverrides": {
 			"reportUnknownMemberType": "none",
 			"reportInconsistentConstructor": "none",
@@ -72,6 +69,7 @@
 			"--ignore=E501,E203,W503,F821",
 		],
 		"clangd.fallbackFlags": [
+			"-I${workspaceFolder}/../osscad/share/yosys/include",
 			"-I${workspaceFolder}/../oss-cad-suite/share/yosys/include",
 			"-I${workspaceFolder}/build",
 		],
