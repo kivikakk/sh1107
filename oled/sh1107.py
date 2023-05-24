@@ -338,7 +338,13 @@ class Cmd:
             return [0xA6 | self.reverse]
 
     class SetDisplayOffset(Base):
-        # POR is 0
+        """
+        The first *column* displayed is "offset"; i.e. increment repeatedly by 1
+        to slowly wrap the display in a leftward direction until fully wrapped.
+
+        POR is 0
+        """
+
         def __init__(self, offset: int):
             assert 0 <= offset <= 0x7F
             self.offset = offset
@@ -532,7 +538,12 @@ class Cmd:
             return [0xDB, self.level]
 
     class SetDisplayStartColumn(Base):
-        # POR is 0
+        """
+        Despite the name, this XXX
+
+        POR is 0
+        """
+
         def __init__(self, column: int):
             assert 0 <= column <= 0x7F
             self.column = column

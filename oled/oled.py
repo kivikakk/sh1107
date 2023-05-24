@@ -11,8 +11,7 @@ from .clser import Clser
 from .locator import Locator
 from .rom import OFFSET_CHAR, OFFSET_DISPLAY_OFF, OFFSET_DISPLAY_ON
 from .rom_writer import ROMWriter
-
-# from .sh1107 import Cmd
+from .scroller import Scroller
 
 __all__ = ["OLED"]
 
@@ -41,6 +40,7 @@ class OLED(Elaboratable):
     rom_writer: ROMWriter
     locator: Locator
     clser: Clser
+    scroller: Scroller
 
     i_fifo: SyncFIFO
     i_i2c_ack_in: Signal  # For blackbox simulation only
@@ -60,6 +60,7 @@ class OLED(Elaboratable):
         self.rom_writer = ROMWriter(addr=OLED.ADDR)
         self.locator = Locator(addr=OLED.ADDR)
         self.clser = Clser(addr=OLED.ADDR)
+        self.scroller = Scroller(addr=OLED.ADDR)
 
         self.i_fifo = SyncFIFO(width=8, depth=1)
         self.i_i2c_ack_in = Signal()
@@ -93,6 +94,8 @@ class OLED(Elaboratable):
         m.submodules.rom_writer = self.rom_writer
         m.submodules.locator = self.locator
         m.submodules.clser = self.clser
+        m.submodules.scroller = self.scroller
+
         m.submodules.i_fifo = self.i_fifo
 
         with m.If(self.rom_writer.o_busy):
@@ -101,6 +104,8 @@ class OLED(Elaboratable):
             m.d.comb += self.i2c_bus.connect(self.locator.i2c_bus)
         with m.Elif(self.clser.o_busy):
             m.d.comb += self.i2c_bus.connect(self.clser.i2c_bus)
+        with m.Elif(self.scroller.o_busy):
+            m.d.comb += self.i2c_bus.connect(self.scroller.i2c_bus)
         with m.Else():
             m.d.comb += [
                 self.i2c_bus.i_fifo_w_data.eq(0),
@@ -345,14 +350,19 @@ class OLED(Elaboratable):
             with m.If(~self.locator.o_busy):
                 m.next = "PRINT: DATA: SCROLL"
 
-        # offset_cmd = Cmd.SetDisplayOffset(8).to_bytes()
         with m.State("PRINT: DATA: SCROLL"):
-            # need to (a) change the display offset, (b) clear the row, (c)
-            # adjust our internal estimation of where we are to compensate for
-            # the offset change.
-            with m.If(remaining == 1):
-                m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
-                m.next = "IDLE"
-            with m.Else():
-                m.d.sync += remaining.eq(remaining - 1)
-                m.next = "PRINT: DATA: WAIT"
+            m.d.sync += self.scroller.i_stb.eq(1)
+            m.next = "PRINT: DATA: SCROLL: STROBED SCROLLER"
+
+        with m.State("PRINT: DATA: SCROLL: STROBED SCROLLER"):
+            m.d.sync += self.scroller.i_stb.eq(0)
+            m.next = "PRINT: DATA: SCROLL: UNSTROBED SCROLLER"
+
+        with m.State("PRINT: DATA: SCROLL: UNSTROBED SCROLLER"):
+            with m.If(~self.scroller.o_busy):
+                with m.If(remaining == 1):
+                    m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
+                    m.next = "IDLE"
+                with m.Else():
+                    m.d.sync += remaining.eq(remaining - 1)
+                    m.next = "PRINT: DATA: WAIT"

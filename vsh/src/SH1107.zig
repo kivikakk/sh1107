@@ -115,7 +115,7 @@ pub fn cmd(self: *@This(), c: Cmd.Command) void {
             self.reversed = reverse;
         },
         .SetDisplayOffset => |offset| {
-            self.start_line = offset;
+            self.start_column = offset;
         },
         .SetDCDC => |on| {
             self.dcdc = on;
@@ -141,7 +141,7 @@ pub fn cmd(self: *@This(), c: Cmd.Command) void {
             self.vcom_desel = level;
         },
         .SetDisplayStartColumn => |column| {
-            self.start_column = column;
+            self.start_line = column;
         },
         .ReadModifyWrite => {
             @panic("not impl");

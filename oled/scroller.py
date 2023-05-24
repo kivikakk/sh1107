@@ -1,6 +1,5 @@
 from typing import Optional
 
-from amaranth import Mux  # pyright: ignore[reportUnknownVariableType]
 from amaranth import Elaboratable, Module, Signal
 from amaranth.build import Platform
 
@@ -13,8 +12,6 @@ __all__ = ["Scroller"]
 class Scroller(Elaboratable):
     addr: int
 
-    i_row: Signal
-    i_col: Signal
     i_stb: Signal
 
     o_busy: Signal
@@ -24,8 +21,6 @@ class Scroller(Elaboratable):
     def __init__(self, *, addr: int):
         self.addr = addr
 
-        self.i_row = Signal(range(17))
-        self.i_col = Signal(range(17))
         self.i_stb = Signal()
 
         self.o_busy = Signal()
@@ -36,6 +31,12 @@ class Scroller(Elaboratable):
         m = Module()
 
         transfer = Transfer(self.i2c_bus.i_fifo_w_data)
+
+        # need to (a) change the display offset, (b) clear the row, (c)
+        # adjust our internal estimation of where we are to compensate for
+        # the offset change.
+        offset_cmd = Cmd.SetDisplayOffset(8).to_bytes()
+        assert len(offset_cmd) == 2
 
         with m.FSM():
             with m.State("IDLE"):
@@ -70,64 +71,33 @@ class Scroller(Elaboratable):
                 with m.If(
                     self.i2c_bus.o_busy & self.i2c_bus.o_ack & self.i2c_bus.o_fifo_w_rdy
                 ):
-                    with m.If(self.i_row != 0):
-                        byte = Cmd.SetPageAddress(0x00).to_byte() + self.i_row - 1
-                        m.d.sync += transfer.payload.data.eq(byte)
-                        m.d.sync += self.i2c_bus.i_fifo_w_en.eq(1)
-                        m.next = "START: ROW: STROBED W_EN"
-                    with m.Elif(self.i_col != 0):
-                        self.start_col(m)
-                        m.next = "START: COL LOWER: STROBED W_EN"
-                    with m.Else():
-                        m.d.sync += self.o_busy.eq(0)
-                        m.next = "IDLE"
+                    m.d.sync += transfer.payload.data.eq(offset_cmd[0])
+                    m.d.sync += self.i2c_bus.i_fifo_w_en.eq(1)
+                    m.next = "START: OFFSET_CMD[0]: STROBED W_EN"
                 with m.Elif(~self.i2c_bus.o_busy):
                     m.d.sync += self.o_busy.eq(0)
                     m.next = "IDLE"
 
-            with m.State("START: ROW: STROBED W_EN"):
+            with m.State("START: OFFSET_CMD[0]: STROBED W_EN"):
                 m.d.sync += self.i2c_bus.i_fifo_w_en.eq(0)
-                m.next = "START: ROW: UNSTROBED W_EN"
+                m.next = "START: OFFSET_CMD[0]: UNSTROBED W_EN"
 
-            with m.State("START: ROW: UNSTROBED W_EN"):
-                with m.If(self.i_col != 0):
-                    with m.If(
-                        self.i2c_bus.o_busy
-                        & self.i2c_bus.o_ack
-                        & self.i2c_bus.o_fifo_w_rdy
-                    ):
-                        self.start_col(m)
-                        m.next = "START: COL LOWER: STROBED W_EN"
-                    with m.Elif(~self.i2c_bus.o_busy):
-                        m.d.sync += self.o_busy.eq(0)
-                        m.next = "IDLE"
-                with m.Elif(~self.i2c_bus.o_busy):
-                    m.d.sync += self.o_busy.eq(0)
-                    m.next = "IDLE"
-
-            with m.State("START: COL LOWER: STROBED W_EN"):
-                m.d.sync += self.i2c_bus.i_fifo_w_en.eq(0)
-                m.next = "START: COL LOWER: UNSTROBED W_EN"
-
-            with m.State("START: COL LOWER: UNSTROBED W_EN"):
+            with m.State("START: OFFSET_CMD[0]: UNSTROBED W_EN"):
                 with m.If(
                     self.i2c_bus.o_busy & self.i2c_bus.o_ack & self.i2c_bus.o_fifo_w_rdy
                 ):
-                    byte = Cmd.SetHigherColumnAddress(0x00).to_byte() + (
-                        (self.i_col - 1) >> 1
-                    )
-                    m.d.sync += transfer.payload.data.eq(byte)
+                    m.d.sync += transfer.payload.data.eq(offset_cmd[1])
                     m.d.sync += self.i2c_bus.i_fifo_w_en.eq(1)
-                    m.next = "START: COL HIGHER: STROBED W_EN"
+                    m.next = "START: OFFSET_CMD[1]: STROBED W_EN"
                 with m.Elif(~self.i2c_bus.o_busy):
                     m.d.sync += self.o_busy.eq(0)
                     m.next = "IDLE"
 
-            with m.State("START: COL HIGHER: STROBED W_EN"):
+            with m.State("START: OFFSET_CMD[1]: STROBED W_EN"):
                 m.d.sync += self.i2c_bus.i_fifo_w_en.eq(0)
-                m.next = "START: COL HIGHER: UNSTROBED W_EN"
+                m.next = "START: OFFSET_CMD[1]: UNSTROBED W_EN"
 
-            with m.State("START: COL HIGHER: UNSTROBED W_EN"):
+            with m.State("START: OFFSET_CMD[1]: UNSTROBED W_EN"):
                 with m.If(
                     ~self.i2c_bus.o_busy
                     & self.i2c_bus.o_ack
