@@ -9,7 +9,7 @@
  *
  * We emulate the external interface of i2c.py's I2C module for the benefit of
  * the rest of the design, rather than the benefit of the simulation.  The
- * simulation snoops our _inputs_ and uses those directly.
+ * simulation snoops _our inputs_ and uses those directly.
  */
 
 namespace cxxrtl_design {
@@ -44,7 +44,7 @@ struct bb_p_i2c_impl : public bb_p_i2c {
     fifo_value = 0u;
 
     p_busy = wire<1>{0u};
-    p_ack = wire<1>{0u};
+    p_ack = wire<1>{1u};
     p_fifo__w__rdy = wire<1>{1u};
   }
 
