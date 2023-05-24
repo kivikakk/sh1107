@@ -101,7 +101,7 @@ class Top(Elaboratable):
             ]
         else:
             ports += [
-                self.oled.i2c_i_ack_in,
+                self.oled.i_i2c_ack_in,
             ]
         return ports
 
@@ -118,8 +118,8 @@ class Top(Elaboratable):
                 led_busy = cast(Signal, platform.request("led", 0).o)
                 led_ack = cast(Signal, platform.request("led", 1).o)
 
-                m.d.comb += led_busy.eq(self.oled.i2c.o_busy)
-                m.d.comb += led_ack.eq(self.oled.i2c.o_ack)
+                m.d.comb += led_busy.eq(self.oled.i2c_bus.o_busy)
+                m.d.comb += led_ack.eq(self.oled.i2c_bus.o_ack)
 
                 switch = cast(Signal, platform.request("button").i)
                 m.submodules.button = button = Button()
@@ -136,8 +136,8 @@ class Top(Elaboratable):
                 led_busy = cast(Signal, cast(Record, rgb.r).o)
                 led_ack = cast(Signal, cast(Record, rgb.g).o)
 
-                m.d.comb += led_busy.eq(self.oled.i2c.o_busy)
-                m.d.comb += led_ack.eq(self.oled.i2c.o_ack)
+                m.d.comb += led_busy.eq(self.oled.i2c_bus.o_busy)
+                m.d.comb += led_ack.eq(self.oled.i2c_bus.o_ack)
 
                 switch = cast(Signal, platform.request("button").i)
                 m.submodules.button = button = ButtonWithHold()

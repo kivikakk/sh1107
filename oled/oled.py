@@ -6,7 +6,7 @@ from amaranth.lib.enum import IntEnum
 from amaranth.lib.fifo import SyncFIFO
 
 from common import Hz
-from i2c import I2C
+from i2c import I2C, I2CBus
 from .clser import Clser
 from .locator import Locator
 from .rom import OFFSET_CHAR, OFFSET_DISPLAY_OFF, OFFSET_DISPLAY_ON
@@ -43,16 +43,10 @@ class OLED(Elaboratable):
     clser: Clser
 
     i_fifo: SyncFIFO
+    i_i2c_ack_in: Signal  # For blackbox simulation only
     o_result: Signal
 
-    i2c_i_fifo_w_data: Signal
-    i2c_i_fifo_w_en: Signal
-    i2c_i_stb: Signal
-    i2c_i_ack_in: Signal  # For blackbox simulation only
-    i2c_o_ack: Signal
-    i2c_o_busy: Signal
-    i2c_o_fifo_w_rdy: Signal
-    i2c_o_fifo_r_rdy: Signal  # For simtest only
+    i2c_bus: I2CBus
 
     row: Signal
     col: Signal
@@ -61,30 +55,17 @@ class OLED(Elaboratable):
     def __init__(self, *, speed: Hz, build_i2c: bool):
         self.build_i2c = build_i2c
 
+        if build_i2c:
+            self.i2c = I2C(speed=speed)
         self.rom_writer = ROMWriter(addr=OLED.ADDR)
         self.locator = Locator(addr=OLED.ADDR)
         self.clser = Clser(addr=OLED.ADDR)
 
         self.i_fifo = SyncFIFO(width=8, depth=1)
+        self.i_i2c_ack_in = Signal()
         self.o_result = Signal(OLED.Result)
 
-        if build_i2c:
-            self.i2c = I2C(speed=speed)
-            self.i2c_i_fifo_w_data = self.i2c.i_fifo_w_data
-            self.i2c_i_fifo_w_en = self.i2c.i_fifo_w_en
-            self.i2c_i_stb = self.i2c.i_stb
-            self.i2c_o_ack = self.i2c.o_ack
-            self.i2c_o_busy = self.i2c.o_busy
-            self.i2c_o_fifo_w_rdy = self.i2c.o_fifo_w_rdy
-            self.i2c_o_fifo_r_rdy = self.i2c.o_fifo_r_rdy
-        else:
-            self.i2c_i_fifo_w_data = Signal(9)
-            self.i2c_i_fifo_w_en = Signal()
-            self.i2c_i_stb = Signal()
-            self.i2c_i_ack_in = Signal()
-            self.i2c_o_ack = Signal()
-            self.i2c_o_busy = Signal()
-            self.i2c_o_fifo_w_rdy = Signal()
+        self.i2c_bus = I2CBus()
 
         self.row = Signal(range(1, 17), reset=1)
         self.col = Signal(range(1, 17), reset=1)
@@ -93,17 +74,19 @@ class OLED(Elaboratable):
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
 
-        if not self.build_i2c:
+        if self.build_i2c:
+            m.d.comb += self.i2c.bus.connect(self.i2c_bus)
+        else:
             self.i2c = Instance(
                 "i2c",
                 i_clk=ClockSignal(),
-                i_fifo_w_data=self.i2c_i_fifo_w_data,
-                i_fifo_w_en=self.i2c_i_fifo_w_en,
-                i_stb=self.i2c_i_stb,
-                i_ack_in=self.i2c_i_ack_in,
-                o_ack=self.i2c_o_ack,
-                o_busy=self.i2c_o_busy,
-                o_fifo_w_rdy=self.i2c_o_fifo_w_rdy,
+                i_fifo_w_data=self.i2c_bus.i_fifo_w_data,
+                i_fifo_w_en=self.i2c_bus.i_fifo_w_en,
+                i_stb=self.i2c_bus.i_stb,
+                i_ack_in=self.i_i2c_ack_in,
+                o_ack=self.i2c_bus.o_ack,
+                o_busy=self.i2c_bus.o_busy,
+                o_fifo_w_rdy=self.i2c_bus.o_fifo_w_rdy,
             )
 
         m.submodules.i2c = self.i2c
@@ -112,56 +95,24 @@ class OLED(Elaboratable):
         m.submodules.clser = self.clser
         m.submodules.i_fifo = self.i_fifo
 
-        self.rom_writer.connect_i2c_in(
-            m,
-            o_fifo_w_rdy=self.i2c_o_fifo_w_rdy,
-            o_busy=self.i2c_o_busy,
-            o_ack=self.i2c_o_ack,
-        )
-        self.locator.connect_i2c_in(
-            m,
-            o_fifo_w_rdy=self.i2c_o_fifo_w_rdy,
-            o_busy=self.i2c_o_busy,
-            o_ack=self.i2c_o_ack,
-        )
-        self.clser.connect_i2c_in(
-            m,
-            o_fifo_w_rdy=self.i2c_o_fifo_w_rdy,
-            o_busy=self.i2c_o_busy,
-            o_ack=self.i2c_o_ack,
-        )
-
         with m.If(self.rom_writer.o_busy):
-            self.rom_writer.connect_i2c_out(
-                m,
-                i_fifo_w_data=self.i2c_i_fifo_w_data,
-                i_fifo_w_en=self.i2c_i_fifo_w_en,
-                i_stb=self.i2c_i_stb,
-            )
+            m.d.comb += self.i2c_bus.connect(self.rom_writer.i2c_bus)
         with m.Elif(self.locator.o_busy):
-            self.locator.connect_i2c_out(
-                m,
-                i_fifo_w_data=self.i2c_i_fifo_w_data,
-                i_fifo_w_en=self.i2c_i_fifo_w_en,
-                i_stb=self.i2c_i_stb,
-            )
+            m.d.comb += self.i2c_bus.connect(self.locator.i2c_bus)
         with m.Elif(self.clser.o_busy):
-            self.clser.connect_i2c_out(
-                m,
-                i_fifo_w_data=self.i2c_i_fifo_w_data,
-                i_fifo_w_en=self.i2c_i_fifo_w_en,
-                i_stb=self.i2c_i_stb,
-            )
+            m.d.comb += self.i2c_bus.connect(self.clser.i2c_bus)
         with m.Else():
-            m.d.comb += self.i2c_i_fifo_w_data.eq(0)
-            m.d.comb += self.i2c_i_fifo_w_en.eq(0)
-            m.d.comb += self.i2c_i_stb.eq(0)
+            m.d.comb += [
+                self.i2c_bus.i_fifo_w_data.eq(0),
+                self.i2c_bus.i_fifo_w_en.eq(0),
+                self.i2c_bus.i_stb.eq(0),
+            ]
 
         # TODO: actually flash cursor when on
 
         with m.FSM():
             with m.State("IDLE"):
-                with m.If(self.i_fifo.r_rdy & self.i2c_o_fifo_w_rdy):
+                with m.If(self.i_fifo.r_rdy & self.i2c_bus.o_fifo_w_rdy):
                     m.d.sync += self.i_fifo.r_en.eq(1)
                     m.d.sync += self.o_result.eq(OLED.Result.BUSY)
                     m.next = "START: STROBED I_FIFO R_EN"
@@ -367,7 +318,7 @@ class OLED(Elaboratable):
                 m.next = "PRINT: DATA: SCROLL"
 
         with m.State("PRINT: DATA: PAGE ADJUST"):
-            with m.If(self.i2c_o_fifo_w_rdy):
+            with m.If(self.i2c_bus.o_fifo_w_rdy):
                 m.d.sync += self.locator.i_row.eq(self.row)
                 m.d.sync += self.locator.i_col.eq(0)
                 m.d.sync += self.locator.i_stb.eq(1)

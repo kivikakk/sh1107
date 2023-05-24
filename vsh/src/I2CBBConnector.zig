@@ -32,7 +32,7 @@ pub fn init(cxxrtl: Cxxrtl, addr: u7) I2CBBConnector {
     const fifo_w_data = cxxrtl.get(u9, "oled i2c fifo_w_data");
     const fifo_w_en = cxxrtl.get(bool, "oled i2c fifo_w_en");
     const stb = cxxrtl.get(bool, "oled i2c stb");
-    const ack_in = cxxrtl.get(bool, "i2c_i_ack_in");
+    const ack_in = cxxrtl.get(bool, "i_i2c_ack_in");
     const busy = cxxrtl.get(bool, "oled i2c busy");
 
     return .{

@@ -17,7 +17,4 @@ module \i2c
 
     attribute \cxxrtl_sync 1
     wire output 8 \fifo_w_rdy
-
-    # attribute \cxxrtl_sync 1
-    # wire output 9 \fifo_r_rdy
 end

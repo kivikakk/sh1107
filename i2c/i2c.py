@@ -1,7 +1,8 @@
 from typing import Final, Optional, Self, cast
 
-from amaranth import Elaboratable, Module, Signal
+from amaranth import Elaboratable, Module, Record, Signal
 from amaranth.build import Attrs, Platform
+from amaranth.hdl.rec import DIR_FANIN, DIR_FANOUT
 from amaranth.lib import data, enum
 from amaranth.lib.fifo import SyncFIFO
 from amaranth.lib.io import Pin
@@ -13,7 +14,7 @@ from amaranth_boards.resources import (
 
 from common import Counter, Hz
 
-__all__ = ["I2C", "RW", "Transfer"]
+__all__ = ["I2C", "I2CBus", "RW", "Transfer"]
 
 
 class RW(enum.IntEnum, shape=1):
@@ -59,6 +60,22 @@ class Transfer(data.Struct):
     kind: Kind
 
 
+class I2CBus(Record):
+    def __init__(self):
+        super().__init__(
+            [
+                ("i_fifo_w_data", 9, DIR_FANIN),
+                ("i_fifo_w_en", 1, DIR_FANIN),
+                ("i_stb", 1, DIR_FANIN),
+                ("o_ack", 1, DIR_FANOUT),
+                ("o_busy", 1, DIR_FANOUT),
+                ("o_fifo_w_rdy", 1, DIR_FANOUT),
+                ("o_fifo_r_rdy", 1, DIR_FANOUT),
+            ]
+        )
+        self.fields["o_ack"].reset = 1
+
+
 class I2C(Elaboratable):
     """
     I2C controller.
@@ -97,14 +114,7 @@ class I2C(Elaboratable):
     _fifo: SyncFIFO
     _fifo_r_data: Transfer
 
-    i_fifo_w_data: Signal
-    i_fifo_w_en: Signal
-    i_stb: Signal
-
-    o_busy: Signal
-    o_ack: Signal
-    o_fifo_w_rdy: Signal
-    o_fifo_r_rdy: Signal
+    bus: I2CBus
 
     sda: Pin
     scl: Pin
@@ -128,14 +138,7 @@ class I2C(Elaboratable):
         self._fifo = SyncFIFO(width=9, depth=1)
         self._fifo_r_data = Transfer(target=self._fifo.r_data)
 
-        self.i_fifo_w_data = self._fifo.w_data
-        self.i_fifo_w_en = self._fifo.w_en  # XXX(Ch): eq() en comb?
-        self.i_stb = Signal()
-
-        self.o_busy = Signal()
-        self.o_ack = Signal(reset=1)
-        self.o_fifo_w_rdy = self._fifo.w_rdy  # XXX(Ch): como anteriormente
-        self.o_fifo_r_rdy = self._fifo.r_rdy  # XXX(Ch): como anteriormente
+        self.bus = I2CBus()
 
         self.assign(scl=Pin(1, "io", name="scl"), sda=Pin(1, "io", name="sda"))
         self.sda_i.reset = 1
@@ -160,6 +163,13 @@ class I2C(Elaboratable):
         m = Module()
 
         m.submodules.fifo = self._fifo
+
+        m.d.comb += [
+            self._fifo.w_data.eq(self.bus.i_fifo_w_data),
+            self._fifo.w_en.eq(self.bus.i_fifo_w_en),
+            self.bus.o_fifo_w_rdy.eq(self._fifo.w_rdy),
+            self.bus.o_fifo_r_rdy.eq(self._fifo.r_rdy),
+        ]
 
         match platform:
             case ICEBreakerPlatform():
@@ -223,9 +233,9 @@ class I2C(Elaboratable):
                 m.d.sync += self.sda_o.eq(1)
                 m.d.sync += self.scl_o.eq(1)
 
-                with m.If(self.i_stb):
-                    m.d.sync += self.o_busy.eq(1)
-                    m.d.sync += self.o_ack.eq(1)
+                with m.If(self.bus.i_stb):
+                    m.d.sync += self.bus.o_busy.eq(1)
+                    m.d.sync += self.bus.o_ack.eq(1)
                     m.d.sync += self.next_byte.eq(I2C.NextByte.IDLE)
                     m.d.sync += self.sda_o.eq(0)
                     m.d.sync += c.en.eq(1)
@@ -277,15 +287,17 @@ class I2C(Elaboratable):
             with m.State("ACK BIT: SCL HIGH"):
                 with m.If(c.o_half):
                     # Read ACK. SDA should be brought low by the addressee.
-                    m.d.sync += self.o_ack.eq(~self.sda_i)
+                    m.d.sync += self.bus.o_ack.eq(~self.sda_i)
                     m.d.sync += self.sda_oe.eq(1)
                 with m.Elif(c.o_full):
                     with m.If(self.next_byte == I2C.NextByte.READY):
-                        with m.If(self.o_ack & (self.byte.kind == Transfer.Kind.DATA)):
+                        with m.If(
+                            self.bus.o_ack & (self.byte.kind == Transfer.Kind.DATA)
+                        ):
                             m.d.sync += self.byte_ix.eq(0)
                             m.next = "DATA BIT: SCL LOW"
                         with m.Elif(
-                            self.o_ack & (self.byte.kind == Transfer.Kind.START)
+                            self.bus.o_ack & (self.byte.kind == Transfer.Kind.START)
                         ):
                             m.d.sync += self.rw.eq(self.byte.payload.start.rw)
                             m.d.sync += self.byte.eq(self.byte)
@@ -328,7 +340,7 @@ class I2C(Elaboratable):
                 with m.Elif(c.o_full):
                     # Turn off the clock to keep SCL high.
                     m.d.sync += c.en.eq(0)
-                    m.d.sync += self.o_busy.eq(0)
+                    m.d.sync += self.bus.o_busy.eq(0)
                     m.d.sync += self.scl_o.eq(1)
                     m.next = "IDLE"
 
