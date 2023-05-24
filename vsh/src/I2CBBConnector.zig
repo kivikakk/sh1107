@@ -3,56 +3,46 @@ const std = @import("std");
 const Cxxrtl = @import("./Cxxrtl.zig");
 const Tick = @import("./OLEDConnector.zig").Tick;
 const RW = @import("./OLEDConnector.zig").RW;
-const Value = @import("./Value.zig").Value;
-const track = @import("./Value.zig").track;
+const Sample = @import("./Sample.zig").Sample;
 
 const I2CBBConnector = @This();
 
 addr: u7,
 
 addressed: bool = false,
-
 latched_fifo_data: u9 = undefined,
 
-fifo_w_data: Cxxrtl.Object(u9),
-fifo_w_data_prev: u9 = 0,
-
-fifo_w_en_prev: bool = false,
-fifo_w_en: Cxxrtl.Object(bool),
-
-stb: Cxxrtl.Object(bool),
-stb_prev: bool = false,
-
+fifo_w_data: Sample(u9),
+fifo_w_en: Sample(bool),
+stb: Sample(bool),
+busy: Sample(bool),
 ack_in: Cxxrtl.Object(bool),
 
-busy: Cxxrtl.Object(bool),
-busy_prev: bool = false,
-
 pub fn init(cxxrtl: Cxxrtl, addr: u7) I2CBBConnector {
-    const fifo_w_data = cxxrtl.get(u9, "oled i2c fifo_w_data");
-    const fifo_w_en = cxxrtl.get(bool, "oled i2c fifo_w_en");
-    const stb = cxxrtl.get(bool, "oled i2c stb");
+    const fifo_w_data = Sample(u9).init(cxxrtl, "oled i2c fifo_w_data", 0);
+    const fifo_w_en = Sample(bool).init(cxxrtl, "oled i2c fifo_w_en", false);
+    const stb = Sample(bool).init(cxxrtl, "oled i2c stb", false);
+    const busy = Sample(bool).init(cxxrtl, "oled i2c busy", false);
     const ack_in = cxxrtl.get(bool, "i_i2c_ack_in");
-    const busy = cxxrtl.get(bool, "oled i2c busy");
 
     return .{
         .addr = addr,
         .fifo_w_data = fifo_w_data,
         .fifo_w_en = fifo_w_en,
         .stb = stb,
-        .ack_in = ack_in,
         .busy = busy,
+        .ack_in = ack_in,
     };
 }
 
 pub fn tick(self: *I2CBBConnector) Tick {
-    const fifo_w_data = track(self, u9, "fifo_w_data");
-    const fifo_w_en = track(self, bool, "fifo_w_en");
-    const stb = track(self, bool, "stb");
-    const busy = track(self, bool, "busy");
+    const fifo_w_data = self.fifo_w_data.tick();
+    const fifo_w_en = self.fifo_w_en.tick();
+    const stb = self.stb.tick();
+    const busy = self.busy.tick();
 
     if (fifo_w_en.rising()) {
-        self.latched_fifo_data = fifo_w_data.value;
+        self.latched_fifo_data = fifo_w_data.curr;
 
         if (self.addressed) {
             if ((self.latched_fifo_data & 0x100) == 0x100) {

@@ -3,30 +3,24 @@ const std = @import("std");
 const Cxxrtl = @import("./Cxxrtl.zig");
 const Tick = @import("./OLEDConnector.zig").Tick;
 const RW = @import("./OLEDConnector.zig").RW;
-const Value = @import("./Value.zig").Value;
-const track = @import("./Value.zig").track;
+const Sample = @import("./Sample.zig").Sample;
 
 addr: u7,
 
 byte_receiver: ByteReceiver = .{},
 addressed: bool = false,
 
-scl_o: Cxxrtl.Object(bool),
-scl_oe: Cxxrtl.Object(bool),
-sda_o: Cxxrtl.Object(bool),
-sda_oe: Cxxrtl.Object(bool),
+scl_o: Sample(bool),
+scl_oe: Sample(bool),
+sda_o: Sample(bool),
+sda_oe: Sample(bool),
 sda_i: Cxxrtl.Object(bool),
 
-scl_o_prev: bool = false,
-scl_oe_prev: bool = false,
-sda_o_prev: bool = false,
-sda_oe_prev: bool = false,
-
 pub fn init(cxxrtl: Cxxrtl, addr: u7) @This() {
-    const scl_o = cxxrtl.get(bool, "scl__o");
-    const scl_oe = cxxrtl.get(bool, "scl__oe");
-    const sda_o = cxxrtl.get(bool, "sda__o");
-    const sda_oe = cxxrtl.get(bool, "sda__oe");
+    const scl_o = Sample(bool).init(cxxrtl, "scl__o", false);
+    const scl_oe = Sample(bool).init(cxxrtl, "scl__oe", false);
+    const sda_o = Sample(bool).init(cxxrtl, "sda__o", false);
+    const sda_oe = Sample(bool).init(cxxrtl, "sda__oe", false);
     const sda_i = cxxrtl.get(bool, "sda__i");
 
     return .{
@@ -40,10 +34,10 @@ pub fn init(cxxrtl: Cxxrtl, addr: u7) @This() {
 }
 
 pub fn tick(self: *@This()) Tick {
-    const scl_o = track(self, bool, "scl_o");
-    const scl_oe = track(self, bool, "scl_oe");
-    const sda_o = track(self, bool, "sda_o");
-    const sda_oe = track(self, bool, "sda_oe");
+    const scl_o = self.scl_o.tick();
+    const scl_oe = self.scl_oe.tick();
+    const sda_o = self.sda_o.tick();
+    const sda_oe = self.sda_oe.tick();
 
     const result = self.byte_receiver.process(scl_o, scl_oe, sda_o, sda_oe);
     switch (result) {
@@ -113,7 +107,7 @@ const ByteReceiver = struct {
         Fish,
     };
 
-    fn process(self: *ByteReceiver, scl_o: Value(bool), scl_oe: Value(bool), sda_o: Value(bool), sda_oe: Value(bool)) Result {
+    fn process(self: *ByteReceiver, scl_o: *const Sample(bool), scl_oe: *const Sample(bool), sda_o: *const Sample(bool), sda_oe: *const Sample(bool)) Result {
         const all_stable = scl_oe.stable() and scl_o.stable() and sda_oe.stable() and sda_o.stable();
 
         switch (self.state) {
@@ -135,7 +129,7 @@ const ByteReceiver = struct {
             .WAIT_BIT_SCL_RISE => {
                 if (scl_oe.stable_high() and scl_o.rising() and sda_oe.stable_high() and sda_o.stable()) {
                     self.bits += 1;
-                    self.byte = (self.byte << 1) | @boolToInt(sda_o.value);
+                    self.byte = (self.byte << 1) | @boolToInt(sda_o.curr);
                     self.state = .WAIT_BIT_SCL_FALL;
                 } else if (!scl_oe.stable_high() or !sda_oe.stable_high()) {
                     self.state = .IDLE;

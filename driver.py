@@ -168,14 +168,14 @@ def vsh(args: Namespace):
     )
 
     cmd: list[str] = ["zig", "build"]
-    if not args.build_only:
+    if not args.compile:
         cmd += ["run"]
     cmd += [
         *(["-Doptimize=ReleaseFast"] if args.opt else []),
         f"-Dyosys_data_dir={yosys.data_dir()}",
         f"-Dcxxrtl_lib_path={cxxrtl_lib_path}",
     ]
-    if not args.build_only:
+    if not args.compile:
         cmd += ["--"]
         if args.vcd:
             cmd += ["--vcd"]
@@ -265,6 +265,12 @@ def main():
         help="simulate the full I2C protocol; by default it is replaced with a blackbox for speed",
     )
     vsh_parser.add_argument(
+        "-c",
+        "--compile",
+        action="store_true",
+        help="compile only; don't run",
+    )
+    vsh_parser.add_argument(
         "-t",
         "--top",
         help="which top-level module to simulate (default: oled.Top)",
@@ -275,12 +281,6 @@ def main():
         "--vcd",
         action="store_true",
         help="output a VCD file",
-    )
-    vsh_parser.add_argument(
-        "-b",
-        "--build-only",
-        action="store_true",
-        help="only build the Virtual SH1107, don't run it",
     )
     vsh_parser.add_argument(
         "-O",
