@@ -60,7 +60,7 @@ At the most fine-grained level (`vsh -i`), it responds to the gateware just
 somewhat permissively — edge detection at I²C level. This method is less slow
 than the pure Python version.
 
-By default, though, the I²C circuit is stubbed out with a [blackbox](vsh/vsh.cc)
-that acts close enough to the real controller for the rest of the design, and
-the Virtual SH1107 spies on the inputs to the blackbox directly. This is _much_
-faster.
+By default, though, the I²C circuit is stubbed out with a
+[blackbox](vsh/i2c_blackbox.cc) that acts close enough to the real controller
+for the rest of the design, and the Virtual SH1107 spies on the inputs to the
+blackbox directly. This is _much_ faster.
