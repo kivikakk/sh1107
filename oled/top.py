@@ -9,12 +9,17 @@ from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
 from common import Button, ButtonWithHold, Hz
 from .oled import OLED
 
-__all__ = ["Top", "TEST_SEQUENCE_WITHOUT_INITIALISE", "TEST_SEQUENCE_WITH_INITIALISE"]
+__all__ = ["Top"]
 
 msg1 = "Nyonk\n plonk"
 msg2 = "14: Hej\n 15: Mm\n  16: Z!\n   17: :)"
-TEST_SEQUENCE_WITHOUT_INITIALISE = [
+TEST_SEQUENCE = [
+    0x02,  # DISPLAY_OFF
+    0x03,  # CLS
     0x01,  # DISPLAY_ON
+    0x04,
+    0x01,
+    0x01,  # LOCATE 1, 1
     0x05,
     len(msg1),
     *[ord(c) for c in msg1],  # PRINT msg1
@@ -26,12 +31,6 @@ TEST_SEQUENCE_WITHOUT_INITIALISE = [
     *[ord(c) for c in msg2],  # PRINT msg2
     0x06,  # CURSOR_ON
 ]
-
-test_initialise = [
-    0x02,  # DISPLAY_OFF
-    0x03,  # CLS
-]
-TEST_SEQUENCE_WITH_INITIALISE = test_initialise + TEST_SEQUENCE_WITHOUT_INITIALISE
 
 # msg = "Hello, world! This should wrap correctly."
 # TEST_SEQUENCE = [
@@ -73,7 +72,7 @@ class Top(Elaboratable):
     def __init__(
         self,
         *,
-        test_sequence: list[int] = TEST_SEQUENCE_WITH_INITIALISE,
+        test_sequence: list[int] = TEST_SEQUENCE,
         speed: Hz = Hz(1_000_000),
         build_i2c: bool = False,
     ):

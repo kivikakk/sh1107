@@ -290,10 +290,14 @@ class Cmd:
         def to_bytes(self) -> list[int]:
             return [0xA0 | self.adc]
 
-    # NOTE(AEC): I really don't quite understand what this does and
-    # need to play around with it on the hardware.
     class SetMultiplexRatio(Base):
-        # POR is 128
+        """
+        Seems to mean: how many columns to actually draw.  Needs to be called
+        for different sizes of display to work correctly.
+
+        POR is 128
+        """
+
         def __init__(self, ratio: int):
             assert 0x01 <= ratio <= 0x80
             self.ratio = ratio
@@ -339,8 +343,13 @@ class Cmd:
 
     class SetDisplayOffset(Base):
         """
-        The first *column* displayed is "offset"; i.e. increment repeatedly by 1
-        to slowly wrap the display in a leftward direction until fully wrapped.
+        This appears to do exactly the same thing as SetDisplayStartLine on my
+        hardware; the image is scrolled (and wrapped) left.
+
+        Internally this appears to be done by changing which COMx is used for
+        each column, but I'm not sure it .. matters?  It doesn't appear to have
+        any different effect when we change COM scan direction or remap seg
+        either.
 
         POR is 0
         """
@@ -537,9 +546,15 @@ class Cmd:
         def to_bytes(self) -> list[int]:
             return [0xDB, self.level]
 
-    class SetDisplayStartColumn(Base):
+    class SetDisplayStartLine(Base):
         """
-        Despite the name, this XXX
+        The datasheet says this is the one to use for smooth scrolling. Notably,
+        it specifies the _column address_ for COM0.  If you start at 0 and go up
+        through 127, you'll smoothly move the contents of the display left
+        (wrapping around to the right), one pixel at a time.
+
+        Note that it has nothing to do with rows — this is a horizontal scroll
+        only.
 
         POR is 0
         """

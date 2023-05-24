@@ -165,12 +165,14 @@ fn drawTop(self: *Display, sh1107: *const SH1107) void {
     tds.fmt("contrast", "{x:0>2}", .{sh1107.contrast});
 
     tds.row();
-    tds.fmt("start", "{x:0>2}/{x:0>2}", .{ sh1107.start_line, sh1107.start_column });
+    tds.fmt("start", "{x:0>2}/{x:0>2}", .{ sh1107.start_line, sh1107.start_line });
     tds.fmt("address", "{x:0>2}/{x:0>2}", .{ sh1107.page_address, sh1107.column_address });
     tds.fmt("mode", "{s}", .{sh1107.addressing_mode.str()});
     tds.fmt("multiplex", "{x:0>2}", .{sh1107.multiplex});
 
     tds.row();
+    tds.fmt("offset", "{x:0>2}", .{sh1107.start_offset});
+    tds.fmt("start", "{x:0>2}", .{sh1107.start_line});
     tds.check("seg remap", sh1107.segment_remap == .Flipped);
     tds.check("com rev", sh1107.com_scan_dir == .Backwards);
 }
@@ -198,10 +200,12 @@ fn drawOLED(self: *Display, sh1107: *const SH1107) void {
             DisplayBase.on_border,
         );
 
-        const factor = if (sh1107.com_scan_dir == .Backwards) @as(f32, -1) else @as(f32, 1);
-        const scale = @intToFloat(f32, DisplayBase.display_scale) * factor;
+        const x_factor = if (sh1107.com_scan_dir == .Backwards) @as(f32, -1) else @as(f32, 1);
+        const x_scale = @intToFloat(f32, DisplayBase.display_scale) * x_factor;
         const shift = if (sh1107.com_scan_dir == .Backwards) @intToFloat(f32, DisplayBase.i2c_width) else 0;
         const display_scale = @intToFloat(f32, DisplayBase.display_scale);
+
+        const start_line = sh1107.start_line +% sh1107.start_offset;
 
         gk.gfx.draw.texScaleXYRegion(
             self.img,
@@ -210,28 +214,28 @@ fn drawOLED(self: *Display, sh1107: *const SH1107) void {
                 .y = @intToFloat(f32, DisplayBase.padding + DisplayBase.border_width + DisplayBase.top_area),
             },
             .{
-                .x = @intToFloat(f32, sh1107.start_column),
+                .x = @intToFloat(f32, start_line),
                 .y = 0,
-                .w = @intToFloat(f32, DisplayBase.i2c_width - sh1107.start_column),
+                .w = @intToFloat(f32, DisplayBase.i2c_width - start_line),
                 .h = @intToFloat(f32, DisplayBase.i2c_height),
             },
-            scale,
+            x_scale,
             DisplayBase.display_scale,
         );
-        if (sh1107.start_column > 0) {
+        if (start_line > 0) {
             gk.gfx.draw.texScaleXYRegion(
                 self.img,
                 .{
-                    .x = @intToFloat(f32, DisplayBase.padding + DisplayBase.border_width) + (shift + @intToFloat(f32, DisplayBase.i2c_width - sh1107.start_column) * factor) * display_scale,
+                    .x = @intToFloat(f32, DisplayBase.padding + DisplayBase.border_width) + (shift + @intToFloat(f32, DisplayBase.i2c_width - start_line) * x_factor) * display_scale,
                     .y = @intToFloat(f32, DisplayBase.padding + DisplayBase.border_width + DisplayBase.top_area),
                 },
                 .{
                     .x = 0,
                     .y = 0,
-                    .w = @intToFloat(f32, sh1107.start_column),
+                    .w = @intToFloat(f32, start_line),
                     .h = @intToFloat(f32, DisplayBase.i2c_height),
                 },
-                scale,
+                x_scale,
                 DisplayBase.display_scale,
             );
         }

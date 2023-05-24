@@ -35,7 +35,8 @@ class Scroller(Elaboratable):
         # need to (a) change the display offset, (b) clear the row, (c)
         # adjust our internal estimation of where we are to compensate for
         # the offset change.
-        offset_cmd = Cmd.SetDisplayOffset(8).to_bytes()
+        # TODO
+        offset_cmd = Cmd.SetDisplayStartLine(0).to_bytes()
         assert len(offset_cmd) == 2
 
         with m.FSM():

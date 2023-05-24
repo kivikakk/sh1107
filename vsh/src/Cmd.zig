@@ -40,7 +40,7 @@ pub const Command = union(enum) {
         discharge: u4,
     },
     SetVCOMDeselectLevel: u8,
-    SetDisplayStartColumn: u7,
+    SetDisplayStartLine: u7,
     ReadModifyWrite,
     End,
     Nop,
@@ -207,7 +207,7 @@ pub const Command = union(enum) {
                 return null;
             }
             if (bytes.len == 2) {
-                return .{ .SetDisplayStartColumn = @truncate(u7, bytes[1]) };
+                return .{ .SetDisplayStartLine = @truncate(u7, bytes[1]) };
             }
             return error.Unrecoverable;
         }

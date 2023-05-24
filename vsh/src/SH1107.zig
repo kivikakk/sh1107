@@ -76,7 +76,7 @@ all_on: bool = false,
 reversed: bool = false,
 contrast: u8 = 0x80,
 start_line: u7 = 0,
-start_column: u7 = 0,
+start_offset: u7 = 0,
 page_address: u4 = 0,
 column_address: u7 = 0,
 addressing_mode: AddrMode = .Page,
@@ -115,7 +115,7 @@ pub fn cmd(self: *@This(), c: Cmd.Command) void {
             self.reversed = reverse;
         },
         .SetDisplayOffset => |offset| {
-            self.start_column = offset;
+            self.start_offset = offset;
         },
         .SetDCDC => |on| {
             self.dcdc = on;
@@ -140,7 +140,7 @@ pub fn cmd(self: *@This(), c: Cmd.Command) void {
         .SetVCOMDeselectLevel => |level| {
             self.vcom_desel = level;
         },
-        .SetDisplayStartColumn => |column| {
+        .SetDisplayStartLine => |column| {
             self.start_line = column;
         },
         .ReadModifyWrite => {
