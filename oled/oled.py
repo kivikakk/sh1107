@@ -81,13 +81,13 @@ class OLED(Elaboratable):
             self.i2c = Instance(
                 "i2c",
                 i_clk=ClockSignal(),
-                i_fifo_w_data=self.i2c_bus.i_fifo_w_data,
-                i_fifo_w_en=self.i2c_bus.i_fifo_w_en,
+                i_in_fifo_w_data=self.i2c_bus.i_in_fifo_w_data,
+                i_in_fifo_w_en=self.i2c_bus.i_in_fifo_w_en,
                 i_stb=self.i2c_bus.i_stb,
                 i_ack_in=self.i_i2c_ack_in,
                 o_ack=self.i2c_bus.o_ack,
                 o_busy=self.i2c_bus.o_busy,
-                o_fifo_w_rdy=self.i2c_bus.o_fifo_w_rdy,
+                o_in_fifo_w_rdy=self.i2c_bus.o_in_fifo_w_rdy,
             )
 
         m.submodules.i2c = self.i2c
@@ -108,8 +108,8 @@ class OLED(Elaboratable):
             m.d.comb += self.i2c_bus.connect(self.scroller.i2c_bus)
         with m.Else():
             m.d.comb += [
-                self.i2c_bus.i_fifo_w_data.eq(0),
-                self.i2c_bus.i_fifo_w_en.eq(0),
+                self.i2c_bus.i_in_fifo_w_data.eq(0),
+                self.i2c_bus.i_in_fifo_w_en.eq(0),
                 self.i2c_bus.i_stb.eq(0),
             ]
 
@@ -117,7 +117,7 @@ class OLED(Elaboratable):
 
         with m.FSM():
             with m.State("IDLE"):
-                with m.If(self.i_fifo.r_rdy & self.i2c_bus.o_fifo_w_rdy):
+                with m.If(self.i_fifo.r_rdy & self.i2c_bus.o_in_fifo_w_rdy):
                     m.d.sync += self.i_fifo.r_en.eq(1)
                     m.d.sync += self.o_result.eq(OLED.Result.BUSY)
                     m.next = "START: STROBED I_FIFO R_EN"
@@ -323,7 +323,7 @@ class OLED(Elaboratable):
                 m.next = "PRINT: DATA: SCROLL"
 
         with m.State("PRINT: DATA: PAGE ADJUST"):
-            with m.If(self.i2c_bus.o_fifo_w_rdy):
+            with m.If(self.i2c_bus.o_in_fifo_w_rdy):
                 m.d.sync += self.locator.i_row.eq(self.row)
                 m.d.sync += self.locator.i_col.eq(0)
                 m.d.sync += self.locator.i_stb.eq(1)

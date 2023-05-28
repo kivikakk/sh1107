@@ -12,23 +12,23 @@ addr: u7,
 addressed: bool = false,
 latched_fifo_data: u9 = undefined,
 
-fifo_w_data: Sample(u9),
-fifo_w_en: Sample(bool),
+in_fifo_w_data: Sample(u9),
+in_fifo_w_en: Sample(bool),
 stb: Sample(bool),
 busy: Sample(bool),
 ack_in: Cxxrtl.Object(bool),
 
 pub fn init(cxxrtl: Cxxrtl, addr: u7) I2CBBConnector {
-    const fifo_w_data = Sample(u9).init(cxxrtl, "oled i2c fifo_w_data", 0);
-    const fifo_w_en = Sample(bool).init(cxxrtl, "oled i2c fifo_w_en", false);
+    const in_fifo_w_data = Sample(u9).init(cxxrtl, "oled i2c in_fifo_w_data", 0);
+    const in_fifo_w_en = Sample(bool).init(cxxrtl, "oled i2c in_fifo_w_en", false);
     const stb = Sample(bool).init(cxxrtl, "oled i2c stb", false);
     const busy = Sample(bool).init(cxxrtl, "oled i2c busy", false);
     const ack_in = cxxrtl.get(bool, "i_i2c_ack_in");
 
     return .{
         .addr = addr,
-        .fifo_w_data = fifo_w_data,
-        .fifo_w_en = fifo_w_en,
+        .in_fifo_w_data = in_fifo_w_data,
+        .in_fifo_w_en = in_fifo_w_en,
         .stb = stb,
         .busy = busy,
         .ack_in = ack_in,
@@ -36,13 +36,13 @@ pub fn init(cxxrtl: Cxxrtl, addr: u7) I2CBBConnector {
 }
 
 pub fn tick(self: *I2CBBConnector) Tick {
-    const fifo_w_data = self.fifo_w_data.tick();
-    const fifo_w_en = self.fifo_w_en.tick();
+    const in_fifo_w_data = self.in_fifo_w_data.tick();
+    const in_fifo_w_en = self.in_fifo_w_en.tick();
     const stb = self.stb.tick();
     const busy = self.busy.tick();
 
-    if (fifo_w_en.rising()) {
-        self.latched_fifo_data = fifo_w_data.curr;
+    if (in_fifo_w_en.rising()) {
+        self.latched_fifo_data = in_fifo_w_data.curr;
 
         if (self.addressed) {
             if ((self.latched_fifo_data & 0x100) == 0x100) {

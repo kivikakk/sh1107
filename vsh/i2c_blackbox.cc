@@ -45,7 +45,7 @@ struct bb_p_i2c_impl : public bb_p_i2c {
 
     p_busy = wire<1>{0u};
     p_ack = wire<1>{1u};
-    p_fifo__w__rdy = wire<1>{1u};
+    p_in__fifo__w__rdy = wire<1>{1u};
   }
 
   bool eval() override {
@@ -68,7 +68,7 @@ struct bb_p_i2c_impl : public bb_p_i2c {
         if (this->fifo_state == FIFO_STATE_FULL) {
           this->fifo_state = FIFO_STATE_EMPTY;
           this->ticks_until_done = TICKS_TO_WAIT;
-          p_fifo__w__rdy.next = value<1>{1u};
+          p_in__fifo__w__rdy.next = value<1>{1u};
         }
 
         if (--this->ticks_until_done == 0u) {
@@ -81,10 +81,10 @@ struct bb_p_i2c_impl : public bb_p_i2c {
 
       switch (this->fifo_state) {
       case FIFO_STATE_EMPTY: {
-        if (p_fifo__w__en) {
-          this->fifo_value = p_fifo__w__data.get<uint16_t>();
+        if (p_in__fifo__w__en) {
+          this->fifo_value = p_in__fifo__w__data.get<uint16_t>();
           this->fifo_state = FIFO_STATE_FULL;
-          p_fifo__w__rdy.next = value<1>{0u};
+          p_in__fifo__w__rdy.next = value<1>{0u};
         }
         break;
       }

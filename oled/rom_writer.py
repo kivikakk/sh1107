@@ -47,7 +47,7 @@ class ROMWriter(Elaboratable):
 
         m.submodules.rom_rd = self.rom_rd
 
-        transfer = Transfer(self.i2c_bus.i_fifo_w_data)
+        transfer = Transfer(self.i2c_bus.i_in_fifo_w_data)
 
         with m.FSM():
             with m.State("IDLE"):
@@ -80,11 +80,11 @@ class ROMWriter(Elaboratable):
                 m.d.sync += transfer.kind.eq(Transfer.Kind.START)
                 m.d.sync += transfer.payload.start.addr.eq(self.addr)
                 m.d.sync += transfer.payload.start.rw.eq(RW.W)
-                m.d.sync += self.i2c_bus.i_fifo_w_en.eq(1)
+                m.d.sync += self.i2c_bus.i_in_fifo_w_en.eq(1)
                 m.next = "ADDRESS PERIPHERAL: LATCHED W_EN"
 
             with m.State("ADDRESS PERIPHERAL: LATCHED W_EN"):
-                m.d.sync += self.i2c_bus.i_fifo_w_en.eq(0)
+                m.d.sync += self.i2c_bus.i_in_fifo_w_en.eq(0)
                 m.d.sync += self.i2c_bus.i_stb.eq(1)
                 m.next = "LOOP HEAD: SEQ BREAK OR WAIT I2C"
 
@@ -94,24 +94,26 @@ class ROMWriter(Elaboratable):
                     m.d.sync += self.rom_rd.addr.eq(self.offset + 1)
                     m.d.sync += self.offset.eq(self.offset + 1)
                     m.next = "SEQ BREAK: ADDRESSED NEXTLEN[1], NEXTLEN[0] AVAILABLE"
-                with m.Elif(self.i2c_bus.o_fifo_w_rdy):
+                with m.Elif(self.i2c_bus.o_in_fifo_w_rdy):
                     m.d.sync += self.offset.eq(self.offset + 1)
                     m.d.sync += self.remain.eq(self.remain - 1)
                     m.d.sync += transfer.kind.eq(Transfer.Kind.DATA)
                     m.d.sync += transfer.payload.data.eq(self.rom_rd.data)
-                    m.d.sync += self.i2c_bus.i_fifo_w_en.eq(1)
+                    m.d.sync += self.i2c_bus.i_in_fifo_w_en.eq(1)
 
                     # Prepare next read, whether it's data or NEXTLEN[0].
                     m.d.sync += self.rom_rd.addr.eq(self.offset + 1)
                     m.next = "SEND: LATCHED W_EN"
 
             with m.State("SEND: LATCHED W_EN"):
-                m.d.sync += self.i2c_bus.i_fifo_w_en.eq(0)
+                m.d.sync += self.i2c_bus.i_in_fifo_w_en.eq(0)
                 m.next = "SEND: WAIT FOR I2C"
 
             with m.State("SEND: WAIT FOR I2C"):
                 with m.If(
-                    self.i2c_bus.o_busy & self.i2c_bus.o_ack & self.i2c_bus.o_fifo_w_rdy
+                    self.i2c_bus.o_busy
+                    & self.i2c_bus.o_ack
+                    & self.i2c_bus.o_in_fifo_w_rdy
                 ):
                     m.next = "LOOP HEAD: SEQ BREAK OR WAIT I2C"
                 with m.Elif(~self.i2c_bus.o_busy):
@@ -134,18 +136,18 @@ class ROMWriter(Elaboratable):
                     m.d.sync += transfer.kind.eq(Transfer.Kind.START)
                     m.d.sync += transfer.payload.start.addr.eq(self.addr)
                     m.d.sync += transfer.payload.start.rw.eq(RW.W)
-                    m.d.sync += self.i2c_bus.i_fifo_w_en.eq(1)
+                    m.d.sync += self.i2c_bus.i_in_fifo_w_en.eq(1)
                     m.next = "SEQ BREAK: LATCHED W_EN"
 
             with m.State("SEQ BREAK: LATCHED W_EN"):
-                m.d.sync += self.i2c_bus.i_fifo_w_en.eq(0)
+                m.d.sync += self.i2c_bus.i_in_fifo_w_en.eq(0)
                 m.next = "LOOP HEAD: SEQ BREAK OR WAIT I2C"
 
             with m.State("FIN: WAIT I2C DONE"):
                 with m.If(
                     ~self.i2c_bus.o_busy
                     & self.i2c_bus.o_ack
-                    & self.i2c_bus.o_fifo_w_rdy
+                    & self.i2c_bus.o_in_fifo_w_rdy
                 ):
                     m.d.sync += self.o_busy.eq(0)
                     m.next = "IDLE"

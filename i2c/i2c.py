@@ -64,13 +64,16 @@ class I2CBus(Record):
     def __init__(self):
         super().__init__(
             [
-                ("i_fifo_w_data", 9, DIR_FANIN),
-                ("i_fifo_w_en", 1, DIR_FANIN),
+                ("i_in_fifo_w_data", 9, DIR_FANIN),
+                ("i_in_fifo_w_en", 1, DIR_FANIN),
+                ("i_out_fifo_r_en", 1, DIR_FANIN),
                 ("i_stb", 1, DIR_FANIN),
                 ("o_ack", 1, DIR_FANOUT),
                 ("o_busy", 1, DIR_FANOUT),
-                ("o_fifo_w_rdy", 1, DIR_FANOUT),
-                ("o_fifo_r_rdy", 1, DIR_FANOUT),
+                ("o_in_fifo_w_rdy", 1, DIR_FANOUT),
+                ("o_in_fifo_r_rdy", 1, DIR_FANOUT),
+                ("o_out_fifo_r_rdy", 1, DIR_FANOUT),
+                ("o_out_fifo_r_data", 8, DIR_FANOUT),
             ]
         )
         self.fields["o_ack"].reset = 1
@@ -111,8 +114,8 @@ class I2C(Elaboratable):
 
     speed: Hz
 
-    _fifo: SyncFIFO
-    _fifo_r_data: Transfer
+    _in_fifo: SyncFIFO
+    _in_fifo_r_data: Transfer
 
     bus: I2CBus
 
@@ -135,8 +138,8 @@ class I2C(Elaboratable):
         assert speed.value in self.VALID_SPEEDS
         self.speed = speed
 
-        self._fifo = SyncFIFO(width=9, depth=1)
-        self._fifo_r_data = Transfer(target=self._fifo.r_data)
+        self._in_fifo = SyncFIFO(width=9, depth=1)
+        self._in_fifo_r_data = Transfer(target=self._in_fifo.r_data)
 
         self.bus = I2CBus()
 
@@ -162,13 +165,13 @@ class I2C(Elaboratable):
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
 
-        m.submodules.fifo = self._fifo
+        m.submodules.in_fifo = self._in_fifo
 
         m.d.comb += [
-            self._fifo.w_data.eq(self.bus.i_fifo_w_data),
-            self._fifo.w_en.eq(self.bus.i_fifo_w_en),
-            self.bus.o_fifo_w_rdy.eq(self._fifo.w_rdy),
-            self.bus.o_fifo_r_rdy.eq(self._fifo.r_rdy),
+            self._in_fifo.w_data.eq(self.bus.i_in_fifo_w_data),
+            self._in_fifo.w_en.eq(self.bus.i_in_fifo_w_en),
+            self.bus.o_in_fifo_w_rdy.eq(self._in_fifo.w_rdy),
+            self.bus.o_in_fifo_r_rdy.eq(self._in_fifo.r_rdy),
         ]
 
         match platform:
@@ -217,14 +220,14 @@ class I2C(Elaboratable):
             with m.Case(I2C.NextByte.IDLE):
                 pass
             with m.Case(I2C.NextByte.WANTED):
-                with m.If(self._fifo.r_rdy):
-                    m.d.sync += self._fifo.r_en.eq(1)
+                with m.If(self._in_fifo.r_rdy):
+                    m.d.sync += self._in_fifo.r_en.eq(1)
                     m.d.sync += self.next_byte.eq(I2C.NextByte.R_EN_LATCHED)
             with m.Case(I2C.NextByte.R_EN_LATCHED):
-                m.d.sync += self._fifo.r_en.eq(0)
+                m.d.sync += self._in_fifo.r_en.eq(0)
                 m.d.sync += self.next_byte.eq(I2C.NextByte.R_EN_UNLATCHED)
             with m.Case(I2C.NextByte.R_EN_UNLATCHED):
-                m.d.sync += self.byte.eq(self._fifo_r_data)
+                m.d.sync += self.byte.eq(self._in_fifo_r_data)
                 m.d.sync += self.next_byte.eq(I2C.NextByte.READY)
 
         with m.FSM():
@@ -239,17 +242,17 @@ class I2C(Elaboratable):
                     m.d.sync += self.next_byte.eq(I2C.NextByte.IDLE)
                     m.d.sync += self.sda_o.eq(0)
                     m.d.sync += c.en.eq(1)
-                    m.d.sync += self._fifo.r_en.eq(1)
+                    m.d.sync += self._in_fifo.r_en.eq(1)
 
                     m.next = "START: LATCHED R_EN"
 
             with m.State("START: LATCHED R_EN"):
-                m.d.sync += self._fifo.r_en.eq(0)
+                m.d.sync += self._in_fifo.r_en.eq(0)
                 m.next = "START: UNLATCHED R_EN"
 
             with m.State("START: UNLATCHED R_EN"):
-                m.d.sync += self.rw.eq(self._fifo_r_data.payload.start.rw)
-                m.d.sync += self.byte.eq(self._fifo_r_data)
+                m.d.sync += self.rw.eq(self._in_fifo_r_data.payload.start.rw)
+                m.d.sync += self.byte.eq(self._in_fifo_r_data)
                 m.d.sync += self.byte_ix.eq(0)
                 m.next = "START: WAIT SCL"
 
