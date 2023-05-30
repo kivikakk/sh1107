@@ -117,6 +117,8 @@ class I2C(Elaboratable):
     _in_fifo: SyncFIFO
     _in_fifo_r_data: Transfer
 
+    _out_fifo: SyncFIFO
+
     bus: I2CBus
 
     sda: Pin
@@ -140,6 +142,8 @@ class I2C(Elaboratable):
 
         self._in_fifo = SyncFIFO(width=9, depth=1)
         self._in_fifo_r_data = Transfer(target=self._in_fifo.r_data)
+
+        self._out_fifo = SyncFIFO(width=8, depth=1)
 
         self.bus = I2CBus()
 
@@ -166,12 +170,16 @@ class I2C(Elaboratable):
         m = Module()
 
         m.submodules.in_fifo = self._in_fifo
+        m.submodules.out_fifo = self._out_fifo
 
         m.d.comb += [
             self._in_fifo.w_data.eq(self.bus.i_in_fifo_w_data),
             self._in_fifo.w_en.eq(self.bus.i_in_fifo_w_en),
             self.bus.o_in_fifo_w_rdy.eq(self._in_fifo.w_rdy),
             self.bus.o_in_fifo_r_rdy.eq(self._in_fifo.r_rdy),
+            self._out_fifo.r_en.eq(self.bus.i_out_fifo_r_en),
+            self.bus.o_out_fifo_r_rdy.eq(self._out_fifo.r_rdy),
+            self.bus.o_out_fifo_r_data.eq(self._out_fifo.r_data),
         ]
 
         match platform:
@@ -221,28 +229,38 @@ class I2C(Elaboratable):
                 pass
             with m.Case(I2C.NextByte.WANTED):
                 with m.If(self._in_fifo.r_rdy):
-                    m.d.sync += self._in_fifo.r_en.eq(1)
-                    m.d.sync += self.next_byte.eq(I2C.NextByte.R_EN_LATCHED)
+                    m.d.sync += [
+                        self._in_fifo.r_en.eq(1),
+                        self.next_byte.eq(I2C.NextByte.R_EN_LATCHED),
+                    ]
             with m.Case(I2C.NextByte.R_EN_LATCHED):
-                m.d.sync += self._in_fifo.r_en.eq(0)
-                m.d.sync += self.next_byte.eq(I2C.NextByte.R_EN_UNLATCHED)
+                m.d.sync += [
+                    self._in_fifo.r_en.eq(0),
+                    self.next_byte.eq(I2C.NextByte.R_EN_UNLATCHED),
+                ]
             with m.Case(I2C.NextByte.R_EN_UNLATCHED):
-                m.d.sync += self.byte.eq(self._in_fifo_r_data)
-                m.d.sync += self.next_byte.eq(I2C.NextByte.READY)
+                m.d.sync += [
+                    self.byte.eq(self._in_fifo_r_data),
+                    self.next_byte.eq(I2C.NextByte.READY),
+                ]
 
         with m.FSM():
             with m.State("IDLE"):
-                m.d.sync += self.sda_oe.eq(1)
-                m.d.sync += self.sda_o.eq(1)
-                m.d.sync += self.scl_o.eq(1)
+                m.d.sync += [
+                    self.sda_oe.eq(1),
+                    self.sda_o.eq(1),
+                    self.scl_o.eq(1),
+                ]
 
                 with m.If(self.bus.i_stb):
-                    m.d.sync += self.bus.o_busy.eq(1)
-                    m.d.sync += self.bus.o_ack.eq(1)
-                    m.d.sync += self.next_byte.eq(I2C.NextByte.IDLE)
-                    m.d.sync += self.sda_o.eq(0)
-                    m.d.sync += c.en.eq(1)
-                    m.d.sync += self._in_fifo.r_en.eq(1)
+                    m.d.sync += [
+                        self.bus.o_busy.eq(1),
+                        self.bus.o_ack.eq(1),
+                        self.next_byte.eq(I2C.NextByte.IDLE),
+                        self.sda_o.eq(0),
+                        c.en.eq(1),
+                        self._in_fifo.r_en.eq(1),
+                    ]
 
                     m.next = "START: LATCHED R_EN"
 
@@ -251,60 +269,125 @@ class I2C(Elaboratable):
                 m.next = "START: UNLATCHED R_EN"
 
             with m.State("START: UNLATCHED R_EN"):
-                m.d.sync += self.rw.eq(self._in_fifo_r_data.payload.start.rw)
-                m.d.sync += self.byte.eq(self._in_fifo_r_data)
-                m.d.sync += self.byte_ix.eq(0)
+                m.d.sync += [
+                    self.rw.eq(self._in_fifo_r_data.payload.start.rw),
+                    self.byte.eq(self._in_fifo_r_data),
+                    self.byte_ix.eq(0),
+                ]
                 m.next = "START: WAIT SCL"
 
             with m.State("START: WAIT SCL"):
                 # SDA is low.
                 with m.If(c.o_full):
-                    m.next = "DATA BIT: SCL LOW"
+                    m.next = "WRITE DATA BIT: SCL LOW"
 
-            # This comes from "START: WAIT SCL" or "ACK BIT: SCL HIGH".
-            with m.State("DATA BIT: SCL LOW"):
+            # This comes from "START: WAIT SCL" or "WRITE ACK BIT: SCL HIGH".
+            with m.State("WRITE DATA BIT: SCL LOW"):
                 with m.If(c.o_half):
                     # Set SDA in prep for SCL high. (MSB)
-                    m.d.sync += self.sda_o.eq((self.byte >> (7 - self.byte_ix)) & 0x1)
+                    m.d.sync += self.sda_o.eq(
+                        (self.byte.payload.data >> (7 - self.byte_ix)) & 0x1
+                    )
                 with m.Elif(c.o_full):
-                    m.next = "DATA BIT: SCL HIGH"
+                    m.next = "WRITE DATA BIT: SCL HIGH"
 
-            with m.State("DATA BIT: SCL HIGH"):
+            with m.State("WRITE DATA BIT: SCL HIGH"):
                 with m.If(c.o_full):
                     with m.If(self.byte_ix < 7):
                         m.d.sync += self.byte_ix.eq(self.byte_ix + 1)
-                        m.next = "DATA BIT: SCL LOW"
+                        m.next = "WRITE DATA BIT: SCL LOW"
                         # Wait for next SCL^ before next data bit.
                     with m.Else():
                         m.d.sync += self.next_byte.eq(I2C.NextByte.WANTED)
-                        m.next = "ACK BIT: SCL LOW"
+                        m.next = "WRITE ACK BIT: SCL LOW"
                         # Wait for next SCL^ before R/W.
 
-            with m.State("ACK BIT: SCL LOW"):
+            with m.State("WRITE ACK BIT: SCL LOW"):
                 with m.If(c.o_half):
                     # Let go of SDA.
                     m.d.sync += self.sda_oe.eq(0)
                 with m.Elif(c.o_full):
-                    m.next = "ACK BIT: SCL HIGH"
+                    m.next = "WRITE ACK BIT: SCL HIGH"
 
-            with m.State("ACK BIT: SCL HIGH"):
+            with m.State("WRITE ACK BIT: SCL HIGH"):
                 with m.If(c.o_half):
                     # Read ACK. SDA should be brought low by the addressee.
-                    m.d.sync += self.bus.o_ack.eq(~self.sda_i)
-                    m.d.sync += self.sda_oe.eq(1)
+                    m.d.sync += [
+                        self.bus.o_ack.eq(~self.sda_i),
+                        self.sda_oe.eq(1),
+                    ]
+                    m.next = "COMMON ACK BIT: SCL HIGH"
+
+            with m.State("READ DATA BIT: SCL LOW"):
+                with m.If(c.o_full):
+                    m.next = "READ DATA BIT: SCL HIGH"
+
+            with m.State("READ DATA BIT: SCL HIGH"):
+                with m.If(c.o_half):
+                    m.d.sync += self.byte.payload.data.eq(
+                        self.byte.payload.data | (self.sda_i << (7 - self.byte_ix))
+                    )
+                with m.If(c.o_full):
+                    with m.If(self.byte_ix < 7):
+                        m.d.sync += self.byte_ix.eq(self.byte_ix + 1)
+                        m.next = "READ DATA BIT: SCL LOW"
+                    with m.Else():
+                        m.d.sync += [
+                            self._out_fifo.w_data.eq(self.byte),
+                            self._out_fifo.w_en.eq(1),
+                            self.next_byte.eq(I2C.NextByte.WANTED),
+                        ]
+                        m.next = "READ ACK BIT: SCL LOW"
+                        # Wait for next SCL^ before R/W.
+
+            with m.State("READ ACK BIT: SCL LOW"):
+                m.d.sync += self._out_fifo.w_en.eq(0)
+                with m.If(c.o_half):
+                    # Take back SDA & set.
+                    # If the next byte is more data, we want to read more, so bring SDA low.
+                    m.d.sync += [
+                        self.sda_oe.eq(1),
+                        self.sda_o.eq(
+                            ~(
+                                (self.next_byte == I2C.NextByte.READY)
+                                & (self.byte.kind == Transfer.Kind.DATA)
+                            )
+                        ),
+                    ]
                 with m.Elif(c.o_full):
+                    m.next = "COMMON ACK BIT: SCL HIGH"
+
+            with m.State("COMMON ACK BIT: SCL HIGH"):
+                with m.If(c.o_full):
                     with m.If(self.next_byte == I2C.NextByte.READY):
                         with m.If(
-                            self.bus.o_ack & (self.byte.kind == Transfer.Kind.DATA)
+                            self.bus.o_ack
+                            & (self.byte.kind == Transfer.Kind.DATA)
+                            & (self.rw == RW.W)
                         ):
                             m.d.sync += self.byte_ix.eq(0)
-                            m.next = "DATA BIT: SCL LOW"
+                            m.next = "WRITE DATA BIT: SCL LOW"
                         with m.Elif(
-                            self.bus.o_ack & (self.byte.kind == Transfer.Kind.START)
+                            self.bus.o_ack
+                            & (self.byte.kind == Transfer.Kind.DATA)
+                            & (self.rw == RW.R)
                         ):
-                            m.d.sync += self.rw.eq(self.byte.payload.start.rw)
-                            m.d.sync += self.byte.eq(self.byte)
-                            m.d.sync += self.byte_ix.eq(0)
+                            m.d.sync += [
+                                self.byte.payload.data.eq(0),
+                                self.byte_ix.eq(0),
+                                self.sda_oe.eq(0),
+                            ]
+                            m.next = "READ DATA BIT: SCL LOW"
+                        with m.Elif(
+                            self.bus.o_ack
+                            & (self.byte.kind == Transfer.Kind.START)
+                            & (self.rw == RW.W)
+                        ):
+                            m.d.sync += [
+                                self.rw.eq(self.byte.payload.start.rw),
+                                self.byte.eq(self.byte),
+                                self.byte_ix.eq(0),
+                            ]
                             m.next = "REP START: SCL LOW"
                         with m.Else():
                             # Consume anything that got queued before the NACK was realised.
@@ -327,7 +410,7 @@ class I2C(Elaboratable):
                     # Bring SDA low mid SCL-high to repeat start.
                     m.d.sync += self.sda_o.eq(0)
                 with m.Elif(c.o_full):
-                    m.next = "DATA BIT: SCL LOW"
+                    m.next = "WRITE DATA BIT: SCL LOW"
 
             with m.State("FIN: SCL LOW"):
                 with m.If(c.o_half):
@@ -342,9 +425,11 @@ class I2C(Elaboratable):
                     m.d.sync += self.sda_o.eq(1)
                 with m.Elif(c.o_full):
                     # Turn off the clock to keep SCL high.
-                    m.d.sync += c.en.eq(0)
-                    m.d.sync += self.bus.o_busy.eq(0)
-                    m.d.sync += self.scl_o.eq(1)
+                    m.d.sync += [
+                        c.en.eq(0),
+                        self.bus.o_busy.eq(0),
+                        self.scl_o.eq(1),
+                    ]
                     m.next = "IDLE"
 
         return m

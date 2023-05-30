@@ -201,35 +201,44 @@ def receive(i2c: I2C, byte: int) -> sim.Generator:
 
         yield from wait_scl(i2c, 1)
 
-        # assert not (yield i2c.sda_oe)
+        assert not (yield i2c.sda_oe)
 
-        yield from wait_scl(i2c, 0, sda_o=ValueChange.STEADY)
+        yield from wait_scl(i2c, 0, sda_oe=ValueChange.STEADY)
 
 
-def ack(i2c: I2C, *, ack: bool = True) -> sim.Generator:
-    # Master releases SDA; we ACK by driving SDA low.
-    assert (yield i2c.sda_oe)
-    yield Delay(_tick(i2c))
-    if ack:
-        yield cast(Signal, i2c.sda.i).eq(0)
-    yield Delay(3 * _tick(i2c))
-    assert not (yield i2c.sda_oe)
-    yield Delay(_tick(i2c))
+def ack(i2c: I2C, *, ack: bool = True, from_them: bool = False) -> sim.Generator:
+    if from_them:
+        # Controller takes SDA; keeps it at the end.
+        assert not (yield i2c.sda_oe)
 
-    yield Delay(4 * _tick(i2c))
-    assert (yield i2c.sda_oe)
-    if ack:
-        yield cast(Signal, i2c.sda.i).eq(1)
-    yield Delay(_tick(i2c))
+        yield Delay(4 * _tick(i2c))
+        assert (yield i2c.sda_oe)
+        assert ack ^ (yield i2c.sda_o)  # ACK/low or NACK/high
 
-    if ack:
-        assert (yield i2c.bus.o_ack)
+        yield Delay(6 * _tick(i2c))
+        assert (yield i2c.sda_oe)
+
     else:
-        assert not (yield i2c.bus.o_ack)
+        # Controller releases SDA; we ACK by driving SDA low.
+        assert (yield i2c.sda_oe)
+        yield Delay(_tick(i2c))
+        if ack:
+            yield cast(Signal, i2c.sda.i).eq(0)
+        yield Delay(3 * _tick(i2c))
+        assert not (yield i2c.sda_oe)
+        yield Delay(_tick(i2c))
+
+        yield Delay(4 * _tick(i2c))
+        assert (yield i2c.sda_oe)
+        if ack:
+            yield cast(Signal, i2c.sda.i).eq(1)
+        yield Delay(_tick(i2c))
+
+        assert ack == (yield i2c.bus.o_ack)
 
 
-def nack(i2c: I2C) -> sim.Generator:
-    yield from ack(i2c, ack=False)
+def nack(i2c: I2C, *, from_them: bool = False) -> sim.Generator:
+    yield from ack(i2c, ack=False, from_them=from_them)
 
 
 def stop(i2c: I2C) -> sim.Generator:

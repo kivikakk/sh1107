@@ -66,6 +66,18 @@ class TestI2CReadTop(Elaboratable):
                 m.next = "I2C UNSTROBED"
 
             with m.State("I2C UNSTROBED"):
+                with m.If(bus.o_busy & bus.o_ack & bus.o_in_fifo_r_rdy):
+                    m.d.sync += [
+                        transfer.kind.eq(Transfer.Kind.DATA),
+                        bus.i_in_fifo_w_en.eq(1),
+                    ]
+                    m.next = "DATA LATCHED"
+
+            with m.State("DATA LATCHED"):
+                m.d.sync += bus.i_in_fifo_w_en.eq(0)
+                m.next = "DATA UNLATCHED"
+
+            with m.State("DATA UNLATCHED"):
                 with m.If(bus.o_busy & bus.o_ack & bus.o_out_fifo_r_rdy):
                     m.d.sync += bus.i_out_fifo_r_en.eq(1)
                     m.next = "R_EN LATCHED"
@@ -100,11 +112,11 @@ class TestI2CRead(sim.TestCase):
         yield from sim_i2c.send(dut.i2c, 0x79)
         yield from sim_i2c.ack(dut.i2c)
         yield from sim_i2c.receive(dut.i2c, 0xC5)
-        yield from sim_i2c.nack(dut.i2c)
+        yield from sim_i2c.nack(dut.i2c, from_them=True)
         yield from sim_i2c.stop(dut.i2c)
         yield from sim_i2c.steady_stopped(dut.i2c)
 
         assert (
             yield dut.status
         ) == Status.SUCCESS, f"expected SUCCESS, got {Status((yield dut.status)).name}"
-        assert (yield dut.result) == 0xC5, f"expected 88, got {(yield dut.result):02x}"
+        assert (yield dut.result) == 0xC5, f"expected C5, got {(yield dut.result):02x}"
