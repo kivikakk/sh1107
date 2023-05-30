@@ -309,6 +309,7 @@ class I2C(Elaboratable):
                 with m.If(c.o_half):
                     with m.If(self.byte_ix == 7):
                         m.d.sync += [
+                            self.next_byte.eq(I2C.NextByte.WANTED),
                             self._out_fifo.w_data.eq(
                                 self.byte.payload.data
                                 | (self.sda_i << (7 - self.byte_ix))
