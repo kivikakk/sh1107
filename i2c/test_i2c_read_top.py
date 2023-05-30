@@ -102,10 +102,7 @@ class TestI2CReadTop(Elaboratable):
                     m.next = "IDLE"
 
                 with m.Else():
-                    m.d.sync += [
-                        self.remaining.eq(self.remaining - 1),
-                        bus.i_in_fifo_w_en.eq(1),
-                    ]
+                    m.d.sync += self.remaining.eq(self.remaining - 1)
                     m.next = "WAIT WRITE"
 
         return m

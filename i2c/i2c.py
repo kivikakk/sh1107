@@ -276,14 +276,14 @@ class I2C(Elaboratable):
 
             with m.State("WRITE DATA BIT: SCL HIGH"):
                 with m.If(c.o_full):
-                    with m.If(self.byte_ix < 7):
-                        m.d.sync += self.byte_ix.eq(self.byte_ix + 1)
-                        m.next = "WRITE DATA BIT: SCL LOW"
-                        # Wait for next SCL^ before next data bit.
-                    with m.Else():
+                    with m.If(self.byte_ix == 7):
                         m.d.sync += self.next_byte.eq(I2C.NextByte.WANTED)
                         m.next = "WRITE ACK BIT: SCL LOW"
                         # Wait for next SCL^ before R/W.
+                    with m.Else():
+                        m.d.sync += self.byte_ix.eq(self.byte_ix + 1)
+                        m.next = "WRITE DATA BIT: SCL LOW"
+                        # Wait for next SCL^ before next data bit.
 
             with m.State("WRITE ACK BIT: SCL LOW"):
                 with m.If(c.o_half):
@@ -307,24 +307,34 @@ class I2C(Elaboratable):
 
             with m.State("READ DATA BIT: SCL HIGH"):
                 with m.If(c.o_half):
-                    m.d.sync += self.byte.payload.data.eq(
-                        self.byte.payload.data | (self.sda_i << (7 - self.byte_ix))
-                    )
-                with m.If(c.o_full):
-                    with m.If(self.byte_ix < 7):
-                        m.d.sync += self.byte_ix.eq(self.byte_ix + 1)
-                        m.next = "READ DATA BIT: SCL LOW"
+                    with m.If(self.byte_ix == 7):
+                        m.d.sync += [
+                            self._out_fifo.w_data.eq(
+                                self.byte.payload.data
+                                | (self.sda_i << (7 - self.byte_ix))
+                            ),
+                            self._out_fifo.w_en.eq(1),
+                        ]
+                        m.next = "READ DATA BIT (LAST): SCL HIGH"
+
                     with m.Else():
                         m.d.sync += [
-                            self._out_fifo.w_data.eq(self.byte),
-                            self._out_fifo.w_en.eq(1),
-                            self.next_byte.eq(I2C.NextByte.WANTED),
+                            self.byte_ix.eq(self.byte_ix + 1),
+                            self.byte.payload.data.eq(
+                                self.byte.payload.data
+                                | (self.sda_i << (7 - self.byte_ix))
+                            ),
                         ]
-                        m.next = "READ ACK BIT: SCL LOW"
-                        # Wait for next SCL^ before R/W.
+
+                with m.If(c.o_full):
+                    m.next = "READ DATA BIT: SCL LOW"
+
+            with m.State("READ DATA BIT (LAST): SCL HIGH"):
+                m.d.sync += self._out_fifo.w_en.eq(0)
+                with m.If(c.o_full):
+                    m.next = "READ ACK BIT: SCL LOW"
 
             with m.State("READ ACK BIT: SCL LOW"):
-                m.d.sync += self._out_fifo.w_en.eq(0)
                 with m.If(c.o_half):
                     # Take back SDA & set.
                     # If the next byte is more data, we want to read more, so bring SDA low.
