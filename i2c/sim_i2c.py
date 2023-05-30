@@ -171,6 +171,7 @@ def send(
 ) -> sim.Generator:
     actual = 0
     assert not (yield i2c.scl_o)
+    assert (yield i2c.sda_oe)
     for bit in range(8):
         if bit == 0:
             if isinstance(next, int):
@@ -208,7 +209,7 @@ def receive(i2c: I2C, byte: int) -> sim.Generator:
 
 def ack(i2c: I2C, *, ack: bool = True, from_them: bool = False) -> sim.Generator:
     if from_them:
-        # Controller takes SDA; keeps it at the end.
+        # Controller takes SDA.
         assert not (yield i2c.sda_oe)
 
         yield Delay(4 * _tick(i2c))
@@ -216,7 +217,6 @@ def ack(i2c: I2C, *, ack: bool = True, from_them: bool = False) -> sim.Generator
         assert ack ^ (yield i2c.sda_o)  # ACK/low or NACK/high
 
         yield Delay(6 * _tick(i2c))
-        assert (yield i2c.sda_oe)
 
     else:
         # Controller releases SDA; we ACK by driving SDA low.

@@ -110,36 +110,43 @@ class OLED(Elaboratable):
             m.d.comb += [
                 self.i2c_bus.i_in_fifo_w_data.eq(0),
                 self.i2c_bus.i_in_fifo_w_en.eq(0),
+                self.i2c_bus.i_out_fifo_r_en.eq(0),
                 self.i2c_bus.i_stb.eq(0),
             ]
 
         # TODO: actually flash cursor when on
 
+        command = Signal(8)
+
         with m.FSM():
             with m.State("IDLE"):
                 with m.If(self.i_fifo.r_rdy & self.i2c_bus.o_in_fifo_w_rdy):
-                    m.d.sync += self.i_fifo.r_en.eq(1)
-                    m.d.sync += self.o_result.eq(OLED.Result.BUSY)
+                    m.d.sync += [
+                        command.eq(self.i_fifo.r_data),
+                        self.i_fifo.r_en.eq(1),
+                        self.o_result.eq(OLED.Result.BUSY),
+                    ]
                     m.next = "START: STROBED I_FIFO R_EN"
 
             with m.State("START: STROBED I_FIFO R_EN"):
                 m.d.sync += self.i_fifo.r_en.eq(0)
-                m.next = "START: UNSTROBED I_FIFO R_EN"
-
-            with m.State("START: UNSTROBED I_FIFO R_EN"):
-                with m.Switch(self.i_fifo.r_data):
+                with m.Switch(command):
                     with m.Case(OLED.Command.NOP):
                         m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
                         m.next = "IDLE"
 
                     with m.Case(OLED.Command.DISPLAY_ON):
-                        m.d.sync += self.rom_writer.i_index.eq(OFFSET_DISPLAY_ON)
-                        m.d.sync += self.rom_writer.i_stb.eq(1)
+                        m.d.sync += [
+                            self.rom_writer.i_index.eq(OFFSET_DISPLAY_ON),
+                            self.rom_writer.i_stb.eq(1),
+                        ]
                         m.next = "ROM WRITE SINGLE: STROBED ROM WRITER"
 
                     with m.Case(OLED.Command.DISPLAY_OFF):
-                        m.d.sync += self.rom_writer.i_index.eq(OFFSET_DISPLAY_OFF)
-                        m.d.sync += self.rom_writer.i_stb.eq(1)
+                        m.d.sync += [
+                            self.rom_writer.i_index.eq(OFFSET_DISPLAY_OFF),
+                            self.rom_writer.i_stb.eq(1),
+                        ]
                         m.next = "ROM WRITE SINGLE: STROBED ROM WRITER"
 
                     with m.Case(OLED.Command.CLS):
@@ -155,13 +162,17 @@ class OLED(Elaboratable):
                         m.next = "PRINT: COUNT: WAIT"
 
                     with m.Case(OLED.Command.CURSOR_ON):
-                        m.d.sync += self.cursor.eq(1)
-                        m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
+                        m.d.sync += [
+                            self.cursor.eq(1),
+                            self.o_result.eq(OLED.Result.SUCCESS),
+                        ]
                         m.next = "IDLE"
 
                     with m.Case(OLED.Command.CURSOR_OFF):
-                        m.d.sync += self.cursor.eq(0)
-                        m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
+                        m.d.sync += [
+                            self.cursor.eq(0),
+                            self.o_result.eq(OLED.Result.SUCCESS),
+                        ]
                         m.next = "IDLE"
 
             with m.State("CLSER: STROBED"):
@@ -190,41 +201,40 @@ class OLED(Elaboratable):
     def locate_states(self, m: Module):
         with m.State("LOCATE: ROW: WAIT"):
             with m.If(self.i_fifo.r_rdy):
+                with m.If(self.i_fifo.r_data != 0):
+                    m.d.sync += [
+                        self.row.eq(self.i_fifo.r_data),
+                        self.locator.i_row.eq(self.i_fifo.r_data),
+                    ]
+                with m.Else():
+                    m.d.sync += self.locator.i_row.eq(0)
                 m.d.sync += self.i_fifo.r_en.eq(1)
                 m.next = "LOCATE: ROW: STROBED R_EN"
 
         with m.State("LOCATE: ROW: STROBED R_EN"):
             m.d.sync += self.i_fifo.r_en.eq(0)
-            m.next = "LOCATE: ROW: UNSTROBED R_EN"
-
-        with m.State("LOCATE: ROW: UNSTROBED R_EN"):
-            with m.If(self.i_fifo.r_data != 0):
-                m.d.sync += self.row.eq(self.i_fifo.r_data)
-                m.d.sync += self.locator.i_row.eq(self.i_fifo.r_data)
-            with m.Else():
-                m.d.sync += self.locator.i_row.eq(0)
             m.next = "LOCATE: COL: WAIT"
 
         with m.State("LOCATE: COL: WAIT"):
             with m.If(self.i_fifo.r_rdy):
-                m.d.sync += self.i_fifo.r_en.eq(1)
+                with m.If(self.i_fifo.r_data != 0):
+                    m.d.sync += [
+                        self.col.eq(self.i_fifo.r_data),
+                        self.locator.i_col.eq(self.i_fifo.r_data),
+                    ]
+                with m.Else():
+                    m.d.sync += self.locator.i_col.eq(0)
+                m.d.sync += [
+                    self.i_fifo.r_en.eq(1),
+                    self.locator.i_stb.eq(1),
+                ]
                 m.next = "LOCATE: COL: STROBED R_EN"
 
         with m.State("LOCATE: COL: STROBED R_EN"):
-            m.d.sync += self.i_fifo.r_en.eq(0)
-            m.next = "LOCATE: COL: UNSTROBED R_EN"
-
-        with m.State("LOCATE: COL: UNSTROBED R_EN"):
-            with m.If(self.i_fifo.r_data != 0):
-                m.d.sync += self.col.eq(self.i_fifo.r_data)
-                m.d.sync += self.locator.i_col.eq(self.i_fifo.r_data)
-            with m.Else():
-                m.d.sync += self.locator.i_col.eq(0)
-            m.d.sync += self.locator.i_stb.eq(1)
-            m.next = "LOCATE: STROBED LOCATOR"
-
-        with m.State("LOCATE: STROBED LOCATOR"):
-            m.d.sync += self.locator.i_stb.eq(0)
+            m.d.sync += [
+                self.i_fifo.r_en.eq(0),
+                self.locator.i_stb.eq(0),
+            ]
             m.next = "LOCATE: UNSTROBED LOCATOR"
 
         with m.State("LOCATE: UNSTROBED LOCATOR"):
@@ -236,6 +246,7 @@ class OLED(Elaboratable):
         remaining = Signal(8)
 
         with m.State("PRINT: COUNT: WAIT"):
+            # XXX(Ch): this still assumes depth=1
             with m.If(self.i_fifo.r_rdy):
                 m.d.sync += self.i_fifo.r_en.eq(1)
                 m.next = "PRINT: COUNT: STROBED R_EN"
@@ -253,6 +264,7 @@ class OLED(Elaboratable):
                 m.next = "IDLE"
 
         with m.State("PRINT: DATA: WAIT"):
+            # XXX(Ch): this still assumes depth=1
             with m.If(self.i_fifo.r_rdy):
                 m.d.sync += self.i_fifo.r_en.eq(1)
                 m.next = "PRINT: DATA: STROBED R_EN"

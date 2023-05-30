@@ -89,7 +89,7 @@ class I2C(Elaboratable):
 
     Write: Feed data one byte at a time into the FIFO as it's emptied, with MSB
     low (i.e. Cat(data<8>, 0<1>)).  If o_ack goes low, there's been a NACK, and
-    the driver will discard the next queued byte and return to idle eventually.
+    the driver will discard any next queued byte and return to idle eventually.
     Idle can be detected when o_busy goes low.  Similarly, any other error will
     cause a return to idle.  To issue a repeated start, instead write Cat(rw<1>,
     addr<7>, 1<1>).
@@ -108,9 +108,7 @@ class I2C(Elaboratable):
     class NextByte(enum.Enum):
         IDLE = 0
         WANTED = 1
-        R_EN_LATCHED = 2
-        R_EN_UNLATCHED = 3
-        READY = 4
+        READY = 2
 
     speed: Hz
 
@@ -231,18 +229,11 @@ class I2C(Elaboratable):
                 with m.If(self._in_fifo.r_rdy):
                     m.d.sync += [
                         self._in_fifo.r_en.eq(1),
-                        self.next_byte.eq(I2C.NextByte.R_EN_LATCHED),
+                        self.byte.eq(self._in_fifo_r_data),
+                        self.next_byte.eq(I2C.NextByte.READY),
                     ]
-            with m.Case(I2C.NextByte.R_EN_LATCHED):
-                m.d.sync += [
-                    self._in_fifo.r_en.eq(0),
-                    self.next_byte.eq(I2C.NextByte.R_EN_UNLATCHED),
-                ]
-            with m.Case(I2C.NextByte.R_EN_UNLATCHED):
-                m.d.sync += [
-                    self.byte.eq(self._in_fifo_r_data),
-                    self.next_byte.eq(I2C.NextByte.READY),
-                ]
+            with m.Case(I2C.NextByte.READY):
+                m.d.sync += self._in_fifo.r_en.eq(0)
 
         with m.FSM():
             with m.State("IDLE"):
@@ -260,23 +251,15 @@ class I2C(Elaboratable):
                         self.sda_o.eq(0),
                         c.en.eq(1),
                         self._in_fifo.r_en.eq(1),
+                        self.rw.eq(self._in_fifo_r_data.payload.start.rw),
+                        self.byte.eq(self._in_fifo_r_data),
+                        self.byte_ix.eq(0),
                     ]
 
-                    m.next = "START: LATCHED R_EN"
-
-            with m.State("START: LATCHED R_EN"):
-                m.d.sync += self._in_fifo.r_en.eq(0)
-                m.next = "START: UNLATCHED R_EN"
-
-            with m.State("START: UNLATCHED R_EN"):
-                m.d.sync += [
-                    self.rw.eq(self._in_fifo_r_data.payload.start.rw),
-                    self.byte.eq(self._in_fifo_r_data),
-                    self.byte_ix.eq(0),
-                ]
-                m.next = "START: WAIT SCL"
+                    m.next = "START: WAIT SCL"
 
             with m.State("START: WAIT SCL"):
+                m.d.sync += self._in_fifo.r_en.eq(0)
                 # SDA is low.
                 with m.If(c.o_full):
                     m.next = "WRITE DATA BIT: SCL LOW"
