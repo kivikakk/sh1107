@@ -42,26 +42,32 @@ class Scroller(Elaboratable):
         with m.FSM():
             with m.State("IDLE"):
                 with m.If(self.i_stb):
-                    m.d.sync += self.o_busy.eq(1)
-                    m.d.sync += transfer.kind.eq(Transfer.Kind.START)
-                    m.d.sync += transfer.payload.start.addr.eq(self.addr)
-                    m.d.sync += transfer.payload.start.rw.eq(RW.W)
-                    m.d.sync += self.i2c_bus.i_in_fifo_w_en.eq(1)
+                    m.d.sync += [
+                        self.o_busy.eq(1),
+                        transfer.kind.eq(Transfer.Kind.START),
+                        transfer.payload.start.addr.eq(self.addr),
+                        transfer.payload.start.rw.eq(RW.W),
+                        self.i2c_bus.i_in_fifo_w_en.eq(1),
+                    ]
                     m.next = "START: ADDR: STROBED W_EN"
 
             with m.State("START: ADDR: STROBED W_EN"):
-                m.d.sync += self.i2c_bus.i_in_fifo_w_en.eq(0)
-                m.d.sync += self.i2c_bus.i_stb.eq(1)
+                m.d.sync += [
+                    self.i2c_bus.i_in_fifo_w_en.eq(0),
+                    self.i2c_bus.i_stb.eq(1),
+                ]
                 m.next = "START: ADDR: STROBED I_STB"
 
             with m.State("START: ADDR: STROBED I_STB"):
                 m.d.sync += self.i2c_bus.i_stb.eq(0)
                 with m.If(self.i2c_bus.o_in_fifo_w_rdy):
-                    m.d.sync += transfer.kind.eq(Transfer.Kind.DATA)
-                    m.d.sync += transfer.payload.data.eq(
-                        ControlByte(False, "Command").to_byte()
-                    )
-                    m.d.sync += self.i2c_bus.i_in_fifo_w_en.eq(1)
+                    m.d.sync += [
+                        transfer.kind.eq(Transfer.Kind.DATA),
+                        transfer.payload.data.eq(
+                            ControlByte(False, "Command").to_byte()
+                        ),
+                        self.i2c_bus.i_in_fifo_w_en.eq(1),
+                    ]
                     m.next = "START: CONTROL: STROBED W_EN"
 
             with m.State("START: CONTROL: STROBED W_EN"):
@@ -74,8 +80,10 @@ class Scroller(Elaboratable):
                     & self.i2c_bus.o_ack
                     & self.i2c_bus.o_in_fifo_w_rdy
                 ):
-                    m.d.sync += transfer.payload.data.eq(offset_cmd[0])
-                    m.d.sync += self.i2c_bus.i_in_fifo_w_en.eq(1)
+                    m.d.sync += [
+                        transfer.payload.data.eq(offset_cmd[0]),
+                        self.i2c_bus.i_in_fifo_w_en.eq(1),
+                    ]
                     m.next = "START: OFFSET_CMD[0]: STROBED W_EN"
                 with m.Elif(~self.i2c_bus.o_busy):
                     m.d.sync += self.o_busy.eq(0)
@@ -91,8 +99,10 @@ class Scroller(Elaboratable):
                     & self.i2c_bus.o_ack
                     & self.i2c_bus.o_in_fifo_w_rdy
                 ):
-                    m.d.sync += transfer.payload.data.eq(offset_cmd[1])
-                    m.d.sync += self.i2c_bus.i_in_fifo_w_en.eq(1)
+                    m.d.sync += [
+                        transfer.payload.data.eq(offset_cmd[1]),
+                        self.i2c_bus.i_in_fifo_w_en.eq(1),
+                    ]
                     m.next = "START: OFFSET_CMD[1]: STROBED W_EN"
                 with m.Elif(~self.i2c_bus.o_busy):
                     m.d.sync += self.o_busy.eq(0)

@@ -42,8 +42,10 @@ class Button(Elaboratable):
         m.d.comb += self.debounce.i.eq(self.i)
         m.d.sync += self.__registered.eq(self.debounce.o)
 
-        m.d.comb += self.o_down.eq(~self.__registered & self.debounce.o)
-        m.d.comb += self.o_up.eq(self.__registered & ~self.debounce.o)
+        m.d.comb += [
+            self.o_down.eq(~self.__registered & self.debounce.o),
+            self.o_up.eq(self.__registered & ~self.debounce.o),
+        ]
 
         return m
 
@@ -79,8 +81,10 @@ class ButtonWithHold(Button):
 
         holding = Signal()
         with m.If(self.o_down):
-            m.d.sync += holding.eq(1)
-            m.d.sync += self.o_held.eq(0)
+            m.d.sync += [
+                holding.eq(1),
+                self.o_held.eq(0),
+            ]
         with m.If(self.o_up):
             m.d.sync += holding.eq(0)
 

@@ -57,8 +57,10 @@ class Counter(Elaboratable):
             0 <= half_clock_tgt < full_clock_tgt
         ), f"{assertion_msg}; !(0 <= {half_clock_tgt} < {full_clock_tgt})"
 
-        m.d.comb += self.o_half.eq(clk_counter == half_clock_tgt)
-        m.d.comb += self.o_full.eq(clk_counter == full_clock_tgt)
+        m.d.comb += [
+            self.o_half.eq(clk_counter == half_clock_tgt),
+            self.o_full.eq(clk_counter == full_clock_tgt),
+        ]
 
         with m.If(self.en & ~self.o_full):
             m.d.sync += clk_counter.eq(clk_counter + 1)

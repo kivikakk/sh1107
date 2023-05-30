@@ -117,8 +117,10 @@ class Top(Elaboratable):
                 led_busy = cast(Signal, platform.request("led", 0).o)
                 led_ack = cast(Signal, platform.request("led", 1).o)
 
-                m.d.comb += led_busy.eq(self.oled.i2c_bus.o_busy)
-                m.d.comb += led_ack.eq(self.oled.i2c_bus.o_ack)
+                m.d.comb += [
+                    led_busy.eq(self.oled.i2c_bus.o_busy),
+                    led_ack.eq(self.oled.i2c_bus.o_ack),
+                ]
 
                 switch = cast(Signal, platform.request("button").i)
                 m.submodules.button = button = Button()
@@ -135,8 +137,10 @@ class Top(Elaboratable):
                 led_busy = cast(Signal, cast(Record, rgb.r).o)
                 led_ack = cast(Signal, cast(Record, rgb.g).o)
 
-                m.d.comb += led_busy.eq(self.oled.i2c_bus.o_busy)
-                m.d.comb += led_ack.eq(self.oled.i2c_bus.o_ack)
+                m.d.comb += [
+                    led_busy.eq(self.oled.i2c_bus.o_busy),
+                    led_ack.eq(self.oled.i2c_bus.o_ack),
+                ]
 
                 switch = cast(Signal, platform.request("button").i)
                 m.submodules.button = button = ButtonWithHold()
@@ -176,8 +180,10 @@ class Top(Elaboratable):
 
             with m.State("LOOP: AVAILABLE"):
                 with m.If(self.oled.i_fifo.w_rdy):
-                    m.d.sync += self.oled.i_fifo.w_data.eq(self.rom_rd.data)
-                    m.d.sync += self.oled.i_fifo.w_en.eq(1)
+                    m.d.sync += [
+                        self.oled.i_fifo.w_data.eq(self.rom_rd.data),
+                        self.oled.i_fifo.w_en.eq(1),
+                    ]
                     m.next = "LOOP: STROBED W_EN"
 
             with m.State("LOOP: STROBED W_EN"):

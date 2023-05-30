@@ -246,63 +246,66 @@ class OLED(Elaboratable):
         remaining = Signal(8)
 
         with m.State("PRINT: COUNT: WAIT"):
-            # XXX(Ch): this still assumes depth=1
             with m.If(self.i_fifo.r_rdy):
-                m.d.sync += self.i_fifo.r_en.eq(1)
+                m.d.sync += [
+                    self.i_fifo.r_en.eq(1),
+                    remaining.eq(self.i_fifo.r_data),
+                ]
                 m.next = "PRINT: COUNT: STROBED R_EN"
 
         with m.State("PRINT: COUNT: STROBED R_EN"):
             m.d.sync += self.i_fifo.r_en.eq(0)
-            m.next = "PRINT: COUNT: UNSTROBED R_EN"
-
-        with m.State("PRINT: COUNT: UNSTROBED R_EN"):
-            with m.If(self.i_fifo.r_data != 0):
-                m.d.sync += remaining.eq(self.i_fifo.r_data)
-                m.next = "PRINT: DATA: WAIT"
-            with m.Else():
+            with m.If(remaining == 0):
                 m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
                 m.next = "IDLE"
+            with m.Else():
+                m.next = "PRINT: DATA: WAIT"
 
         with m.State("PRINT: DATA: WAIT"):
-            # XXX(Ch): this still assumes depth=1
             with m.If(self.i_fifo.r_rdy):
                 m.d.sync += self.i_fifo.r_en.eq(1)
-                m.next = "PRINT: DATA: STROBED R_EN"
-
-        with m.State("PRINT: DATA: STROBED R_EN"):
-            m.d.sync += self.i_fifo.r_en.eq(0)
-            m.next = "PRINT: DATA: UNSTROBED R_EN"
-
-        with m.State("PRINT: DATA: UNSTROBED R_EN"):
-            with m.If(self.i_fifo.r_data == 13):
-                # CR
-                m.d.sync += self.col.eq(1)
-                m.d.sync += self.locator.i_col.eq(1)
-                m.d.sync += self.locator.i_row.eq(0)
-                m.d.sync += self.locator.i_stb.eq(1)
-                m.next = "PRINT: DATA: LOC ADJUST: STROBED LOCATOR"
-            with m.Elif(self.i_fifo.r_data == 10):
-                # LF
-                with m.If(self.row == 16):
-                    m.d.sync += self.col.eq(1)
-                    m.d.sync += self.locator.i_row.eq(0)
-                    m.d.sync += self.locator.i_col.eq(1)
-                    m.d.sync += self.locator.i_stb.eq(1)
-                    m.next = "PRINT: DATA: LOC ADJUST: STROBED LOCATOR, NEEDS SCROLL"
-                with m.Else():
-                    m.d.sync += self.col.eq(1)
-                    m.d.sync += self.row.eq(self.row + 1)
-                    m.d.sync += self.locator.i_row.eq(self.row + 1)
-                    m.d.sync += self.locator.i_col.eq(1)
-                    m.d.sync += self.locator.i_stb.eq(1)
+                with m.If(self.i_fifo.r_data == 13):
+                    # CR
+                    m.d.sync += [
+                        self.col.eq(1),
+                        self.locator.i_col.eq(1),
+                        self.locator.i_row.eq(0),
+                        self.locator.i_stb.eq(1),
+                    ]
                     m.next = "PRINT: DATA: LOC ADJUST: STROBED LOCATOR"
-            with m.Else():
-                m.d.sync += self.rom_writer.i_index.eq(OFFSET_CHAR + self.i_fifo.r_data)
-                m.d.sync += self.rom_writer.i_stb.eq(1)
-                m.next = "PRINT: DATA: STROBED ROM WRITER"
+                with m.Elif(self.i_fifo.r_data == 10):
+                    # LF
+                    with m.If(self.row == 16):
+                        m.d.sync += [
+                            self.col.eq(1),
+                            self.locator.i_row.eq(0),
+                            self.locator.i_col.eq(1),
+                            self.locator.i_stb.eq(1),
+                        ]
+                        m.next = (
+                            "PRINT: DATA: LOC ADJUST: STROBED LOCATOR, NEEDS SCROLL"
+                        )
+                    with m.Else():
+                        m.d.sync += [
+                            self.col.eq(1),
+                            self.row.eq(self.row + 1),
+                            self.locator.i_row.eq(self.row + 1),
+                            self.locator.i_col.eq(1),
+                            self.locator.i_stb.eq(1),
+                        ]
+                        m.next = "PRINT: DATA: LOC ADJUST: STROBED LOCATOR"
+                with m.Else():
+                    m.d.sync += [
+                        self.rom_writer.i_index.eq(OFFSET_CHAR + self.i_fifo.r_data),
+                        self.rom_writer.i_stb.eq(1),
+                    ]
+                    m.next = "PRINT: DATA: STROBED ROM WRITER"
 
         with m.State("PRINT: DATA: STROBED ROM WRITER"):
-            m.d.sync += self.rom_writer.i_stb.eq(0)
+            m.d.sync += [
+                self.rom_writer.i_stb.eq(0),
+                self.i_fifo.r_en.eq(0),
+            ]
             # Page addressing mode automatically matches our column adjust;
             # we need to manually change page when we wrap, though.
             with m.If(self.col == 16):
@@ -310,8 +313,10 @@ class OLED(Elaboratable):
                     m.d.sync += self.col.eq(1)
                     m.next = "PRINT: DATA: UNSTROBED ROM WRITER, NEEDS SCROLL"
                 with m.Else():
-                    m.d.sync += self.col.eq(1)
-                    m.d.sync += self.row.eq(self.row + 1)
+                    m.d.sync += [
+                        self.col.eq(1),
+                        self.row.eq(self.row + 1),
+                    ]
                     m.next = "PRINT: DATA: UNSTROBED ROM WRITER, NEEDS PAGE ADJUST"
             with m.Else():
                 m.d.sync += self.col.eq(self.col + 1)
@@ -336,13 +341,18 @@ class OLED(Elaboratable):
 
         with m.State("PRINT: DATA: PAGE ADJUST"):
             with m.If(self.i2c_bus.o_in_fifo_w_rdy):
-                m.d.sync += self.locator.i_row.eq(self.row)
-                m.d.sync += self.locator.i_col.eq(0)
-                m.d.sync += self.locator.i_stb.eq(1)
+                m.d.sync += [
+                    self.locator.i_row.eq(self.row),
+                    self.locator.i_col.eq(0),
+                    self.locator.i_stb.eq(1),
+                ]
                 m.next = "PRINT: DATA: LOC ADJUST: STROBED LOCATOR"
 
         with m.State("PRINT: DATA: LOC ADJUST: STROBED LOCATOR"):
-            m.d.sync += self.locator.i_stb.eq(0)
+            m.d.sync += [
+                self.i_fifo.r_en.eq(0),
+                self.locator.i_stb.eq(0),
+            ]
             m.next = "PRINT: DATA: LOC ADJUST: UNSTROBED LOCATOR"
 
         with m.State("PRINT: DATA: LOC ADJUST: UNSTROBED LOCATOR"):
@@ -355,7 +365,10 @@ class OLED(Elaboratable):
                     m.next = "PRINT: DATA: WAIT"
 
         with m.State("PRINT: DATA: LOC ADJUST: STROBED LOCATOR, NEEDS SCROLL"):
-            m.d.sync += self.locator.i_stb.eq(0)
+            m.d.sync += [
+                self.locator.i_stb.eq(0),
+                self.i_fifo.r_en.eq(0),
+            ]
             m.next = "PRINT: DATA: LOC ADJUST: UNSTROBED LOCATOR, NEEDS SCROLL"
 
         with m.State("PRINT: DATA: LOC ADJUST: UNSTROBED LOCATOR, NEEDS SCROLL"):
