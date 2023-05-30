@@ -366,6 +366,7 @@ class I2C(Elaboratable):
                             & (self.rw == RW.R)
                         ):
                             m.d.sync += [
+                                self.next_byte.eq(I2C.NextByte.IDLE),
                                 self.byte.payload.data.eq(0),
                                 self.byte_ix.eq(0),
                                 self.sda_oe.eq(0),

@@ -44,7 +44,11 @@ class TestI2CReadTop(Elaboratable):
         bus = self.i2c.bus
         transfer = Transfer(bus.i_in_fifo_w_data)
 
-        m.d.comb += self.result.w_data.eq(bus.o_out_fifo_r_data)
+        m.d.comb += [
+            self.result.w_data.eq(bus.o_out_fifo_r_data),
+            self.result.w_en.eq(bus.o_out_fifo_r_rdy),
+            bus.i_out_fifo_r_en.eq(bus.o_out_fifo_r_rdy),
+        ]
 
         with m.FSM():
             with m.State("IDLE"):
@@ -77,25 +81,6 @@ class TestI2CReadTop(Elaboratable):
 
             with m.State("PLACEHOLDER LATCHED"):
                 m.d.sync += bus.i_in_fifo_w_en.eq(0)
-                m.next = "PLACEHOLDER UNLATCHED"
-
-            with m.State("PLACEHOLDER UNLATCHED"):
-                with m.If(bus.o_busy & bus.o_ack & bus.o_out_fifo_r_rdy):
-                    m.d.sync += [
-                        bus.i_out_fifo_r_en.eq(1),
-                        self.result.w_en.eq(1),
-                    ]
-                    m.next = "R_EN LATCHED"
-
-                with m.Elif(~bus.o_busy):
-                    m.d.sync += self.busy.eq(0)
-                    m.next = "IDLE"
-
-            with m.State("R_EN LATCHED"):
-                m.d.sync += [
-                    bus.i_out_fifo_r_en.eq(0),
-                    self.result.w_en.eq(0),
-                ]
 
                 with m.If(self.remaining == 1):
                     m.d.sync += self.busy.eq(0)
