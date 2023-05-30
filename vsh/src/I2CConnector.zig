@@ -44,16 +44,20 @@ pub fn tick(self: *@This()) Tick {
         .Pass => return .Pass,
         .AckNack => {
             const byte = self.byte_receiver.byte;
+            // XXX(Ch): This is probably buggy: if we get a START for not-us, we
+            // .Pass, but then imagine the first data byte looks like it
+            // addressses us.
             if (!self.addressed) {
                 const addr: u7 = @truncate(u7, byte >> 1);
                 const rw = @intToEnum(RW, @truncate(u1, byte));
                 if (addr == self.addr and rw == .W) {
                     self.sda_i.next(false);
                     self.addressed = true;
-                    return .Addressed;
+                    return .AddressedWrite;
                 } else if (addr == self.addr and rw == .R) {
-                    std.debug.print("NYI: read\n", .{});
-                    return .Pass;
+                    self.sda_i.next(false);
+                    self.addressed = true;
+                    return .AddressedRead;
                 } else {
                     return .Pass;
                 }

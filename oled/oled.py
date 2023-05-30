@@ -28,6 +28,7 @@ class OLED(Elaboratable):
         PRINT = 0x05
         CURSOR_ON = 0x06
         CURSOR_OFF = 0x07
+        ID = 0x08
 
     class Result(IntEnum, shape=2):
         SUCCESS = 0
@@ -98,6 +99,11 @@ class OLED(Elaboratable):
 
         m.submodules.i_fifo = self.i_fifo
 
+        i_in_fifo_w_data = Signal(9)
+        i_in_fifo_w_en = Signal()
+        i_out_fifo_r_en = Signal()
+        i_stb = Signal()
+
         with m.If(self.rom_writer.o_busy):
             m.d.comb += self.i2c_bus.connect(self.rom_writer.i2c_bus)
         with m.Elif(self.locator.o_busy):
@@ -108,10 +114,10 @@ class OLED(Elaboratable):
             m.d.comb += self.i2c_bus.connect(self.scroller.i2c_bus)
         with m.Else():
             m.d.comb += [
-                self.i2c_bus.i_in_fifo_w_data.eq(0),
-                self.i2c_bus.i_in_fifo_w_en.eq(0),
-                self.i2c_bus.i_out_fifo_r_en.eq(0),
-                self.i2c_bus.i_stb.eq(0),
+                self.i2c_bus.i_in_fifo_w_data.eq(i_in_fifo_w_data),
+                self.i2c_bus.i_in_fifo_w_en.eq(i_in_fifo_w_en),
+                self.i2c_bus.i_out_fifo_r_en.eq(i_out_fifo_r_en),
+                self.i2c_bus.i_stb.eq(i_stb),
             ]
 
         # TODO: actually flash cursor when on
@@ -175,6 +181,9 @@ class OLED(Elaboratable):
                         ]
                         m.next = "IDLE"
 
+                    with m.Case(OLED.Command.ID):
+                        m.next = "ID: START"
+
             with m.State("CLSER: STROBED"):
                 m.d.sync += self.clser.i_stb.eq(0)
                 m.next = "CLSER: UNSTROBED"
@@ -195,6 +204,53 @@ class OLED(Elaboratable):
                 with m.If(~self.rom_writer.o_busy):
                     m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
                     m.next = "IDLE"
+
+            with m.State("ID: START"):
+                m.d.sync += [
+                    i_in_fifo_w_data.eq(0x179),
+                    i_in_fifo_w_en.eq(0x179),
+                ]
+                m.next = "ID: START: STROBED W_EN"
+            with m.State("ID: START: STROBED W_EN"):
+                m.d.sync += [
+                    i_in_fifo_w_en.eq(0),
+                    i_stb.eq(1),
+                ]
+                m.next = "ID: START: STROBED I_STB"
+            with m.State("ID: START: STROBED I_STB"):
+                m.d.sync += i_stb.eq(0)
+                m.next = "ID: START: UNSTROBED I_STB"
+            with m.State("ID: START: UNSTROBED I_STB"):
+                with m.If(
+                    self.i2c_bus.o_busy
+                    & self.i2c_bus.o_ack
+                    & self.i2c_bus.o_in_fifo_w_rdy
+                ):
+                    m.d.sync += [
+                        i_in_fifo_w_data.eq(0x00),
+                        i_in_fifo_w_en.eq(0x00),
+                    ]
+                    m.next = "ID: RECV: WAIT"
+                with m.Elif(~self.i2c_bus.o_busy):
+                    m.d.sync += self.o_result.eq(OLED.Result.FAILURE)
+                    m.next = "IDLE"
+            id_recvd = Signal(8)
+            with m.State("ID: RECV: WAIT"):
+                m.d.sync += i_in_fifo_w_en.eq(0)
+                with m.If(self.i2c_bus.o_out_fifo_r_rdy):
+                    m.d.sync += [
+                        id_recvd.eq(self.i2c_bus.o_out_fifo_r_data),
+                        i_out_fifo_r_en.eq(1),
+                    ]
+                    m.next = "ID: RECV: STROBED R_EN"
+                with m.Elif(~self.i2c_bus.o_busy):
+                    m.d.sync += self.o_result.eq(OLED.Result.FAILURE)
+                    m.next = "IDLE"
+            with m.State("ID: RECV: STROBED R_EN"):
+                m.d.sync += i_out_fifo_r_en.eq(0)
+                # TODO Actually do something with it
+                m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
+                m.next = "IDLE"
 
         return m
 

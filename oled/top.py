@@ -11,11 +11,10 @@ from .oled import OLED
 
 __all__ = ["Top"]
 
-msg1 = "Nyonk\n plonk"
-msg2 = "14: Hej\n 15: Mm\n  16: Z!\n   17: :)"
+msg1 = "ID: "
 TEST_SEQUENCE = [
-    0x02,  # DISPLAY_OFF
-    0x03,  # CLS
+    # 0x02,  # DISPLAY_OFF
+    # 0x03,  # CLS
     0x01,  # DISPLAY_ON
     0x04,
     0x01,
@@ -23,14 +22,29 @@ TEST_SEQUENCE = [
     0x05,
     len(msg1),
     *[ord(c) for c in msg1],  # PRINT msg1
-    0x04,
-    0x0E,
-    0x01,  # LOCATE 14, 1
-    0x05,
-    len(msg2),
-    *[ord(c) for c in msg2],  # PRINT msg2
-    0x06,  # CURSOR_ON
+    0x08,  # ID
 ]
+
+# msg1 = "Nyonk\n plonk"
+# msg2 = "14: Hej\n 15: Mm\n  16: Z!\n   17: :)"
+# TEST_SEQUENCE = [
+#     0x02,  # DISPLAY_OFF
+#     0x03,  # CLS
+#     0x01,  # DISPLAY_ON
+#     0x04,
+#     0x01,
+#     0x01,  # LOCATE 1, 1
+#     0x05,
+#     len(msg1),
+#     *[ord(c) for c in msg1],  # PRINT msg1
+#     0x04,
+#     0x0E,
+#     0x01,  # LOCATE 14, 1
+#     0x05,
+#     len(msg2),
+#     *[ord(c) for c in msg2],  # PRINT msg2
+#     0x06,  # CURSOR_ON
+# ]
 
 # msg = "Hello, world! This should wrap correctly."
 # TEST_SEQUENCE = [

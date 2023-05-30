@@ -74,7 +74,8 @@ class I2CBus(Record):
                 ("o_in_fifo_r_rdy", 1, DIR_FANOUT),
                 ("o_out_fifo_r_rdy", 1, DIR_FANOUT),
                 ("o_out_fifo_r_data", 8, DIR_FANOUT),
-            ]
+            ],
+            name="I2CBus",
         )
         self.fields["o_ack"].reset = 1
 

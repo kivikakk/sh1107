@@ -46,7 +46,7 @@ pub fn tick(self: *I2CBBConnector) Tick {
 
         if (self.addressed) {
             if ((self.latched_fifo_data & 0x100) == 0x100) {
-                return if (self.handleAddress(self.latched_fifo_data)) .Addressed else .Fish;
+                return if (self.handleAddress(self.latched_fifo_data)) .AddressedWrite else .Fish;
             } else {
                 return .{ .Byte = @truncate(u8, self.latched_fifo_data) };
             }
@@ -55,7 +55,7 @@ pub fn tick(self: *I2CBBConnector) Tick {
 
     if (stb.rising()) {
         if (!self.addressed and (self.latched_fifo_data & 0x100) == 0x100) {
-            return if (self.handleAddress(self.latched_fifo_data)) .Addressed else .Pass;
+            return if (self.handleAddress(self.latched_fifo_data)) .AddressedWrite else .Pass;
         }
     }
 
@@ -76,7 +76,7 @@ fn handleAddress(self: *I2CBBConnector, fifo: u9) bool {
         self.ack_in.next(true);
         return true;
     } else if (addr == self.addr and rw == .R) {
-        std.debug.print("NYI: read\n", .{});
+        std.debug.print("NYI (BB): read\n", .{});
         return false;
     } else {
         return false;

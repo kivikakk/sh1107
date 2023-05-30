@@ -16,7 +16,8 @@ parser: ?Cmd.Parser = null,
 
 pub const Tick = union(enum) {
     Pass,
-    Addressed,
+    AddressedWrite,
+    AddressedRead,
     Error,
     Fish,
     Byte: u8,
@@ -32,9 +33,10 @@ pub fn tick(self: *@This(), fpga_thread: *FPGAThread) void {
         inline else => |*i2c_connector| {
             switch (i2c_connector.tick()) {
                 .Pass => {},
-                .Addressed => {
+                .AddressedWrite => {
                     self.parser = .{};
                 },
+                .AddressedRead => {},
                 .Error => {
                     std.debug.print("i2c error\n", .{});
                     self.parser = null;
