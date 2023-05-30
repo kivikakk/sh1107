@@ -214,7 +214,9 @@ def ack(i2c: I2C, *, ack: bool = True, from_them: bool = False) -> sim.Generator
 
         yield Delay(4 * _tick(i2c))
         assert (yield i2c.sda_oe)
-        assert ack ^ (yield i2c.sda_o)  # ACK/low or NACK/high
+        assert ack ^ (
+            yield i2c.sda_o
+        ), f"expected ack {ack} from other side, got {not ack}"  # ACK/low or NACK/high
 
         yield Delay(6 * _tick(i2c))
 
