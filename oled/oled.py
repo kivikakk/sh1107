@@ -31,9 +31,11 @@ class OLED(Elaboratable):
     # I tried adding some delays after switching to command mode (i.e. add some
     # extra commands!) before restarting the transaction in read, but it still
     # ended up giving me display RAM data back.  This doesn't happen at 400kHz.
-    VALID_SPEEDS: Final[list[int]] = [
+    VALID_BUILD_SPEEDS: Final[list[int]] = [
         100_000,
         400_000,
+    ]
+    VALID_SPEEDS: Final[list[int]] = VALID_BUILD_SPEEDS + [
         2_000_000,  # for vsh
     ]
     DEFAULT_SPEED: Final[int] = 400_000

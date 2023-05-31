@@ -12,6 +12,7 @@ from .oled import OLED
 __all__ = ["Top"]
 
 msg1 = "ID: "
+msg2 = "/"
 TEST_SEQUENCE = [
     0x02,  # DISPLAY_OFF
     0x03,  # CLS
@@ -22,9 +23,13 @@ TEST_SEQUENCE = [
     0x05,
     len(msg1),
     *[ord(c) for c in msg1],  # PRINT msg1
-    0x02,
     0x08,  # ID
-    0x01,
+    0x05,
+    len(msg2),
+    *[ord(c) for c in msg2],  # PRINT msg2
+    0x02,  # DISPLAY_OFF
+    0x08,  # ID
+    0x01,  # DISPLAY_ON
 ]
 
 # msg1 = "Nyonk\n plonk"
