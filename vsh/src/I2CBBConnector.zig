@@ -54,7 +54,7 @@ pub fn tick(self: *I2CBBConnector) Tick {
         self.bb_in_out_fifo_stb.next(false);
     }
 
-    if (in_fifo_w_en.rising()) {
+    if (in_fifo_w_en.curr) {
         self.latched_fifo_in_data = in_fifo_w_data.curr;
 
         if (self.addressed) |rw| {
