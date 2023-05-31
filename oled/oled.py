@@ -1,5 +1,6 @@
 from typing import Final, Optional
 
+from amaranth import Mux  # pyright: ignore[reportUnknownVariableType]
 from amaranth import ClockSignal, Elaboratable, Instance, Module, Signal
 from amaranth.build import Platform
 from amaranth.lib.enum import IntEnum
@@ -248,9 +249,45 @@ class OLED(Elaboratable):
                     m.next = "IDLE"
             with m.State("ID: RECV: STROBED R_EN"):
                 m.d.sync += i_out_fifo_r_en.eq(0)
-                # TODO Actually do something with it
-                m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
-                m.next = "IDLE"
+                with m.If(~self.i2c_bus.o_busy):
+                    first_half = id_recvd[4:8]
+                    m.d.sync += [
+                        self.rom_writer.i_index.eq(
+                            OFFSET_CHAR
+                            + Mux(
+                                first_half > 9,
+                                ord("A") + first_half - 10,
+                                ord("0") + first_half,
+                            )
+                        ),
+                        self.rom_writer.i_stb.eq(1),
+                    ]
+                    m.next = "ID: FIRST HALF: STROBED ROM WRITER"
+            with m.State("ID: FIRST HALF: STROBED ROM WRITER"):
+                m.d.sync += self.rom_writer.i_stb.eq(0)
+                m.next = "ID: FIRST HALF: UNSTROBED ROM WRITER"
+            with m.State("ID: FIRST HALF: UNSTROBED ROM WRITER"):
+                with m.If(~self.rom_writer.o_busy):
+                    second_half = id_recvd[:4]
+                    m.d.sync += [
+                        self.rom_writer.i_index.eq(
+                            OFFSET_CHAR
+                            + Mux(
+                                second_half > 9,
+                                ord("A") + second_half - 10,
+                                ord("0") + second_half,
+                            )
+                        ),
+                        self.rom_writer.i_stb.eq(1),
+                    ]
+                    m.next = "ID: SECOND HALF: STROBED ROM WRITER"
+            with m.State("ID: SECOND HALF: STROBED ROM WRITER"):
+                m.d.sync += self.rom_writer.i_stb.eq(0)
+                m.next = "ID: SECOND HALF: UNSTROBED ROM WRITER"
+            with m.State("ID: SECOND HALF: UNSTROBED ROM WRITER"):
+                with m.If(~self.rom_writer.o_busy):
+                    m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
+                    m.next = "IDLE"
 
         return m
 
