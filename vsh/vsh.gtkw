@@ -1,34 +1,38 @@
 [*]
 [*] GTKWave Analyzer v3.3.100 (w)1999-2019 BSI
-[*] Wed May 31 02:42:11 2023
+[*] Wed May 31 06:04:18 2023
 [*]
 [dumpfile] "C:\Users\kivikakk\Code\sh1107\vsh\vsh.vcd"
-[dumpfile_mtime] "Wed May 31 02:39:26 2023"
-[dumpfile_size] 288537
+[dumpfile_mtime] "Wed May 31 05:54:55 2023"
+[dumpfile_size] 45522323
 [savefile] "C:\Users\kivikakk\Code\sh1107\vsh\vsh.gtkw"
-[timestart] 11155
-[size] 1240 1398
-[pos] -1 -1
-*-5.415710 11260 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[timestart] 161100
+[size] 2498 1417
+[pos] -1253 -14
+*-10.696841 168806 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] oled.
 [sst_width] 197
 [signals_width] 321
 [sst_expanded] 1
-[sst_vpaned_height] 433
+[sst_vpaned_height] 440
 @28
 oled.clk
 @22
 oled.i2c.byte[8:0]
 @28
 oled.i2c.byte_ix[2:0]
-@23
-oled.i2c.I2CBus__o_out_fifo_r_data[7:0]
 @22
 oled.i2c.fsm_state[3:0]
 @28
+[color] 6
 oled.i2c.scl__o
+@29
+[color] 3
 oled.i2c.sda__oe
+@28
+[color] 1
 oled.i2c.sda__o
+[color] 2
 oled.i2c.sda__i
 oled.i2c.I2CBus__o_ack
 oled.i2c.rw
@@ -38,5 +42,10 @@ oled.i2c.I2CBus__o_busy
 oled.i2c.I2CBus__i_in_fifo_w_data[8:0]
 @28
 oled.i2c.I2CBus__i_in_fifo_w_en
+oled.rom_writer.o_busy
+@22
+oled.rom_writer.offset[11:0]
+oled.rom_writer.remain[11:0]
+oled.rom_writer.i_index[8:0]
 [pattern_trace] 1
 [pattern_trace] 0
