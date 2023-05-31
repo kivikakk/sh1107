@@ -38,7 +38,6 @@ class TestClserTop(Elaboratable):
 class TestClser(sim.TestCase):
     @sim.args(speed=Hz(100_000), ci_only=True)
     @sim.args(speed=Hz(400_000), ci_only=True)
-    @sim.args(speed=Hz(1_000_000), ci_only=True)
     @sim.args(speed=Hz(2_000_000))
     def test_sim_clser(self, dut: TestClserTop) -> sim.Generator:
         def trigger() -> sim.Generator:

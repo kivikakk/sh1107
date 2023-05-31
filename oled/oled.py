@@ -20,6 +20,24 @@ __all__ = ["OLED"]
 class OLED(Elaboratable):
     ADDR: Final[int] = 0x3C
 
+    # 1MHz is a bit unacceptable.  It seems to mostly work, except that
+    # switching between command and data before doing a read isn't consistent.
+    # There's a clear reason why this might be the case: the SH1107 datasheet
+    # specifies 400kHz as the maximum SCL clock frequency, and further specifies
+    # a bunch of timings that we don't meet at 1MHz — particularly
+    # START/STOP/RESTART hold times, which are all listed as min 0.6μs.  At
+    # 1MHz, we're only holding for 0.5μs.
+    #
+    # I tried adding some delays after switching to command mode (i.e. add some
+    # extra commands!) before restarting the transaction in read, but it still
+    # ended up giving me display RAM data back.  This doesn't happen at 400kHz.
+    VALID_SPEEDS: Final[list[int]] = [
+        100_000,
+        400_000,
+        2_000_000,  # for vsh
+    ]
+    DEFAULT_SPEED: Final[int] = 400_000
+
     class Command(IntEnum, shape=8):
         NOP = 0x00
         DISPLAY_ON = 0x01
@@ -57,6 +75,8 @@ class OLED(Elaboratable):
     cursor: Signal
 
     def __init__(self, *, speed: Hz, build_i2c: bool):
+        assert speed.value in self.VALID_SPEEDS
+
         self.build_i2c = build_i2c
 
         if build_i2c:
