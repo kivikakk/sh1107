@@ -2,7 +2,7 @@
 
 PYTHON="${PYTHON:-python}"
 BOARDS=( icebreaker orangecrab )
-SPEEDS=( 100000 400000 1000000 )
+SPEEDS=( 100000 400000 )
 
 if ! type asdf &>/dev/null; then
 	source ~/.asdf/asdf.sh
