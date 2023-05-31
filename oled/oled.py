@@ -237,6 +237,9 @@ class OLED(Elaboratable):
                     m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
                     m.next = "IDLE"
 
+            # XXX(Ch): this is all biggest hack and we don't adjust
+            # cursor pos or wrap or do ANYTHING when we print these
+            # hex digits out, beware.
             with m.State("ID: START"):
                 m.d.sync += [
                     i_in_fifo_w_data.eq(0x178),
