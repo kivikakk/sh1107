@@ -31,10 +31,11 @@ pub fn Sample(comptime T: type) type {
         pub fn format(self: Self, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
             _ = options;
             _ = fmt;
-            return std.fmt.format(writer, "{} -> {}", .{
-                self.prev,
-                self.curr,
-            });
+            if (self.prev != self.curr) {
+                return std.fmt.format(writer, "{} -> {}", .{ self.prev, self.curr });
+            } else {
+                return std.fmt.format(writer, "{}", .{self.curr});
+            }
         }
 
         pub usingnamespace if (T == bool) struct {

@@ -12,12 +12,16 @@ const InnerI2CConnector = union(enum) {
 };
 
 i2c_connector: InnerI2CConnector,
-parser: ?Cmd.Parser = null,
+state: union(enum) {
+    Unaddressed,
+    AddressedWrite: Cmd.Parser,
+    AddressedRead,
+} = .Unaddressed,
 
 pub const Tick = union(enum) {
     Pass,
     AddressedWrite,
-    AddressedRead,
+    AddressedRead: *u8,
     Error,
     Fish,
     Byte: u8,
@@ -34,40 +38,50 @@ pub fn tick(self: *@This(), fpga_thread: *FPGAThread) void {
             switch (i2c_connector.tick()) {
                 .Pass => {},
                 .AddressedWrite => {
-                    self.parser = .{};
+                    self.state = .{ .AddressedWrite = .{} };
                 },
-                .AddressedRead => {},
+                .AddressedRead => |byte_out| {
+                    self.state = .AddressedRead;
+                    byte_out.* = 0xA7;
+                },
                 .Error => {
                     std.debug.print("i2c error\n", .{});
-                    self.parser = null;
+                    self.state = .Unaddressed;
                 },
                 .Fish => {
-                    if (self.parser == null) {
-                        std.debug.print("i2c fish without parser\n", .{});
-                    } else if (!self.parser.?.valid_finish) {
-                        std.debug.print("i2c fish without valid_finish\n", .{});
+                    switch (self.state) {
+                        .Unaddressed => std.debug.print("i2c fish while unaddressed\n", .{}),
+                        .AddressedWrite => |parser| if (!parser.valid_finish) {
+                            std.debug.print("i2c fish without valid_finish\n", .{});
+                        },
+                        .AddressedRead => {},
                     }
-                    self.parser = null;
+                    self.state = .Unaddressed;
                 },
-                .Byte => |byte| switch (self.parser.?.feed(byte)) {
-                    .Pass => {},
-                    .Unrecoverable => {
-                        std.debug.print("command parser noped out, fed {x:0>2} -- " ++
-                            "state: {} / continuation: {} / partial_cmd: {?x:0>2}\n", .{
-                            byte,
-                            self.parser.?.state,
-                            self.parser.?.continuation,
-                            self.parser.?.partial_cmd,
-                        });
-                        self.parser = null;
-                        i2c_connector.reset();
-                    },
-                    .Command => |cmd| {
-                        fpga_thread.process_cmd(cmd);
-                    },
-                    .Data => |data| {
-                        fpga_thread.process_data(data);
-                    },
+                .Byte => |byte| {
+                    switch (self.state) {
+                        .AddressedWrite => |*parser| switch (parser.feed(byte)) {
+                            .Pass => {},
+                            .Unrecoverable => {
+                                std.debug.print("command parser noped out, fed {x:0>2} -- " ++
+                                    "state: {} / continuation: {} / partial_cmd: {?x:0>2}\n", .{
+                                    byte,
+                                    parser.state,
+                                    parser.continuation,
+                                    parser.partial_cmd,
+                                });
+                                self.state = .Unaddressed;
+                                i2c_connector.reset();
+                            },
+                            .Command => |cmd| {
+                                fpga_thread.process_cmd(cmd);
+                            },
+                            .Data => |data| {
+                                fpga_thread.process_data(data);
+                            },
+                        },
+                        else => std.debug.print("i2c got Byte while not AddressedWrite\n", .{}),
+                    }
                 },
             }
         },

@@ -228,7 +228,7 @@ class OLED(Elaboratable):
                 ):
                     m.d.sync += [
                         i_in_fifo_w_data.eq(0x00),
-                        i_in_fifo_w_en.eq(0x00),
+                        i_in_fifo_w_en.eq(1),
                     ]
                     m.next = "ID: RECV: WAIT"
                 with m.Elif(~self.i2c_bus.o_busy):
