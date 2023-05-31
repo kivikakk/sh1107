@@ -42,7 +42,7 @@ pub fn tick(self: *@This()) Tick {
     const result = self.byte_transmitter.process(scl_o, scl_oe, sda_o, sda_oe);
     switch (result) {
         .Pass => return .Pass,
-        .AckNackW => {
+        .WriteAck => {
             const byte = self.byte_transmitter.byte;
             // XXX(Ch): This is probably buggy: if we get a START for not-us, we
             // .Pass, but then imagine the first data byte looks like it
@@ -115,7 +115,7 @@ const ByteTransmitter = struct {
 
     const Result = union(enum) {
         Pass,
-        AckNackW,
+        WriteAck,
         ReadAck,
         SetSda: bool,
         Error,
@@ -175,7 +175,7 @@ const ByteTransmitter = struct {
                             return .Error;
                         }
                         self.state = .WAIT_ACK_SCL_RISE;
-                        return .AckNackW;
+                        return .WriteAck;
                     } else if (scl_oe.stable_high() and scl_o.falling() and sda_oe.stable_high() and sda_o.stable()) {
                         if (self.bits == 7) {
                             self.state = .IDLE;
@@ -200,8 +200,6 @@ const ByteTransmitter = struct {
                         self.rw = .W;
                         self.bits = 0;
                         self.byte = 0;
-                        // NOTE(Ch): cuando queremos manejar lecturas también, este
-                        // "Fish" prob tendrá que cambiar.
                         return .Fish;
                     } else if (!all_stable) {
                         self.state = .IDLE;
