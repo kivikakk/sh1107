@@ -139,7 +139,7 @@ class TestSH1107Command(unittest.TestCase):
         #
         # (input, output, leftover, partial command, end state, end continuation, fish ok/more needed/unrecoverable)
         #
-        ([0x80], [], [], [], "Cmd", True, "M"),
+        ([0x80], [], [], [], "Cmd", True, "F"),
         ([0x80, 0xD5], [], [], [0xD5], "Ctrl", True, "M"),
         ([0x80, 0xD5, 0x80], [], [], [0xD5], "Cmd", True, "M"),
         (
@@ -158,7 +158,7 @@ class TestSH1107Command(unittest.TestCase):
             [],
             "Cmd",
             False,
-            "M",
+            "F",
         ),
         (
             [0x80, 0xD5, 0x80, 0x46, 0x00, 0xAF],
@@ -216,7 +216,7 @@ class TestSH1107Command(unittest.TestCase):
             [],
             "Cmd",
             False,
-            "M",
+            "F",
         ),
         (
             [0x80, 0xAF, 0x00, 0xD5],
@@ -252,7 +252,7 @@ class TestSH1107Command(unittest.TestCase):
             [],
             "Cmd",
             False,
-            "M",  # empty section invalid
+            "F",
         ),
         (
             [0x00, 0xAF],
@@ -279,7 +279,7 @@ class TestSH1107Command(unittest.TestCase):
             [],
             "Data",
             False,
-            "M",  # empty section invalid
+            "F",
         ),
         (
             [0x40, 0xAA],
@@ -297,7 +297,7 @@ class TestSH1107Command(unittest.TestCase):
             [],
             "Data",
             False,
-            "M",
+            "F",
         ),
         (
             [0x40, 0xAA, 0x40],
@@ -324,7 +324,7 @@ class TestSH1107Command(unittest.TestCase):
             [],
             "Data",
             True,
-            "M",
+            "F",
         ),
         (
             [0xC0, 0xAA],
@@ -371,7 +371,7 @@ class TestSH1107Command(unittest.TestCase):
     def test_parse_partial(self):
         # (input, output, leftover, partial command, end state, end continuation, fish ok/more needed/unrecoverable)
 
-        for (
+        for i, (
             bytes,
             cmds,
             leftover,
@@ -379,30 +379,31 @@ class TestSH1107Command(unittest.TestCase):
             state,
             continuation,
             fmu,
-        ) in self.PARSE_PARTIAL:
+        ) in enumerate(self.PARSE_PARTIAL):
+            msg = f"partial {i}"
             parser = Cmd.Parser()
             result = parser.feed(bytes)
-            self.assertEqual(result, cmds)
-            self.assertEqual(parser.bytes, leftover)
-            self.assertEqual(parser.partial_cmd, partial_cmd)
+            self.assertEqual(result, cmds, msg)
+            self.assertEqual(parser.bytes, leftover, msg)
+            self.assertEqual(parser.partial_cmd, partial_cmd, msg)
             match state:
                 case "Ctrl":
-                    self.assertEqual(parser.state, ParseState.Control)
+                    self.assertEqual(parser.state, ParseState.Control, msg)
                 case "Cmd":
-                    self.assertEqual(parser.state, ParseState.Command)
+                    self.assertEqual(parser.state, ParseState.Command, msg)
                 case "Data":
-                    self.assertEqual(parser.state, ParseState.Data)
-            self.assertEqual(parser.continuation, continuation)
+                    self.assertEqual(parser.state, ParseState.Data, msg)
+            self.assertEqual(parser.continuation, continuation, msg)
             match fmu:
                 case "F":
-                    self.assertTrue(parser.valid_finish)
-                    self.assertFalse(parser.unrecoverable)
+                    self.assertTrue(parser.valid_finish, msg)
+                    self.assertFalse(parser.unrecoverable, msg)
                 case "M":
-                    self.assertFalse(parser.valid_finish)
-                    self.assertFalse(parser.unrecoverable)
+                    self.assertFalse(parser.valid_finish, msg)
+                    self.assertFalse(parser.unrecoverable, msg)
                 case "U":
-                    self.assertFalse(parser.valid_finish)
-                    self.assertTrue(parser.unrecoverable)
+                    self.assertFalse(parser.valid_finish, msg)
+                    self.assertTrue(parser.unrecoverable, msg)
 
 
 if __name__ == "__main__":

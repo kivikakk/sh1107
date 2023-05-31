@@ -276,6 +276,10 @@ pub const Parser = struct {
 
                 self.continuation = cb.continuation;
                 self.state = if (cb.dc == .Command) .Command else .Data;
+
+                // It's fine to just set the mode, e.g. for reads.
+                self.valid_finish = self.partial_cmd == null;
+
                 return .Pass;
             },
             .Command => {

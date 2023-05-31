@@ -13,8 +13,8 @@ __all__ = ["Top"]
 
 msg1 = "ID: "
 TEST_SEQUENCE = [
-    # 0x02,  # DISPLAY_OFF
-    # 0x03,  # CLS
+    0x02,  # DISPLAY_OFF
+    0x03,  # CLS
     0x01,  # DISPLAY_ON
     0x04,
     0x01,

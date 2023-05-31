@@ -149,6 +149,10 @@ class Cmd:
                             else ParseState.Data
                         )
 
+                        self.valid_finish = (
+                            not self.partial_cmd
+                        )  # may be just setting mode for read
+
                     case ParseState.Command:
                         self.partial_cmd.append(b)
                         px = Base.parse_one(self.partial_cmd)

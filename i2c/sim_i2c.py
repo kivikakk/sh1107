@@ -190,7 +190,12 @@ def send(
             assert not (yield i2c.bus.i_in_fifo_w_en)
         actual = (actual << 1) | (yield i2c.sda_o)
 
-        yield from wait_scl(i2c, 0, sda_o=ValueChange.STEADY)
+        yield from wait_scl(
+            i2c,
+            0,
+            sda_o=ValueChange.STEADY,
+            sda_oe=ValueChange.STEADY if bit < 7 else ValueChange.FALL,
+        )
 
     assert actual == byte, f"expected {byte:02x}, got {actual:02x}"
 
@@ -225,7 +230,7 @@ def ack(
 
     else:
         # Controller releases SDA; we ACK by driving SDA low.
-        assert (yield i2c.sda_oe)
+        assert not (yield i2c.sda_oe)
         yield Delay(_tick(i2c))
         if ack:
             yield cast(Signal, i2c.sda.i).eq(0)
@@ -238,7 +243,7 @@ def ack(
             yield cast(Signal, i2c.sda.i).eq(1)
         yield Delay(_tick(i2c))
 
-        # assert retakes_sda == (yield i2c.sda_oe)
+        assert retakes_sda == (yield i2c.sda_oe)
         assert ack == (yield i2c.bus.o_ack)
 
 
