@@ -61,6 +61,17 @@ class Transfer(data.Struct):
 
 
 class I2CBus(Record):
+    i_in_fifo_w_data: Signal
+    i_in_fifo_w_en: Signal
+    i_out_fifo_r_en: Signal
+    i_stb: Signal
+    o_ack: Signal
+    o_busy: Signal
+    o_in_fifo_w_rdy: Signal
+    o_in_fifo_r_rdy: Signal
+    o_out_fifo_r_rdy: Signal
+    o_out_fifo_r_data: Signal
+
     def __init__(self):
         super().__init__(
             [

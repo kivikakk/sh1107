@@ -39,7 +39,7 @@
 			"reportUnknownMemberType": "none",
 			"reportInconsistentConstructor": "none",
 			"reportMissingTypeStubs": "none",
-			"reportUnknownVariableType": "information",
+			"reportUnknownVariableType": "none",
 			"reportUnusedImport": "none",
 			"reportUnknownLambdaType": "none",
 			"reportUnknownArgumentType": "none",

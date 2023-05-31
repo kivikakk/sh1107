@@ -98,7 +98,9 @@ class Top(Elaboratable):
         self.switch = Signal()
 
         self.rom_rd = Memory(
-            width=8, depth=len(test_sequence), init=test_sequence
+            width=8,
+            depth=len(test_sequence),
+            init=test_sequence,
         ).read_port(transparent=False)
 
     @property
@@ -114,7 +116,9 @@ class Top(Elaboratable):
             ]
         else:
             ports += [
-                self.oled.i_i2c_ack_in,
+                self.oled.i_i2c_bb_in_ack,
+                self.oled.i_i2c_bb_in_out_fifo_data,
+                self.oled.i_i2c_bb_in_out_fifo_stb,
             ]
         return ports
 

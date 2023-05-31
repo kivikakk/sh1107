@@ -45,7 +45,9 @@ class OLED(Elaboratable):
     scroller: Scroller
 
     i_fifo: SyncFIFO
-    i_i2c_ack_in: Signal  # For blackbox simulation only
+    i_i2c_bb_in_ack: Signal  # For blackbox simulation only
+    i_i2c_bb_in_out_fifo_data: Signal  # For blackbox simulation only
+    i_i2c_bb_in_out_fifo_stb: Signal  # For blackbox simulation only
     o_result: Signal
 
     i2c_bus: I2CBus
@@ -65,7 +67,9 @@ class OLED(Elaboratable):
         self.scroller = Scroller(addr=OLED.ADDR)
 
         self.i_fifo = SyncFIFO(width=8, depth=1)
-        self.i_i2c_ack_in = Signal()
+        self.i_i2c_bb_in_ack = Signal()
+        self.i_i2c_bb_in_out_fifo_data = Signal(8)
+        self.i_i2c_bb_in_out_fifo_stb = Signal()
         self.o_result = Signal(OLED.Result)
 
         self.i2c_bus = I2CBus()
@@ -85,11 +89,16 @@ class OLED(Elaboratable):
                 i_clk=ClockSignal(),
                 i_in_fifo_w_data=self.i2c_bus.i_in_fifo_w_data,
                 i_in_fifo_w_en=self.i2c_bus.i_in_fifo_w_en,
+                i_out_fifo_r_en=self.i2c_bus.i_out_fifo_r_en,
                 i_stb=self.i2c_bus.i_stb,
-                i_ack_in=self.i_i2c_ack_in,
+                i_bb_in_ack=self.i_i2c_bb_in_ack,
+                i_bb_in_out_fifo_data=self.i_i2c_bb_in_out_fifo_data,
+                i_bb_in_out_fifo_stb=self.i_i2c_bb_in_out_fifo_stb,
                 o_ack=self.i2c_bus.o_ack,
                 o_busy=self.i2c_bus.o_busy,
                 o_in_fifo_w_rdy=self.i2c_bus.o_in_fifo_w_rdy,
+                o_out_fifo_r_rdy=self.i2c_bus.o_out_fifo_r_rdy,
+                o_out_fifo_r_data=self.i2c_bus.o_out_fifo_r_data,
             )
 
         m.submodules.i2c = self.i2c

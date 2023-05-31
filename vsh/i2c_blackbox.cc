@@ -32,20 +32,29 @@ struct bb_p_i2c_impl : public bb_p_i2c {
   uint16_t ticks_until_done;
 
   enum {
-    FIFO_STATE_EMPTY,
-    FIFO_STATE_FULL,
-  } fifo_state;
+    IN_FIFO_STATE_EMPTY,
+    IN_FIFO_STATE_FULL,
+  } in_fifo_state;
+  uint16_t in_fifo_value;
 
-  uint16_t fifo_value;
+  enum {
+    OUT_FIFO_STATE_EMPTY,
+    OUT_FIFO_STATE_FULL,
+  } out_fifo_state;
+  uint8_t out_fifo_value;
 
   void reset() override {
     state = STATE_IDLE;
-    fifo_state = FIFO_STATE_EMPTY;
-    fifo_value = 0u;
+    in_fifo_state = IN_FIFO_STATE_EMPTY;
+    in_fifo_value = 0u;
+    out_fifo_state = OUT_FIFO_STATE_EMPTY;
+    out_fifo_value = 0u;
 
     p_busy = wire<1>{0u};
     p_ack = wire<1>{1u};
     p_in__fifo__w__rdy = wire<1>{1u};
+    p_out__fifo__r__rdy = wire<1>{0u};
+    p_out__fifo__r__data = wire<8>{0u};
   }
 
   bool eval() override {
@@ -53,7 +62,19 @@ struct bb_p_i2c_impl : public bb_p_i2c {
     bool posedge_p_clk = this->posedge_p_clk();
 
     if (posedge_p_clk) {
-      p_ack.next = p_ack__in;
+      p_ack.next = p_bb__in__ack;
+
+      if (p_out__fifo__r__en && out_fifo_state == OUT_FIFO_STATE_FULL) {
+        out_fifo_state = OUT_FIFO_STATE_EMPTY;
+        p_out__fifo__r__rdy.next = value<1>{0u};
+      }
+
+      if (p_bb__in__out__fifo__stb) {
+        out_fifo_state = OUT_FIFO_STATE_FULL;
+        out_fifo_value = p_bb__in__out__fifo__data.get<uint8_t>();
+        p_out__fifo__r__rdy.next = value<1>{1u};
+        p_out__fifo__r__data.next = value<8>{out_fifo_value};
+      }
 
       switch (this->state) {
       case STATE_IDLE: {
@@ -65,8 +86,8 @@ struct bb_p_i2c_impl : public bb_p_i2c {
         break;
       }
       case STATE_BUSY: {
-        if (this->fifo_state == FIFO_STATE_FULL) {
-          this->fifo_state = FIFO_STATE_EMPTY;
+        if (this->in_fifo_state == IN_FIFO_STATE_FULL) {
+          this->in_fifo_state = IN_FIFO_STATE_EMPTY;
           this->ticks_until_done = TICKS_TO_WAIT;
           p_in__fifo__w__rdy.next = value<1>{1u};
         }
@@ -79,16 +100,16 @@ struct bb_p_i2c_impl : public bb_p_i2c {
       }
       }
 
-      switch (this->fifo_state) {
-      case FIFO_STATE_EMPTY: {
+      switch (this->in_fifo_state) {
+      case IN_FIFO_STATE_EMPTY: {
         if (p_in__fifo__w__en) {
-          this->fifo_value = p_in__fifo__w__data.get<uint16_t>();
-          this->fifo_state = FIFO_STATE_FULL;
+          this->in_fifo_value = p_in__fifo__w__data.get<uint16_t>();
+          this->in_fifo_state = IN_FIFO_STATE_FULL;
           p_in__fifo__w__rdy.next = value<1>{0u};
         }
         break;
       }
-      case FIFO_STATE_FULL: {
+      case IN_FIFO_STATE_FULL: {
         break;
       }
       }

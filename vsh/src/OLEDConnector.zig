@@ -42,7 +42,10 @@ pub fn tick(self: *@This(), fpga_thread: *FPGAThread) void {
                 },
                 .AddressedRead => |byte_out| {
                     self.state = .AddressedRead;
-                    byte_out.* = 0xA7;
+                    const sh1107 = fpga_thread.acquire_sh1107();
+
+                    // not busy, display on/off, ID=7
+                    byte_out.* = 0x07 | (if (sh1107.power) @as(u8, 0x00) else @as(u8, 0x40));
                 },
                 .Error => {
                     std.debug.print("i2c error\n", .{});
