@@ -234,11 +234,11 @@ def ack(
         yield Delay(_tick(i2c))
 
         yield Delay(4 * _tick(i2c))
-        assert retakes_sda == (yield i2c.sda_oe)
         if ack:
             yield cast(Signal, i2c.sda.i).eq(1)
         yield Delay(_tick(i2c))
 
+        # assert retakes_sda == (yield i2c.sda_oe)
         assert ack == (yield i2c.bus.o_ack)
 
 

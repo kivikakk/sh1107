@@ -278,7 +278,11 @@ class I2C(Elaboratable):
             with m.State("WRITE DATA BIT: SCL HIGH"):
                 with m.If(c.o_full):
                     with m.If(self.byte_ix == 7):
-                        m.d.sync += self.next_byte.eq(I2C.NextByte.WANTED)
+                        # Let go of SDA.
+                        m.d.sync += [
+                            self.sda_oe.eq(0),
+                            self.next_byte.eq(I2C.NextByte.WANTED),
+                        ]
                         m.next = "WRITE ACK BIT: SCL LOW"
                         # Wait for next SCL^ before R/W.
                     with m.Else():
@@ -287,22 +291,15 @@ class I2C(Elaboratable):
                         # Wait for next SCL^ before next data bit.
 
             with m.State("WRITE ACK BIT: SCL LOW"):
-                with m.If(c.o_half):
-                    # Let go of SDA.
-                    m.d.sync += self.sda_oe.eq(0)
-                with m.Elif(c.o_full):
+                with m.If(c.o_full):
                     m.next = "WRITE ACK BIT: SCL HIGH"
 
             with m.State("WRITE ACK BIT: SCL HIGH"):
                 with m.If(c.o_half):
-                    # Read ACK. SDA should be brought low by the addressee. Take
-                    # SDA back unless we're starting a read and got an ACK. (If
-                    # we were mid-read and not starting one, we'd be in "READ
-                    # ACK BIT" states instead.)
-                    m.d.sync += [
-                        self.bus.o_ack.eq(~self.sda_i),
-                        self.sda_oe.eq(~(~self.sda_i & (self.rw == RW.R))),
-                    ]
+                    # Read ACK. SDA should be brought low by the addressee.
+                    # Don't take SDA back until end of the cycle, otherwise it
+                    # looks like a STOP condition if sda_o was left high.
+                    m.d.sync += self.bus.o_ack.eq(~self.sda_i)
                     m.next = "COMMON ACK BIT: SCL HIGH"
 
             with m.State("READ DATA BIT: SCL LOW"):
@@ -363,7 +360,11 @@ class I2C(Elaboratable):
                             & (self.byte.kind == Transfer.Kind.DATA)
                             & (self.rw == RW.W)
                         ):
-                            m.d.sync += self.byte_ix.eq(0)
+                            m.d.sync += [
+                                self.byte_ix.eq(0),
+                                self.sda_oe.eq(1),
+                                self.sda_o.eq(0),
+                            ]
                             m.next = "WRITE DATA BIT: SCL LOW"
                         with m.Elif(
                             self.bus.o_ack
@@ -386,13 +387,19 @@ class I2C(Elaboratable):
                                 self.rw.eq(self.byte.payload.start.rw),
                                 self.byte.eq(self.byte),
                                 self.byte_ix.eq(0),
+                                self.sda_oe.eq(1),
+                                self.sda_o.eq(0),
                             ]
                             m.next = "REP START: SCL LOW"
                         with m.Else():
                             # Consume anything that got queued before the NACK was realised.
-                            m.d.sync += self.next_byte.eq(I2C.NextByte.WANTED)
+                            m.d.sync += [
+                                self.next_byte.eq(I2C.NextByte.WANTED),
+                                self.sda_oe.eq(1),
+                            ]
                             m.next = "FIN: SCL LOW"
                     with m.Else():
+                        m.d.sync += self.sda_oe.eq(1)
                         m.next = "FIN: SCL LOW"
 
             with m.State("REP START: SCL LOW"):
