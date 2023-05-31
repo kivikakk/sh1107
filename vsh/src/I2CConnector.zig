@@ -168,15 +168,23 @@ const ByteTransmitter = struct {
             },
             .WAIT_BIT_SCL_FALL => {
                 if (self.rw == .W) {
-                    if (scl_oe.stable_high() and scl_o.falling() and sda_oe.stable_high() and sda_o.stable()) {
-                        if (self.bits == 7) {
-                            self.state = .WAIT_ACK_SCL_RISE;
-                            return .AckNackW;
-                        } else {
-                            self.bits += 1;
-                            self.state = .WAIT_BIT_SCL_RISE;
-                            return .Pass;
+                    if (scl_oe.stable_high() and scl_o.falling() and sda_oe.falling() and sda_o.stable()) {
+                        if (self.bits != 7) {
+                            self.state = .IDLE;
+                            std.debug.print("WAIT_BIT_SCL_FALL(W): bits({}), byte({}) -- scl_oe({}), scl_o({}), sda_oe({}), sda_o({})\n", .{ self.bits, self.byte, scl_oe, scl_o, sda_oe, sda_o });
+                            return .Error;
                         }
+                        self.state = .WAIT_ACK_SCL_RISE;
+                        return .AckNackW;
+                    } else if (scl_oe.stable_high() and scl_o.falling() and sda_oe.stable_high() and sda_o.stable()) {
+                        if (self.bits == 7) {
+                            self.state = .IDLE;
+                            std.debug.print("WAIT_BIT_SCL_FALL(W): bits({}), byte({}) -- scl_oe({}), scl_o({}), sda_oe({}), sda_o({})\n", .{ self.bits, self.byte, scl_oe, scl_o, sda_oe, sda_o });
+                            return .Error;
+                        }
+                        self.bits += 1;
+                        self.state = .WAIT_BIT_SCL_RISE;
+                        return .Pass;
                     } else if (scl_oe.stable_high() and scl_o.stable_high() and sda_oe.stable_high() and sda_o.rising()) {
                         if (self.bits == 0 and self.byte == 0) {
                             self.state = .IDLE;
