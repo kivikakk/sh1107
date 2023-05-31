@@ -207,8 +207,10 @@ def receive(i2c: I2C, byte: int) -> sim.Generator:
         yield from wait_scl(i2c, 0, sda_oe=ValueChange.STEADY)
 
 
-def ack(i2c: I2C, *, ack: bool = True, from_them: bool = False) -> sim.Generator:
-    if from_them:
+def ack(
+    i2c: I2C, *, ack: bool = True, from_us: bool = False, retakes_sda: bool = True
+) -> sim.Generator:
+    if from_us:
         # Controller takes SDA.
         assert not (yield i2c.sda_oe)
 
@@ -216,9 +218,10 @@ def ack(i2c: I2C, *, ack: bool = True, from_them: bool = False) -> sim.Generator
         assert (yield i2c.sda_oe)
         assert ack ^ (
             yield i2c.sda_o
-        ), f"expected ack {ack} from other side, got {not ack}"  # ACK/low or NACK/high
-
+        ), f"expected ack {ack} from us, got {not ack}"  # ACK/low or NACK/high
         yield Delay(6 * _tick(i2c))
+
+        assert retakes_sda == (yield i2c.sda_oe)
 
     else:
         # Controller releases SDA; we ACK by driving SDA low.
@@ -231,7 +234,7 @@ def ack(i2c: I2C, *, ack: bool = True, from_them: bool = False) -> sim.Generator
         yield Delay(_tick(i2c))
 
         yield Delay(4 * _tick(i2c))
-        assert (yield i2c.sda_oe)
+        assert retakes_sda == (yield i2c.sda_oe)
         if ack:
             yield cast(Signal, i2c.sda.i).eq(1)
         yield Delay(_tick(i2c))
@@ -239,8 +242,8 @@ def ack(i2c: I2C, *, ack: bool = True, from_them: bool = False) -> sim.Generator
         assert ack == (yield i2c.bus.o_ack)
 
 
-def nack(i2c: I2C, *, from_them: bool = False) -> sim.Generator:
-    yield from ack(i2c, ack=False, from_them=from_them)
+def nack(i2c: I2C, *, from_us: bool = False) -> sim.Generator:
+    yield from ack(i2c, ack=False, from_us=from_us)
 
 
 def stop(i2c: I2C) -> sim.Generator:

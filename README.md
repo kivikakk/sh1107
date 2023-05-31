@@ -4,10 +4,10 @@
 
 Chawwo!
 
-We're just learning to write gateware. This repository is a testbed for
-exploring [Amaranth](https://github.com/amaranth-lang/amaranth) while doing so.
-It contains an I²C controller, plus a basic controller for SH1107-type OLEDs
-over I²C, such as the [Pimoroni 1.12" 128x128 monochrome
+I'm just learning to write gateware. This repository is a testbed for exploring
+[Amaranth](https://github.com/amaranth-lang/amaranth) while doing so. It
+contains an I²C controller, plus a basic controller for SH1107-type OLEDs over
+I²C, such as the [Pimoroni 1.12" 128x128 monochrome
 OLED](https://shop.pimoroni.com/products/1-12-oled-breakout). The controller
 supports simple commands akin to old BASIC: `CLS`, `PRINT`, `LOCATE`. The old
 IBM 8x8 font is used to this end.

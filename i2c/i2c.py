@@ -295,10 +295,13 @@ class I2C(Elaboratable):
 
             with m.State("WRITE ACK BIT: SCL HIGH"):
                 with m.If(c.o_half):
-                    # Read ACK. SDA should be brought low by the addressee.
+                    # Read ACK. SDA should be brought low by the addressee. Take
+                    # SDA back unless we're starting a read and got an ACK. (If
+                    # we were mid-read and not starting one, we'd be in "READ
+                    # ACK BIT" states instead.)
                     m.d.sync += [
                         self.bus.o_ack.eq(~self.sda_i),
-                        self.sda_oe.eq(1),
+                        self.sda_oe.eq(~(~self.sda_i & (self.rw == RW.R))),
                     ]
                     m.next = "COMMON ACK BIT: SCL HIGH"
 
