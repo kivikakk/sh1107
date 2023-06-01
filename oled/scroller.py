@@ -13,6 +13,7 @@ class Scroller(Elaboratable):
     addr: int
 
     i_stb: Signal
+    i_rst: Signal
 
     o_busy: Signal
     o_adjusted: Signal
@@ -23,6 +24,7 @@ class Scroller(Elaboratable):
         self.addr = addr
 
         self.i_stb = Signal()
+        self.i_rst = Signal()
 
         self.o_busy = Signal()
         self.o_adjusted = Signal(range(16))
@@ -50,6 +52,8 @@ class Scroller(Elaboratable):
                         self.o_adjusted.eq(self.o_adjusted + 1),
                     ]
                     m.next = "START: ADDR: STROBED W_EN"
+                with m.If(self.i_rst):
+                    m.d.sync += self.o_adjusted.eq(0)
 
             with m.State("START: ADDR: STROBED W_EN"):
                 m.d.sync += [

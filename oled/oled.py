@@ -151,6 +151,8 @@ class OLED(Elaboratable):
         with m.Else():
             m.d.comb += self.i2c_bus.connect(self.own_i2c_bus)
 
+        m.d.comb += self.locator.i_adjust.eq(self.scroller.o_adjusted)
+
         # TODO: actually flash cursor when on
 
         command = Signal(8)
@@ -176,8 +178,9 @@ class OLED(Elaboratable):
                         m.d.sync += [
                             self.rom_writer.i_index.eq(OFFSET_DISPLAY_ON),
                             self.rom_writer.i_stb.eq(1),
+                            self.scroller.i_rst.eq(1),
                         ]
-                        m.next = "ROM WRITE SINGLE: STROBED ROM WRITER"
+                        m.next = "DISPLAY ON: STROBED ROM WRITER"
 
                     with m.Case(OLED.Command.DISPLAY_OFF):
                         m.d.sync += [
@@ -227,6 +230,13 @@ class OLED(Elaboratable):
                 with m.If(~self.clser.o_busy):
                     m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
                     m.next = "IDLE"
+
+            with m.State("DISPLAY ON: STROBED ROM WRITER"):
+                m.d.sync += [
+                    self.rom_writer.i_stb.eq(0),
+                    self.scroller.i_rst.eq(0),
+                ]
+                m.next = "ROM WRITE SINGLE: UNSTROBED ROM WRITER"
 
             with m.State("ROM WRITE SINGLE: STROBED ROM WRITER"):
                 m.d.sync += self.rom_writer.i_stb.eq(0)
