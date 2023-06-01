@@ -19,7 +19,7 @@ TEST_SEQUENCE = [
     0x01,  # DISPLAY_ON
     0x04,
     0x01,
-    0x01,  # LOCATE 1, 1
+    0x09,  # LOCATE 1, 9
     0x05,
     len(msg1),
     *[ord(c) for c in msg1],  # PRINT msg1
