@@ -78,14 +78,14 @@ class Locator(Elaboratable):
                     & self.i2c_bus.o_ack
                     & self.i2c_bus.o_in_fifo_w_rdy
                 ):
-                    with m.If(self.i_row != 0):
-                        byte = Cmd.SetPageAddress(0x00).to_byte() + self.i_row - 1
+                    with m.If(self.i_col != 0):
+                        byte = Cmd.SetPageAddress(0x00).to_byte() + 16 - self.i_col
                         m.d.sync += [
                             transfer.payload.data.eq(byte),
                             self.i2c_bus.i_in_fifo_w_en.eq(1),
                         ]
-                        m.next = "START: ROW: STROBED W_EN"
-                    with m.Elif(self.i_col != 0):
+                        m.next = "START: PAGE: STROBED W_EN"
+                    with m.Elif(self.i_row != 0):
                         self.startCol(m)
                         m.next = "START: COL LOWER: STROBED W_EN"
                     with m.Else():
@@ -95,12 +95,12 @@ class Locator(Elaboratable):
                     m.d.sync += self.o_busy.eq(0)
                     m.next = "IDLE"
 
-            with m.State("START: ROW: STROBED W_EN"):
+            with m.State("START: PAGE: STROBED W_EN"):
                 m.d.sync += self.i2c_bus.i_in_fifo_w_en.eq(0)
-                m.next = "START: ROW: UNSTROBED W_EN"
+                m.next = "START: PAGE: UNSTROBED W_EN"
 
-            with m.State("START: ROW: UNSTROBED W_EN"):
-                with m.If(self.i_col != 0):
+            with m.State("START: PAGE: UNSTROBED W_EN"):
+                with m.If(self.i_row != 0):
                     with m.If(
                         self.i2c_bus.o_busy
                         & self.i2c_bus.o_ack
@@ -126,7 +126,7 @@ class Locator(Elaboratable):
                     & self.i2c_bus.o_in_fifo_w_rdy
                 ):
                     byte = Cmd.SetHigherColumnAddress(0x00).to_byte() + (
-                        (self.i_col - 1) >> 1
+                        (self.i_row - 1) >> 1
                     )
                     m.d.sync += [
                         transfer.payload.data.eq(byte),
@@ -158,7 +158,7 @@ class Locator(Elaboratable):
     def startCol(self, m: Module):
         # For columns 1, 3, 5, 7, .., the column addresses are 0x00, 0x10, 0x20, ...
         # For columns 2, 4, 6, 8, .., the column addresses are 0x08, 0x18, 0x28, ...
-        byte = Cmd.SetLowerColumnAddress(0x00).to_byte() + Mux(self.i_col[0], 0, 8)
+        byte = Cmd.SetLowerColumnAddress(0x00).to_byte() + Mux(self.i_row[0], 0, 8)
         transfer = Transfer(self.i2c_bus.i_in_fifo_w_data)
         m.d.sync += [
             transfer.payload.data.eq(byte),

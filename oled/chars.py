@@ -16,9 +16,4 @@ rawchar_size = (FONT_WIDTH * FONT_HEIGHT) // 8
 for i in range(256):
     rawchar = rawfont[i * rawchar_size : (i + 1) * rawchar_size]
     assert len(rawchar) == FONT_HEIGHT
-    cols = [0] * FONT_WIDTH
-    for ri, row in enumerate(rawchar):
-        for col in range(FONT_WIDTH):
-            bit = (row >> (7 - col)) & 1
-            cols[col] |= bit << ri
-    CHARS.append(cols)
+    CHARS.append(rawchar)

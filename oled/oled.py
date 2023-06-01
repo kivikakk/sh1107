@@ -366,8 +366,6 @@ class OLED(Elaboratable):
                     self.rom_writer.i_stb.eq(0),
                     self.i_fifo.r_en.eq(0),
                 ]
-                # Page addressing mode automatically matches our column adjust;
-                # we need to manually change page when we wrap, though.
                 with m.If(self.col == 16):
                     with m.If(self.row == 16):
                         m.d.sync += self.col.eq(1)
@@ -377,21 +375,16 @@ class OLED(Elaboratable):
                             self.col.eq(1),
                             self.row.eq(self.row + 1),
                         ]
-                        m.next = "CHPR: UNSTROBED ROM WRITER, NEEDS PAGE ADJUST"
+                        m.next = "CHPR: UNSTROBED ROM WRITER"
                 with m.Else():
                     m.d.sync += self.col.eq(self.col + 1)
                     m.next = "CHPR: UNSTROBED ROM WRITER"
 
             with m.State("CHPR: UNSTROBED ROM WRITER"):
                 with m.If(~self.rom_writer.o_busy):
-                    m.d.sync += self.chpr_run.eq(0)
-                    m.next = "IDLE"
-
-            with m.State("CHPR: UNSTROBED ROM WRITER, NEEDS PAGE ADJUST"):
-                with m.If(~self.rom_writer.o_busy):
                     m.d.sync += [
                         self.locator.i_row.eq(self.row),
-                        self.locator.i_col.eq(0),
+                        self.locator.i_col.eq(self.col),
                         self.locator.i_stb.eq(1),
                     ]
                     m.next = "CHPR: LOC ADJUST: STROBED LOCATOR"

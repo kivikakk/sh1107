@@ -15,7 +15,8 @@ const FPGAThread = @This();
 
 thread: std.Thread,
 stop_signal: Atomic(bool),
-press_signal: Atomic(bool),
+main_press_signal: Atomic(bool),
+secondary_press_signal: Atomic(bool),
 sh1107_mutex: std.Thread.Mutex = .{},
 sh1107: SH1107,
 
@@ -28,7 +29,8 @@ pub fn start() !*FPGAThread {
     fpga_thread.* = .{
         .thread = undefined,
         .stop_signal = Atomic(bool).init(false),
-        .press_signal = Atomic(bool).init(false),
+        .main_press_signal = Atomic(bool).init(false),
+        .secondary_press_signal = Atomic(bool).init(false),
         .sh1107 = .{},
         .idata_stale = Atomic(bool).init(true),
     };
@@ -49,8 +51,11 @@ pub fn acquire_sh1107(self: *FPGAThread) SH1107 {
     return self.sh1107;
 }
 
-pub fn press_switch_connector(self: *FPGAThread) void {
-    self.press_signal.store(true, .Monotonic);
+pub fn press_switch_connector(self: *FPGAThread, which: u1) void {
+    switch (which) {
+        0 => self.main_press_signal.store(true, .Monotonic),
+        1 => self.secondary_press_signal.store(true, .Monotonic),
+    }
 }
 
 pub fn process_cmd(self: *FPGAThread, cmd: Cmd.Command) void {
@@ -93,7 +98,8 @@ const State = struct {
 
     cxxrtl: Cxxrtl,
     vcd: ?Cxxrtl.Vcd,
-    switch_connector: ?SwitchConnector,
+    main_switch_connector: ?SwitchConnector,
+    secondary_switch_connector: ?SwitchConnector,
     oled_connector: OLEDConnector,
 
     fn init(fpga_thread: *FPGAThread) State {
@@ -104,9 +110,13 @@ const State = struct {
             vcd = Cxxrtl.Vcd.init(cxxrtl);
         }
 
-        var switch_connector: ?SwitchConnector = null;
-        if (cxxrtl.find(bool, "switch")) |swi| {
-            switch_connector = SwitchConnector.init(swi);
+        var main_switch_connector: ?SwitchConnector = null;
+        if (cxxrtl.find(bool, "main_switch")) |swi| {
+            main_switch_connector = SwitchConnector.init(swi);
+        }
+        var secondary_switch_connector: ?SwitchConnector = null;
+        if (cxxrtl.find(bool, "secondary_switch")) |swi| {
+            secondary_switch_connector = SwitchConnector.init(swi);
         }
 
         const oled_connector = OLEDConnector.init(cxxrtl, 0x3c);
@@ -116,7 +126,8 @@ const State = struct {
 
             .cxxrtl = cxxrtl,
             .vcd = vcd,
-            .switch_connector = switch_connector,
+            .main_switch_connector = main_switch_connector,
+            .secondary_switch_connector = secondary_switch_connector,
             .oled_connector = oled_connector,
         };
     }
@@ -135,8 +146,14 @@ const State = struct {
 
         while (!self.fpga_thread.stop_signal.load(.Monotonic)) {
             clk.next(true);
-            if (self.switch_connector) |*swicon| {
-                if (self.fpga_thread.press_signal.compareAndSwap(true, false, .Monotonic, .Monotonic) == null) {
+            if (self.main_switch_connector) |*swicon| {
+                if (self.fpga_thread.main_press_signal.compareAndSwap(true, false, .Monotonic, .Monotonic) == null) {
+                    swicon.press();
+                }
+                swicon.tick();
+            }
+            if (self.secondary_switch_connector) |*swicon| {
+                if (self.fpga_thread.secondary_press_signal.compareAndSwap(true, false, .Monotonic, .Monotonic) == null) {
                     swicon.press();
                 }
                 swicon.tick();

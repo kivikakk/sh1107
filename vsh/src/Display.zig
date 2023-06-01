@@ -33,7 +33,11 @@ pub fn update(self: *Display) bool {
     }
 
     if (gk.input.keyPressed(.key_return)) {
-        self.fpga_thread.press_switch_connector();
+        self.fpga_thread.press_switch_connector(0);
+    }
+
+    if (gk.input.keyPressed(.space)) {
+        self.fpga_thread.press_switch_connector(1);
     }
 
     return true;

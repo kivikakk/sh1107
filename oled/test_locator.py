@@ -52,9 +52,9 @@ class TestLocator(sim.TestCase):
             [
                 0x17A,
                 0x00,
-                0xBF,
+                0xB8,
                 0x08,
-                0x13,
+                0x17,
             ],
         )
 
@@ -74,7 +74,8 @@ class TestLocator(sim.TestCase):
             [
                 0x17A,
                 0x00,
-                0xB6,
+                0x00,
+                0x13,
             ],
         )
 
@@ -94,7 +95,6 @@ class TestLocator(sim.TestCase):
             [
                 0x17A,
                 0x00,
-                0x00,
-                0x16,
+                0xB3,
             ],
         )

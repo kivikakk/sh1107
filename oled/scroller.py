@@ -15,6 +15,7 @@ class Scroller(Elaboratable):
     i_stb: Signal
 
     o_busy: Signal
+    o_adjusted: Signal
 
     i2c_bus: I2CBus
 
@@ -24,6 +25,7 @@ class Scroller(Elaboratable):
         self.i_stb = Signal()
 
         self.o_busy = Signal()
+        self.o_adjusted = Signal(range(16))
 
         self.i2c_bus = I2CBus()
 
@@ -32,12 +34,9 @@ class Scroller(Elaboratable):
 
         transfer = Transfer(self.i2c_bus.i_in_fifo_w_data)
 
-        # need to (a) change the display offset, (b) clear the row, (c)
-        # adjust our internal estimation of where we are to compensate for
-        # the offset change.
-        # TODO
         offset_cmd = Cmd.SetDisplayStartLine(0).to_bytes()
         assert len(offset_cmd) == 2
+        assert offset_cmd[1] == 0x00
 
         with m.FSM():
             with m.State("IDLE"):
@@ -48,6 +47,7 @@ class Scroller(Elaboratable):
                         transfer.payload.start.addr.eq(self.addr),
                         transfer.payload.start.rw.eq(RW.W),
                         self.i2c_bus.i_in_fifo_w_en.eq(1),
+                        self.o_adjusted.eq(self.o_adjusted + 1),
                     ]
                     m.next = "START: ADDR: STROBED W_EN"
 
@@ -100,7 +100,7 @@ class Scroller(Elaboratable):
                     & self.i2c_bus.o_in_fifo_w_rdy
                 ):
                     m.d.sync += [
-                        transfer.payload.data.eq(offset_cmd[1]),
+                        transfer.payload.data.eq(self.o_adjusted * 8),
                         self.i2c_bus.i_in_fifo_w_en.eq(1),
                     ]
                     m.next = "START: OFFSET_CMD[1]: STROBED W_EN"
