@@ -15,8 +15,7 @@ const FPGAThread = @This();
 
 thread: std.Thread,
 stop_signal: Atomic(bool),
-main_press_signal: Atomic(bool),
-secondary_press_signal: Atomic(bool),
+press_signal: Atomic(u8),
 sh1107_mutex: std.Thread.Mutex = .{},
 sh1107: SH1107,
 
@@ -29,8 +28,7 @@ pub fn start() !*FPGAThread {
     fpga_thread.* = .{
         .thread = undefined,
         .stop_signal = Atomic(bool).init(false),
-        .main_press_signal = Atomic(bool).init(false),
-        .secondary_press_signal = Atomic(bool).init(false),
+        .press_signal = Atomic(u8).init(0),
         .sh1107 = .{},
         .idata_stale = Atomic(bool).init(true),
     };
@@ -51,11 +49,8 @@ pub fn acquire_sh1107(self: *FPGAThread) SH1107 {
     return self.sh1107;
 }
 
-pub fn press_switch_connector(self: *FPGAThread, which: u1) void {
-    switch (which) {
-        0 => self.main_press_signal.store(true, .Monotonic),
-        1 => self.secondary_press_signal.store(true, .Monotonic),
-    }
+pub fn press_switch_connector(self: *FPGAThread, which: u8) void {
+    self.press_signal.store(which, .Monotonic);
 }
 
 pub fn process_cmd(self: *FPGAThread, cmd: Cmd.Command) void {
@@ -89,20 +84,28 @@ pub fn process_data(self: *FPGAThread, data: u8) void {
 
 // Called with Thread.spawn.
 fn run(fpga_thread: *FPGAThread) void {
-    var state = State.init(fpga_thread);
-    state.run() catch @panic("FPGAThread threw");
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+
+    var allocator = gpa.allocator();
+
+    var state = State.init(allocator, fpga_thread) catch @panic("State.init threw");
+    defer state.deinit();
+
+    state.run() catch @panic("FPGA thread threw");
 }
 
 const State = struct {
     fpga_thread: *FPGAThread,
+    allocator: std.mem.Allocator,
 
     cxxrtl: Cxxrtl,
     vcd: ?Cxxrtl.Vcd,
-    main_switch_connector: ?SwitchConnector,
-    secondary_switch_connector: ?SwitchConnector,
+
+    switch_connectors: []SwitchConnector,
     oled_connector: OLEDConnector,
 
-    fn init(fpga_thread: *FPGAThread) State {
+    fn init(allocator: std.mem.Allocator, fpga_thread: *FPGAThread) !State {
         const cxxrtl = Cxxrtl.init();
 
         var vcd: ?Cxxrtl.Vcd = null;
@@ -110,34 +113,41 @@ const State = struct {
             vcd = Cxxrtl.Vcd.init(cxxrtl);
         }
 
-        var main_switch_connector: ?SwitchConnector = null;
-        if (cxxrtl.find(bool, "main_switch")) |swi| {
-            main_switch_connector = SwitchConnector.init(swi);
-        }
-        var secondary_switch_connector: ?SwitchConnector = null;
-        if (cxxrtl.find(bool, "secondary_switch")) |swi| {
-            secondary_switch_connector = SwitchConnector.init(swi);
+        var switch_connectors = std.ArrayList(SwitchConnector).init(allocator);
+        defer switch_connectors.deinit();
+
+        var i: usize = 0;
+        while (true) {
+            var name = try std.fmt.allocPrintZ(allocator, "switch_{}", .{i});
+            defer allocator.free(name);
+
+            if (cxxrtl.find(bool, name)) |swi| {
+                try switch_connectors.append(SwitchConnector.init(swi));
+                i += 1;
+            } else {
+                break;
+            }
         }
 
         const oled_connector = OLEDConnector.init(cxxrtl, 0x3c);
 
         return .{
             .fpga_thread = fpga_thread,
+            .allocator = allocator,
 
             .cxxrtl = cxxrtl,
             .vcd = vcd,
-            .main_switch_connector = main_switch_connector,
-            .secondary_switch_connector = secondary_switch_connector,
+
+            .switch_connectors = try switch_connectors.toOwnedSlice(),
             .oled_connector = oled_connector,
         };
     }
 
+    fn deinit(self: *State) void {
+        self.allocator.free(self.switch_connectors);
+    }
+
     fn run(self: *State) !void {
-        var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-        defer _ = gpa.deinit();
-
-        var allocator = gpa.allocator();
-
         const clk = self.cxxrtl.get(bool, "clk");
 
         if (self.vcd) |*vcd| {
@@ -146,18 +156,14 @@ const State = struct {
 
         while (!self.fpga_thread.stop_signal.load(.Monotonic)) {
             clk.next(true);
-            if (self.main_switch_connector) |*swicon| {
-                if (self.fpga_thread.main_press_signal.compareAndSwap(true, false, .Monotonic, .Monotonic) == null) {
+
+            for (self.switch_connectors, 1..) |*swicon, i| {
+                if (self.fpga_thread.press_signal.compareAndSwap(@intCast(u8, i), 0, .Monotonic, .Monotonic) == null) {
                     swicon.press();
                 }
                 swicon.tick();
             }
-            if (self.secondary_switch_connector) |*swicon| {
-                if (self.fpga_thread.secondary_press_signal.compareAndSwap(true, false, .Monotonic, .Monotonic) == null) {
-                    swicon.press();
-                }
-                swicon.tick();
-            }
+
             self.oled_connector.tick(self.fpga_thread);
             self.cxxrtl.step();
 
@@ -176,8 +182,8 @@ const State = struct {
         if (self.vcd) |*vcd| {
             defer vcd.deinit();
 
-            var buffer = try vcd.read(allocator);
-            defer allocator.free(buffer);
+            var buffer = try vcd.read(self.allocator);
+            defer self.allocator.free(buffer);
 
             var file = try std.fs.cwd().createFile("vsh.vcd", .{});
             defer file.close();

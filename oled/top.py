@@ -68,6 +68,15 @@ MAIN_SEQUENCE = [
 
 SECONDARY_SEQUENCE = [0x05, 0x01, 0x0A]  # PRINT "\n"
 
+msg3 = "SHOMK"
+TERTIARY_SEQUENCE = [0x05, len(msg3), *[ord(c) for c in msg3]]  # PRINT msg3
+
+SEQUENCES = [
+    MAIN_SEQUENCE,
+    SECONDARY_SEQUENCE,
+    TERTIARY_SEQUENCE,
+]
+
 # msg = "Hello, world! This should wrap correctly."
 # MAIN_SEQUENCE = [
 #     0x02,  # DISPLAY_OFF
@@ -97,13 +106,11 @@ SECONDARY_SEQUENCE = [0x05, 0x01, 0x0A]  # PRINT "\n"
 
 class Top(Elaboratable):
     oled: OLED
-    main_sequence: list[int]
-    secondary_sequence: list[int]
+    sequences: list[list[int]]
     speed: Hz
     build_i2c: bool
 
-    main_switch: Signal
-    secondary_switch: Signal
+    switches: list[Signal]
 
     rom_len: int
     rom_rd: ReadPort
@@ -111,33 +118,28 @@ class Top(Elaboratable):
     def __init__(
         self,
         *,
-        main_sequence: list[int] = MAIN_SEQUENCE,
-        secondary_sequence: list[int] = SECONDARY_SEQUENCE,
+        sequences: list[list[int]] = SEQUENCES,
         speed: Hz = Hz(400_000),
         build_i2c: bool = False,
     ):
         self.oled = OLED(speed=speed, build_i2c=build_i2c)
-        self.main_sequence = main_sequence
-        self.secondary_sequence = secondary_sequence
+        self.sequences = sequences
         self.speed = speed
         self.build_i2c = build_i2c
 
-        self.main_switch = Signal()
-        self.secondary_switch = Signal()
+        self.switches = [Signal(name=f"switch_{i}") for i, _ in enumerate(sequences)]
 
-        self.rom_len = len(main_sequence) + len(secondary_sequence)
+        self.rom_len = sum(len(seq) for seq in sequences)
         self.rom_rd = Memory(
             width=8,
             depth=self.rom_len,
-            init=main_sequence + secondary_sequence,
+            init=[i for seq in sequences for i in seq],
         ).read_port(transparent=False)
 
     @property
     def ports(self) -> list[Signal]:
-        ports = [
-            self.main_switch,
-            self.secondary_switch,
-        ]
+        ports = self.switches[:]
+
         if self.build_i2c:
             ports += [
                 self.oled.i2c.scl_o,
@@ -160,8 +162,7 @@ class Top(Elaboratable):
         m.submodules.oled = self.oled
         m.submodules.rom_rd = self.rom_rd
 
-        button_up_main: Signal
-        button_up_secondary: Signal
+        button_up_signals: list[Signal] = []
 
         match platform:
             case ICEBreakerPlatform():
@@ -173,16 +174,14 @@ class Top(Elaboratable):
                     led_ack.eq(self.oled.i2c_bus.o_ack),
                 ]
 
-                main_switch = cast(Signal, platform.request("button", 0).i)
-                m.submodules.button_main = button_main = Button()
-                m.d.comb += button_main.i.eq(main_switch)
-                button_up_main = button_main.o_up
-
                 platform.add_resources(platform.break_off_pmod)
-                secondary_switch = cast(Signal, platform.request("button", 1).i)
-                m.submodules.button_secondary = button_secondary = Button()
-                m.d.comb += button_secondary.i.eq(secondary_switch)
-                button_up_secondary = button_secondary.o_up
+
+                for i, _ in enumerate(self.switches):
+                    switch = cast(Signal, platform.request("button", i).i)
+                    m.submodules[f"button_{i}"] = button = Button()
+                    m.d.comb += button.i.eq(switch)
+                    button_up_signals.append(button.o_up)
+
                 # led_l = platform.request("led_g", 1)
                 # led_m = platform.request("led_r", 1)
                 # led_r = platform.request("led_g", 2)
@@ -198,31 +197,27 @@ class Top(Elaboratable):
                 ]
 
                 main_switch = cast(Signal, platform.request("button", 0).i)
-                m.submodules.button_main = button_main = ButtonWithHold()
-                m.d.comb += button_main.i.eq(main_switch)
-                button_up_main = button_main.o_up
+                m.submodules.button_0 = button_0 = ButtonWithHold()
+                m.d.comb += button_0.i.eq(main_switch)
+                button_up_signals.append(button_0.o_up)
 
                 program = cast(Signal, platform.request("program").o)
-                with m.If(button_main.o_held):
+                with m.If(button_0.o_held):
                     m.d.sync += program.eq(1)
 
-                secondary_switch = cast(Signal, platform.request("button", 1).i)
-                m.submodules.button_secondary = button_secondary = ButtonWithHold()
-                m.d.comb += button_secondary.i.eq(secondary_switch)
-                button_up_secondary = button_secondary.o_up
+                for i, _ in list(enumerate(self.switches))[1:]:
+                    switch = cast(Signal, platform.request("button", i).i)
+                    m.submodules[f"button_{i}"] = button = Button()
+                    m.d.comb += button.i.eq(switch)
+                    button_up_signals.append(button.o_up)
 
             case None:
-                buffer_main = Signal()
-                button_up_main = Signal()
-                m.d.sync += buffer_main.eq(self.main_switch)
-                m.d.comb += button_up_main.eq(buffer_main & ~self.main_switch)
-
-                buffer_secondary = Signal()
-                button_up_secondary = Signal()
-                m.d.sync += buffer_secondary.eq(self.secondary_switch)
-                m.d.comb += button_up_secondary.eq(
-                    buffer_secondary & ~self.secondary_switch
-                )
+                for i, switch in enumerate(self.switches):
+                    buffer = Signal()
+                    button_up = Signal()
+                    m.d.sync += buffer.eq(switch)
+                    m.d.comb += button_up.eq(buffer & ~switch)
+                    button_up_signals.append(button_up)
 
             case _:
                 raise NotImplementedError
@@ -235,19 +230,14 @@ class Top(Elaboratable):
         with m.FSM():
             with m.State("IDLE"):
                 m.d.sync += self.oled.i_fifo.w_en.eq(0)
-                with m.If(button_up_main & self.oled.i_fifo.w_rdy):
-                    m.d.sync += [
-                        offset.eq(0),
-                        remain.eq(len(self.main_sequence)),
-                    ]
-                    m.next = "LOOP: ADDRESSED"
 
-                with m.If(button_up_secondary & self.oled.i_fifo.w_rdy):
-                    m.d.sync += [
-                        offset.eq(len(self.main_sequence)),
-                        remain.eq(len(self.secondary_sequence)),
-                    ]
-                    m.next = "LOOP: ADDRESSED"
+                for i, button_up in enumerate(button_up_signals):
+                    with m.If(button_up & self.oled.i_fifo.w_rdy):
+                        m.d.sync += [
+                            offset.eq(sum(len(seq) for seq in self.sequences[:i])),
+                            remain.eq(len(self.sequences[i])),
+                        ]
+                        m.next = "LOOP: ADDRESSED"
 
             with m.State("LOOP: ADDRESSED"):
                 m.next = "LOOP: AVAILABLE"
