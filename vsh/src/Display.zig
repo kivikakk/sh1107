@@ -211,11 +211,11 @@ fn drawOLED(self: *Display, sh1107: *const SH1107) void {
 
         const start_line = sh1107.start_line +% sh1107.start_offset;
 
-        gk.gfx.draw.texScaleXYRegion(
+        gk.gfx.draw.texScaleXYRegionAngle(
             self.img,
             .{
-                .x = @intToFloat(f32, DisplayBase.padding + DisplayBase.border_width) + shift * display_scale,
-                .y = @intToFloat(f32, DisplayBase.padding + DisplayBase.border_width + DisplayBase.top_area),
+                .x = @intToFloat(f32, DisplayBase.padding + DisplayBase.border_width) + @intToFloat(f32, DisplayBase.i2c_width) * display_scale,
+                .y = @intToFloat(f32, DisplayBase.padding + DisplayBase.border_width + DisplayBase.top_area) + shift * display_scale,
             },
             .{
                 .x = @intToFloat(f32, start_line),
@@ -225,13 +225,14 @@ fn drawOLED(self: *Display, sh1107: *const SH1107) void {
             },
             x_scale,
             DisplayBase.display_scale,
+            std.math.pi * 0.5,
         );
         if (start_line > 0) {
-            gk.gfx.draw.texScaleXYRegion(
+            gk.gfx.draw.texScaleXYRegionAngle(
                 self.img,
                 .{
-                    .x = @intToFloat(f32, DisplayBase.padding + DisplayBase.border_width) + (shift + @intToFloat(f32, DisplayBase.i2c_width - start_line) * x_factor) * display_scale,
-                    .y = @intToFloat(f32, DisplayBase.padding + DisplayBase.border_width + DisplayBase.top_area),
+                    .x = @intToFloat(f32, DisplayBase.padding + DisplayBase.border_width) + @intToFloat(f32, DisplayBase.i2c_width) * display_scale,
+                    .y = @intToFloat(f32, DisplayBase.padding + DisplayBase.border_width + DisplayBase.top_area) + (shift + @intToFloat(f32, DisplayBase.i2c_width - start_line) * x_factor) * display_scale,
                 },
                 .{
                     .x = 0,
@@ -241,6 +242,7 @@ fn drawOLED(self: *Display, sh1107: *const SH1107) void {
                 },
                 x_scale,
                 DisplayBase.display_scale,
+                std.math.pi * 0.5,
             );
         }
     } else {
