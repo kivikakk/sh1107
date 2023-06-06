@@ -22,7 +22,11 @@ struct bb_p_i2c_impl : public bb_p_i2c {
   // its users.  We might want to consider a rewrite where transaction ends are
   // signalled explicitly from the user, but that gets Fucky Wucky if they don't
   // actually give input data in time for the I2C bus.
-  const uint16_t TICKS_TO_WAIT = 5u;
+  //
+  // 5 is sufficient for a tight loop, but when e.g. ROMWriter/Scroller do a
+  // repeated start, they spend a few cycles while reading the length of the
+  // next segment, and when it's non-zero, we need to wait a little more.
+  const uint16_t TICKS_TO_WAIT = 7u;
 
   enum {
     STATE_IDLE,
@@ -110,6 +114,10 @@ struct bb_p_i2c_impl : public bb_p_i2c {
         break;
       }
       case IN_FIFO_STATE_FULL: {
+        if (p_in__fifo__w__en) {
+          std::cerr << "bb_p_i2c_impl: dropping a write: " << std::hex << "0x"
+                    << p_in__fifo__w__data.get<uint16_t>() << std::endl;
+        }
         break;
       }
       }

@@ -39,6 +39,7 @@ class OLED(Elaboratable):
         2_000_000,  # for vsh
     ]
     DEFAULT_SPEED: Final[int] = 400_000
+    DEFAULT_SPEED_VSH: Final[int] = 2_000_000
 
     class Command(IntEnum, shape=8):
         NOP = 0x00

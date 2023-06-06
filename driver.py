@@ -124,7 +124,7 @@ def rom(args: Namespace):
 
 
 def vsh(args: Namespace):
-    design = _build_top(args, speed=Hz(2_000_000))
+    design = _build_top(args)
 
     # NOTE(ari): works better on Windows since osscad's yosys-config a) doesn't
     # execute cleanly automatically (bash script), and b) its answers are wrong
@@ -268,6 +268,13 @@ def main():
         "--compile",
         action="store_true",
         help="compile only; don't run",
+    )
+    vsh_parser.add_argument(
+        "-s",
+        "--speed",
+        choices=[str(s) for s in OLED.VALID_SPEEDS],
+        help="I2C bus speed to build at",
+        default=str(OLED.DEFAULT_SPEED_VSH),
     )
     vsh_parser.add_argument(
         "-t",
