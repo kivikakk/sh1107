@@ -41,14 +41,14 @@ DISPLAY_OFF_SEQUENCE = Cmd.compose([Cmd.DisplayOn(False)])
 SCROLL_SEQUENCE, SCROLL_OFFSETS = Cmd.compose_with_offsets(
     [
         Cmd.SetMemoryAddressingMode("Vertical"),
-        "InitialPageAddress",
         Cmd.SetPageAddress(0),
         "InitialHigherColumnAddress",
         Cmd.SetHigherColumnAddress(0),
     ],
     *[
         [
-            Cmd.SetLowerColumnAddress(i),  # XXX
+            f"LowerColumnAddress{i}",
+            Cmd.SetLowerColumnAddress(i),
             DataBytes([0x00] * 16),
         ]
         for i in range(8)

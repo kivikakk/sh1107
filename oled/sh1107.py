@@ -218,9 +218,11 @@ class Cmd:
 
         out: list[int] = []
         finished_control = False
+        next_label: Optional[str] = None
         for i, cmd in enumerate(cmds):
             if isinstance(cmd, str):
-                offsets[cmd] = curr_offset + len(out)
+                assert next_label is None
+                next_label = cmd
                 continue
 
             if not finished_control:
@@ -229,11 +231,21 @@ class Cmd:
                     out.append(ControlByte(False, DC(dcs[i])).to_byte())
 
             if not finished_control:
-                for byte in cmd.to_bytes():
+                bytes = cmd.to_bytes()
+                assert next_label is None or len(bytes) == 1
+                for byte in bytes:
                     out.append(ControlByte(True, DC(dcs[i])).to_byte())
+                    if next_label is not None:
+                        offsets[next_label] = curr_offset + len(out)
+                        next_label = None
                     out.append(byte)
             else:
+                if next_label is not None:
+                    offsets[next_label] = curr_offset + len(out)
+                    next_label = None
                 out.extend(cmd.to_bytes())
+
+        assert next_label is None
 
         return out
 

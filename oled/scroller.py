@@ -1,6 +1,6 @@
 from typing import Optional, cast
 
-from amaranth import Cat, Elaboratable, Memory, Module, Signal
+from amaranth import Cat, Elaboratable, Memory, Module, Mux, Signal
 from amaranth.build import Platform
 
 from i2c import RW, I2CBus, Transfer
@@ -54,7 +54,6 @@ class Scroller(Elaboratable):
                     m.d.sync += [
                         self.rom_rd.addr.eq(rom.OFFSET_SCROLL * 4),
                         self.o_busy.eq(1),
-                        self.o_adjusted.eq(self.o_adjusted + 1),
                         self.written.eq(0),
                     ]
                     m.next = "START: ADDRESSED OFFSET[0]"
@@ -121,9 +120,34 @@ class Scroller(Elaboratable):
                     ]
 
                     with m.If(
+                        self.written == rom.SCROLL_OFFSETS["InitialHigherColumnAddress"]
+                    ):
+                        m.d.sync += transfer.payload.data.eq(
+                            self.rom_rd.data + (self.o_adjusted >> 1)
+                        )
+                    for i in range(8):
+                        with m.Elif(
+                            self.written == rom.SCROLL_OFFSETS[f"LowerColumnAddress{i}"]
+                        ):
+                            m.d.sync += transfer.payload.data.eq(
+                                self.rom_rd.data + (self.o_adjusted[0] << 3)
+                            )
+                    with m.Elif(self.written == rom.SCROLL_OFFSETS["FinalPageAddress"]):
+                        m.d.sync += transfer.payload.data.eq(self.rom_rd.data)  # TODO
+                    with m.Elif(
+                        self.written == rom.SCROLL_OFFSETS["FinalHigherColumnAddress"]
+                    ):
+                        m.d.sync += transfer.payload.data.eq(self.rom_rd.data)  # TODO
+                    with m.Elif(
+                        self.written == rom.SCROLL_OFFSETS["FinalLowerColumnAddress"]
+                    ):
+                        m.d.sync += transfer.payload.data.eq(self.rom_rd.data)  # TODO
+                    with m.Elif(
                         self.written == rom.SCROLL_OFFSETS["DisplayStartLine"] + 1
                     ):
-                        m.d.sync += transfer.payload.data.eq(self.o_adjusted * 8)
+                        m.d.sync += transfer.payload.data.eq(
+                            Mux(self.o_adjusted == 15, 0, 8 + self.o_adjusted * 8)
+                        )
                     with m.Else():
                         m.d.sync += transfer.payload.data.eq(self.rom_rd.data)
 
@@ -179,7 +203,10 @@ class Scroller(Elaboratable):
                     & self.i2c_bus.o_ack
                     & self.i2c_bus.o_in_fifo_w_rdy
                 ):
-                    m.d.sync += self.o_busy.eq(0)
+                    m.d.sync += [
+                        self.o_adjusted.eq(self.o_adjusted + 1),
+                        self.o_busy.eq(0),
+                    ]
                     m.next = "IDLE"
                 with m.Elif(~self.i2c_bus.o_busy):
                     m.d.sync += self.o_busy.eq(0)
