@@ -325,6 +325,7 @@ class OLED(Elaboratable):
                 m.next = "PRINT: DATA: CHPR RUNNING"
 
         with m.State("PRINT: DATA: CHPR RUNNING"):
+            m.d.sync += self.i_fifo.r_en.eq(0)
             with m.If(~self.chpr_run):
                 with m.If(remaining == 1):
                     m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
@@ -345,17 +346,15 @@ class OLED(Elaboratable):
                             self.locator.i_row.eq(0),
                             self.locator.i_stb.eq(1),
                         ]
-                        m.next = "CHPR: LOC ADJUST: STROBED LOCATOR"
+                        m.next = "CHPR: STROBED LOCATOR"
                     with m.Elif(self.chpr_data == 10):
                         # LF
                         with m.If(self.row == 16):
                             m.d.sync += [
                                 self.col.eq(1),
-                                self.locator.i_row.eq(0),
-                                self.locator.i_col.eq(1),
-                                self.locator.i_stb.eq(1),
+                                self.scroller.i_stb.eq(1),
                             ]
-                            m.next = "CHPR: LOC ADJUST: STROBED LOCATOR, NEEDS SCROLL"
+                            m.next = "CHPR: STROBED SCROLLER"
                         with m.Else():
                             m.d.sync += [
                                 self.col.eq(1),
@@ -364,7 +363,7 @@ class OLED(Elaboratable):
                                 self.locator.i_col.eq(1),
                                 self.locator.i_stb.eq(1),
                             ]
-                            m.next = "CHPR: LOC ADJUST: STROBED LOCATOR"
+                            m.next = "CHPR: STROBED LOCATOR"
                     with m.Else():
                         m.d.sync += [
                             self.rom_writer.i_index.eq(OFFSET_CHAR + self.chpr_data),
@@ -373,10 +372,7 @@ class OLED(Elaboratable):
                         m.next = "CHPR: STROBED ROM WRITER"
 
             with m.State("CHPR: STROBED ROM WRITER"):
-                m.d.sync += [
-                    self.rom_writer.i_stb.eq(0),
-                    self.i_fifo.r_en.eq(0),
-                ]
+                m.d.sync += self.rom_writer.i_stb.eq(0)
                 with m.If(self.col == 16):
                     with m.If(self.row == 16):
                         m.d.sync += self.col.eq(1)
@@ -398,45 +394,32 @@ class OLED(Elaboratable):
                         self.locator.i_col.eq(self.col),
                         self.locator.i_stb.eq(1),
                     ]
-                    m.next = "CHPR: LOC ADJUST: STROBED LOCATOR"
+                    m.next = "CHPR: STROBED LOCATOR"
 
             with m.State("CHPR: UNSTROBED ROM WRITER, NEEDS SCROLL"):
                 with m.If(~self.rom_writer.o_busy):
-                    m.next = "CHPR: SCROLL"
+                    m.d.sync += self.scroller.i_stb.eq(1)
+                    m.next = "CHPR: STROBED SCROLLER"
 
-            with m.State("CHPR: LOC ADJUST: STROBED LOCATOR"):
-                m.d.sync += [
-                    self.i_fifo.r_en.eq(0),
-                    self.locator.i_stb.eq(0),
-                ]
-                m.next = "CHPR: LOC ADJUST: UNSTROBED LOCATOR"
-
-            with m.State("CHPR: LOC ADJUST: UNSTROBED LOCATOR"):
-                with m.If(~self.locator.o_busy):
-                    m.d.sync += self.chpr_run.eq(0)
-                    m.next = "IDLE"
-
-            with m.State("CHPR: LOC ADJUST: STROBED LOCATOR, NEEDS SCROLL"):
-                m.d.sync += [
-                    self.locator.i_stb.eq(0),
-                    self.i_fifo.r_en.eq(0),
-                ]
-                m.next = "CHPR: LOC ADJUST: UNSTROBED LOCATOR, NEEDS SCROLL"
-
-            with m.State("CHPR: LOC ADJUST: UNSTROBED LOCATOR, NEEDS SCROLL"):
-                with m.If(~self.locator.o_busy):
-                    m.next = "CHPR: SCROLL"
-
-            with m.State("CHPR: SCROLL"):
-                m.d.sync += self.scroller.i_stb.eq(1)
-                m.next = "CHPR: SCROLL: STROBED SCROLLER"
-
-            with m.State("CHPR: SCROLL: STROBED SCROLLER"):
+            with m.State("CHPR: STROBED SCROLLER"):
                 m.d.sync += self.scroller.i_stb.eq(0)
-                m.next = "CHPR: SCROLL: UNSTROBED SCROLLER"
+                m.next = "CHPR: UNSTROBED SCROLLER"
 
-            with m.State("CHPR: SCROLL: UNSTROBED SCROLLER"):
+            with m.State("CHPR: UNSTROBED SCROLLER"):
                 with m.If(~self.scroller.o_busy):
+                    m.d.sync += [
+                        self.locator.i_row.eq(self.row),
+                        self.locator.i_col.eq(self.col),
+                        self.locator.i_stb.eq(1),
+                    ]
+                    m.next = "CHPR: STROBED LOCATOR"
+
+            with m.State("CHPR: STROBED LOCATOR"):
+                m.d.sync += self.locator.i_stb.eq(0)
+                m.next = "CHPR: UNSTROBED LOCATOR"
+
+            with m.State("CHPR: UNSTROBED LOCATOR"):
+                with m.If(~self.locator.o_busy):
                     m.d.sync += self.chpr_run.eq(0)
                     m.next = "IDLE"
 

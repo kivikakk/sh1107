@@ -55,12 +55,6 @@ SCROLL_SEQUENCE, SCROLL_OFFSETS = Cmd.compose_with_offsets(
     ],
     [
         Cmd.SetMemoryAddressingMode("Page"),
-        "FinalPageAddress",
-        Cmd.SetPageAddress(0),
-        "FinalHigherColumnAddress",
-        Cmd.SetHigherColumnAddress(0),
-        "FinalLowerColumnAddress",
-        Cmd.SetLowerColumnAddress(0),
         "DisplayStartLine",
         Cmd.SetDisplayStartLine(0),
     ],

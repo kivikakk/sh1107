@@ -132,16 +132,6 @@ class Scroller(Elaboratable):
                             m.d.sync += transfer.payload.data.eq(
                                 self.rom_rd.data + (self.o_adjusted[0] << 3)
                             )
-                    with m.Elif(self.written == rom.SCROLL_OFFSETS["FinalPageAddress"]):
-                        m.d.sync += transfer.payload.data.eq(self.rom_rd.data)  # TODO
-                    with m.Elif(
-                        self.written == rom.SCROLL_OFFSETS["FinalHigherColumnAddress"]
-                    ):
-                        m.d.sync += transfer.payload.data.eq(self.rom_rd.data)  # TODO
-                    with m.Elif(
-                        self.written == rom.SCROLL_OFFSETS["FinalLowerColumnAddress"]
-                    ):
-                        m.d.sync += transfer.payload.data.eq(self.rom_rd.data)  # TODO
                     with m.Elif(
                         self.written == rom.SCROLL_OFFSETS["DisplayStartLine"] + 1
                     ):
