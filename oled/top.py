@@ -11,8 +11,10 @@ from .oled import OLED
 
 __all__ = ["Top"]
 
+SEQUENCES: list[list[int]] = []
+
 # msg1 = ("1234567890abcdef" * 15) + "1234567890abcde"
-# MAIN_SEQUENCE = [
+# SEQUENCES.append([
 #     0x02,  # DISPLAY_OFF
 #     0x03,  # CLS
 #     0x01,  # DISPLAY_ON
@@ -22,11 +24,11 @@ __all__ = ["Top"]
 #     0x05,
 #     len(msg1),
 #     *[ord(c) for c in msg1],  # PRINT msg1
-# ]
+# ])
 
 # msg1 = "123.123.ID: "
 # msg2 = "/"
-# MAIN_SEQUENCE = [
+# SEQUENCES.append([
 #     0x02,  # DISPLAY_OFF
 #     0x03,  # CLS
 #     0x01,  # DISPLAY_ON
@@ -43,42 +45,38 @@ __all__ = ["Top"]
 #     0x02,  # DISPLAY_OFF
 #     0x08,  # ID
 #     0x01,  # DISPLAY_ON
-# ]
+# ])
 
 msg1 = "Nyonk\n plonk"
 msg2 = "14: Hej\n 15: Mm\n  16: Z!\n   17: :)"
-MAIN_SEQUENCE = [
-    0x02,  # DISPLAY_OFF
-    0x03,  # CLS
-    0x01,  # DISPLAY_ON
-    0x04,
-    0x01,
-    0x01,  # LOCATE 1, 1
-    0x05,
-    len(msg1),
-    *[ord(c) for c in msg1],  # PRINT msg1
-    0x04,
-    0x0E,
-    0x01,  # LOCATE 14, 1
-    0x05,
-    len(msg2),
-    *[ord(c) for c in msg2],  # PRINT msg2
-    0x06,  # CURSOR_ON
-]
+SEQUENCES.append(
+    [
+        0x02,  # DISPLAY_OFF
+        0x03,  # CLS
+        0x01,  # DISPLAY_ON
+        0x04,
+        0x01,
+        0x01,  # LOCATE 1, 1
+        0x05,
+        len(msg1),
+        *[ord(c) for c in msg1],  # PRINT msg1
+        0x04,
+        0x0E,
+        0x01,  # LOCATE 14, 1
+        0x05,
+        len(msg2),
+        *[ord(c) for c in msg2],  # PRINT msg2
+        0x06,  # CURSOR_ON
+    ]
+)
 
-SECONDARY_SEQUENCE = [0x05, 0x01, 0x0A]  # PRINT "\n"
+SEQUENCES.append([0x05, 0x01, 0x0A])  # PRINT "\n"
 
 msg3 = "SHOMK"
-TERTIARY_SEQUENCE = [0x05, len(msg3), *[ord(c) for c in msg3]]  # PRINT msg3
-
-SEQUENCES = [
-    MAIN_SEQUENCE,
-    SECONDARY_SEQUENCE,
-    TERTIARY_SEQUENCE,
-]
+SEQUENCES.append([0x05, len(msg3), *[ord(c) for c in msg3]])  # PRINT msg3
 
 # msg = "Hello, world! This should wrap correctly."
-# MAIN_SEQUENCE = [
+# SEQUENCES.append([
 #     0x02,  # DISPLAY_OFF
 #     0x03,  # CLS
 #     0x01,  # DISPLAY_ON
@@ -101,7 +99,7 @@ SEQUENCES = [
 #     len(msg),
 #     *[ord(c) for c in msg],  # PRINT msg
 #     0x06,  # CURSOR_ON
-# ]
+# ])
 
 
 class Top(Elaboratable):
