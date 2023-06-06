@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Any, Optional, Self, Type, cast
+from typing import Any, Optional, Self, Tuple, Type, cast
 
 from amaranth.lib.enum import IntEnum
 
@@ -185,18 +185,46 @@ class Cmd:
             return cmds
 
     @staticmethod
-    def compose(*cmds_in: list[Base | DataBytes]) -> list[int]:
-        cmds = [i for sl in cmds_in for i in sl]
+    def compose(*cmds_in: list[Base | DataBytes]) -> list[list[int]]:
+        return Cmd.compose_with_offsets(*cmds_in)[0]
 
-        dcs: list[bool] = []
+    @staticmethod
+    def compose_with_offsets(
+        *seqs: list[Base | DataBytes | str],
+    ) -> Tuple[list[list[int]], dict[str, int]]:
+        curr_offset = 0
+        offsets: dict[str, int] = {}
+        result: list[list[int]] = []
+
+        for seq in seqs:
+            bytes = Cmd._compose_with_offsets_single(seq, offsets, curr_offset)
+            result.append(bytes)
+            curr_offset += len(bytes)
+
+        return result, offsets
+
+    @staticmethod
+    def _compose_with_offsets_single(
+        cmds: list[Base | DataBytes | str],
+        offsets: dict[str, int],
+        curr_offset: int,
+    ) -> list[int]:
+        dcs: list[bool | None] = []
         for cmd in cmds:
-            dcs.append(isinstance(cmd, DataBytes))
+            if isinstance(cmd, str):
+                dcs.append(None)
+            else:
+                dcs.append(isinstance(cmd, DataBytes))
 
         out: list[int] = []
         finished_control = False
         for i, cmd in enumerate(cmds):
+            if isinstance(cmd, str):
+                offsets[cmd] = curr_offset + len(out)
+                continue
+
             if not finished_control:
-                if all(dc == dcs[i] for dc in dcs[i:]):
+                if all(dc is None or dc == dcs[i] for dc in dcs[i:]):
                     finished_control = True
                     out.append(ControlByte(False, DC(dcs[i])).to_byte())
 
@@ -242,7 +270,7 @@ class Cmd:
     class SetMemoryAddressingMode(Base):
         class Mode(IntEnum):
             Page = 0b0  # Column address increments (POR)
-            Column = 0b1  # Page address increments
+            Vertical = 0b1  # Page address increments
 
         mode: Mode
 

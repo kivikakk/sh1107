@@ -5,12 +5,12 @@ from .sh1107 import Base, Cmd, ControlByte, DataBytes, ParseState
 
 
 class TestSH1107Command(unittest.TestCase):
-    PAIRS = [
+    CASES = [
         ([0x07], Cmd.SetLowerColumnAddress(0x7)),
         ([0x13], Cmd.SetHigherColumnAddress(0x3)),
         ([0x18], False),
         ([0x20], Cmd.SetMemoryAddressingMode("Page")),
-        ([0x21], Cmd.SetMemoryAddressingMode("Column")),
+        ([0x21], Cmd.SetMemoryAddressingMode("Vertical")),
         ([0x81], True),
         ([0x81, 0x7F], Cmd.SetContrastControlRegister(0x7F)),
         ([0x81, 0x00], Cmd.SetContrastControlRegister(0x00)),
@@ -59,7 +59,7 @@ class TestSH1107Command(unittest.TestCase):
         (0xC0, ControlByte(True, "Data")),
     ]
 
-    COMPOSE_PAIRS: list[Tuple[list[Base | DataBytes], list[int]]] = [
+    COMPOSE_CASES: list[Tuple[list[Base | DataBytes], list[int]]] = [
         (
             [
                 Cmd.SetDisplayClockFrequency(7, "Neg5"),
@@ -120,6 +120,49 @@ class TestSH1107Command(unittest.TestCase):
                 0x11,  # DataBytes
                 0x88,  # DataBytes
             ],
+        ),
+    ]
+
+    COMPOSE_WITH_OFFSETS_CASES: list[
+        Tuple[list[Base | DataBytes | str], list[int], dict[str, int]]
+    ] = [
+        (
+            [
+                Cmd.SetMemoryAddressingMode("Vertical"),
+                "InitialPageAddress",
+                Cmd.SetPageAddress(0),
+                "InitialHigherColumnAddress",
+                Cmd.SetHigherColumnAddress(0),
+                "InitialLowerColumnAddress",
+                Cmd.SetLowerColumnAddress(0),
+                "FinalHigherColumnAddress",
+                Cmd.SetHigherColumnAddress(0),
+                "FinalLowerColumnAddress",
+                Cmd.SetLowerColumnAddress(0),
+                Cmd.SetMemoryAddressingMode("Page"),
+                "DisplayStartLine",
+                Cmd.SetDisplayStartLine(0),
+            ],
+            [
+                0x00,  # 0: !Co/C
+                0x21,  # 1: SetMemoryAddressingMode Vertical
+                0xB0,  # 2: SetPageAddress 0
+                0x10,  # 3: SetHigherColumnAddress 0
+                0x00,  # 4: SetLowerColumnAddress 0
+                0x10,  # 5: SetHigherColumnAddress 0
+                0x00,  # 6: SetLowerColumnAddress 0
+                0x20,  # 7: SetMemoryAddressingMode Page
+                0xDC,  # 8: SetDisplayStartLine
+                0x00,  # 9: 0
+            ],
+            {
+                "InitialPageAddress": 2,
+                "InitialHigherColumnAddress": 3,
+                "InitialLowerColumnAddress": 4,
+                "FinalHigherColumnAddress": 5,
+                "FinalLowerColumnAddress": 6,
+                "DisplayStartLine": 8,
+            },
         ),
     ]
 
@@ -338,11 +381,11 @@ class TestSH1107Command(unittest.TestCase):
     ]
 
     def test_parse_one(self):
-        for data, value, *_ in self.PAIRS:
+        for data, value, *_ in self.CASES:
             self.assertEqual(Base.parse_one(data), value)
 
     def test_to_bytes(self):
-        for data, value, *maybe in self.PAIRS:
+        for data, value, *maybe in self.CASES:
             if value in (False, True):
                 continue
             if len(maybe) == 1:
@@ -355,11 +398,17 @@ class TestSH1107Command(unittest.TestCase):
             self.assertEqual(cb.to_byte(), b)
 
     def test_compose(self):
-        for cmds, bytes in self.COMPOSE_PAIRS:
-            self.assertEqual(Cmd.compose(cmds), bytes)
+        for cmds, bytes in self.COMPOSE_CASES:
+            self.assertEqual(Cmd.compose(cmds), [bytes])
+
+    def test_compose_with_offset(self):
+        for cmds, bytes, offsets in self.COMPOSE_WITH_OFFSETS_CASES:
+            actual_bytes, actual_offsets = Cmd.compose_with_offsets(cmds)
+            self.assertEqual(actual_bytes, [bytes])
+            self.assertEqual(actual_offsets, offsets)
 
     def test_parse(self):
-        for cmds, bytes in self.COMPOSE_PAIRS:
+        for cmds, bytes in self.COMPOSE_CASES:
             self.assertParseComplete(bytes, cmds)
 
     def assertParseComplete(self, bytes: list[int], cmds: list[Base | DataBytes]):

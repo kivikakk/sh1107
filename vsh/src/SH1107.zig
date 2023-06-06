@@ -45,12 +45,12 @@ pub const DclkFreq = enum(u4) {
 
 pub const AddrMode = enum(u1) {
     Page = 0b0,
-    Column = 0b1,
+    Vertical = 0b1,
 
     pub fn str(self: AddrMode) []const u8 {
         return switch (self) {
             .Page => "page",
-            .Column => "column",
+            .Vertical => "vertical",
         };
     }
 };
@@ -172,7 +172,7 @@ pub fn data(self: *@This(), b: u8) Write {
 
     defer switch (self.addressing_mode) {
         .Page => self.column_address +%= 1,
-        .Column => self.page_address +%= 1,
+        .Vertical => self.page_address +%= 1,
     };
 
     var row: u7 = undefined;

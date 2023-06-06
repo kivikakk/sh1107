@@ -67,7 +67,7 @@ pub const Command = union(enum) {
         }
         if (bytes[0] == 0x21) {
             if (bytes.len == 1) {
-                return .{ .SetMemoryAddressingMode = .Column };
+                return .{ .SetMemoryAddressingMode = .Vertical };
             }
             return error.Unrecoverable;
         }

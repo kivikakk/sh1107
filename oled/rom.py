@@ -3,37 +3,72 @@ import struct
 from .chars import CHARS
 from .sh1107 import Cmd, DataBytes
 
-__all__ = ["ROM", "SEQ_COUNT", "OFFSET_DISPLAY_ON", "OFFSET_DISPLAY_OFF", "OFFSET_CHAR"]
-
-DISPLAY_ON_SEQUENCE: list[list[int]] = [
-    Cmd.compose(
-        [
-            Cmd.DisplayOn(False),
-            Cmd.SetDisplayClockFrequency(1, "Zero"),
-            Cmd.SetDisplayOffset(0),
-            Cmd.SetDisplayStartLine(0),
-            Cmd.SetDCDC(True),
-            Cmd.SetSegmentRemap("Normal"),
-            Cmd.SetCommonOutputScanDirection("Forwards"),
-            Cmd.SetContrastControlRegister(0x80),
-            Cmd.SetMultiplexRatio(0x80),
-            Cmd.SetPreDischargePeriod(2, 2),
-            Cmd.SetVCOMDeselectLevel(0x35),
-            Cmd.SetDisplayReverse(False),
-            Cmd.SetMemoryAddressingMode("Page"),
-            Cmd.SetPageAddress(0),
-            Cmd.SetLowerColumnAddress(0),
-            Cmd.SetHigherColumnAddress(0),
-            Cmd.DisplayOn(True),
-        ]
-    )
+__all__ = [
+    "ROM",
+    "SEQ_COUNT",
+    "OFFSET_DISPLAY_ON",
+    "OFFSET_DISPLAY_OFF",
+    "OFFSET_SCROLL",
+    "OFFSET_CHAR",
 ]
 
-DISPLAY_OFF_SEQUENCE = [Cmd.compose([Cmd.DisplayOn(False)])]
+
+DISPLAY_ON_SEQUENCE: list[list[int]] = Cmd.compose(
+    [
+        Cmd.DisplayOn(False),
+        Cmd.SetDisplayClockFrequency(1, "Zero"),
+        Cmd.SetDisplayOffset(0),
+        Cmd.SetDisplayStartLine(0),
+        Cmd.SetDCDC(True),
+        Cmd.SetSegmentRemap("Normal"),
+        Cmd.SetCommonOutputScanDirection("Forwards"),
+        Cmd.SetContrastControlRegister(0x80),
+        Cmd.SetMultiplexRatio(0x80),
+        Cmd.SetPreDischargePeriod(2, 2),
+        Cmd.SetVCOMDeselectLevel(0x35),
+        Cmd.SetDisplayReverse(False),
+        Cmd.SetMemoryAddressingMode("Page"),
+        Cmd.SetPageAddress(0),
+        Cmd.SetHigherColumnAddress(0),
+        Cmd.SetLowerColumnAddress(0),
+        Cmd.DisplayOn(True),
+    ]
+)
+
+
+DISPLAY_OFF_SEQUENCE = Cmd.compose([Cmd.DisplayOn(False)])
+
+SCROLL_SEQUENCE, SCROLL_OFFSETS = Cmd.compose_with_offsets(
+    [
+        Cmd.SetMemoryAddressingMode("Vertical"),
+        "InitialPageAddress",
+        Cmd.SetPageAddress(0),
+        "InitialHigherColumnAddress",
+        Cmd.SetHigherColumnAddress(0),
+    ],
+    *[
+        [
+            Cmd.SetLowerColumnAddress(i),  # XXX
+            DataBytes([0x00] * 16),
+        ]
+        for i in range(8)
+    ],
+    [
+        Cmd.SetMemoryAddressingMode("Page"),
+        "FinalPageAddress",
+        Cmd.SetPageAddress(0),
+        "FinalHigherColumnAddress",
+        Cmd.SetHigherColumnAddress(0),
+        "FinalLowerColumnAddress",
+        Cmd.SetLowerColumnAddress(0),
+        "DisplayStartLine",
+        Cmd.SetDisplayStartLine(0),
+    ],
+)
 
 CHAR_SEQUENCES: list[list[list[int]]] = []
 for cols in CHARS:
-    CHAR_SEQUENCES.append([Cmd.compose([DataBytes(cols)])])
+    CHAR_SEQUENCES.append(Cmd.compose([DataBytes(cols)]))
 assert len(CHAR_SEQUENCES) == 256
 
 NULL_SEQUENCE: list[list[int]] = [[]]
@@ -41,6 +76,7 @@ NULL_SEQUENCE: list[list[int]] = [[]]
 seqs = (
     DISPLAY_ON_SEQUENCE,
     DISPLAY_OFF_SEQUENCE,
+    SCROLL_SEQUENCE,
     *CHAR_SEQUENCES,
     NULL_SEQUENCE,
 )
@@ -48,7 +84,8 @@ SEQ_COUNT = len(seqs)
 
 OFFSET_DISPLAY_ON = 0x00
 OFFSET_DISPLAY_OFF = 0x01
-OFFSET_CHAR = 0x02
+OFFSET_SCROLL = 0x02
+OFFSET_CHAR = 0x03
 
 rom_offset = SEQ_COUNT * 2 * 2
 

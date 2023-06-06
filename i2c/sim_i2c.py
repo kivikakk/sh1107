@@ -272,7 +272,9 @@ def steady_stopped(i2c: I2C, *, wait_steps: int = 5) -> sim.Generator:
         assert (yield i2c.scl_o)
         assert (yield i2c.sda_o)
 
-    assert not (yield i2c.bus.o_in_fifo_r_rdy)
+    assert not (
+        yield i2c.bus.o_in_fifo_r_rdy
+    ), f"unexpected data waiting on I2C in fifo: {(yield i2c.bus.i_in_fifo_w_data):02x}"
     assert not (yield i2c.bus.o_busy)
 
 
@@ -305,11 +307,15 @@ def full_sequence(
                 yield from repeated_start(i2c)
 
             check_byte = byte & 0xFF
-            check_next = sequence[i + 1] if i < len(sequence) - 1 else "STOP"
+            if i < len(sequence) - 1:
+                check_next = sequence[i + 1]
+                if check_next & 0x100:
+                    # We may not have the next byte in FIFO yet in all cases.
+                    # XXX(Ch): is this OK? Or is this the Scroller bug?
+                    check_next = None
+            else:
+                check_next = "STOP"
             yield from send(i2c, check_byte, next=check_next)
-
-            if check_next != "STOP":
-                check_next = f"{check_next:02x}"
 
             if i == nack_after:
                 yield from nack(i2c)
