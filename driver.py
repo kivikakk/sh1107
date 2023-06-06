@@ -69,7 +69,9 @@ def formal(args: Namespace):
         f.write(output)
 
     sby_file = _path("formal/sh1107.sby")
-    subprocess.run(["sby", "--prefix", "build/sh1107", "-f", sby_file], check=True)
+    subprocess.run(
+        ["sby", "--prefix", "build/sh1107", "-f", sby_file, *args.tasks], check=True
+    )
 
 
 def _print_file_between(
@@ -197,12 +199,16 @@ def main():
         help="run tests from a specific subdirectory",
     )
 
-    # TODO!
     formal_parser = subparsers.add_parser(
         "formal",
         help="formally verify the design",
     )
     formal_parser.set_defaults(func=formal)
+    formal_parser.add_argument(
+        "tasks",
+        help="tasks to run; defaults to all",
+        nargs="*",
+    )
 
     build_parser = subparsers.add_parser(
         "build",
