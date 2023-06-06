@@ -32,12 +32,10 @@ pub fn update(self: *Display) bool {
         return false;
     }
 
-    if (gk.input.keyPressed(.key_return)) {
-        self.fpga_thread.press_switch_connector(0);
-    }
-
-    if (gk.input.keyPressed(.space)) {
-        self.fpga_thread.press_switch_connector(1);
+    inline for (.{ .num_1, .num_2, .num_3, .num_4, .num_5, .num_6, .num_7, .num_8, .num_9, .num_0 }, 1..) |n, i| {
+        if (gk.input.keyPressed(n)) {
+            self.fpga_thread.press_switch_connector(i);
+        }
     }
 
     return true;
