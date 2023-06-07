@@ -128,6 +128,7 @@ class I2C(Elaboratable):
     _out_fifo: SyncFIFO
 
     bus: I2CBus
+    c: Counter
 
     sda: Pin
     scl: Pin
@@ -144,6 +145,9 @@ class I2C(Elaboratable):
 
     next_byte: Signal
 
+    formal_start: Optional[Signal]
+    formal_stop: Optional[Signal]
+
     def __init__(self, *, speed: Hz, formal: bool = False):
         assert speed.value in self.VALID_SPEEDS
         self.speed = speed
@@ -155,6 +159,7 @@ class I2C(Elaboratable):
         self._out_fifo = SyncFIFO(width=8, depth=2 if formal else 1)
 
         self.bus = I2CBus()
+        self.c = Counter(hz=speed.value * 2)
 
         self.assign(scl=Pin(1, "io", name="scl"), sda=Pin(1, "io", name="sda"))
         self.scl_o.reset = 1
@@ -168,6 +173,10 @@ class I2C(Elaboratable):
         self.byte_ix = Signal(range(8))  # ... but we never write the whole thing out.
 
         self.next_byte = Signal(I2C.NextByte)
+
+        if formal:
+            self.formal_start = Signal()
+            self.formal_stop = Signal()
 
     def assign(self, *, scl: Pin, sda: Pin):
         self.scl = scl
@@ -232,7 +241,7 @@ class I2C(Elaboratable):
         # NOTE(Mia): we might need to keep scl_o=0 and toggle scl_oe instead for
         # clock stretching?
 
-        m.submodules.c = c = Counter(hz=self.speed.value * 2)
+        m.submodules.c = c = self.c
         with m.If(c.o_full):
             m.d.sync += self.scl_o.eq(~self.scl_o)
 
@@ -258,11 +267,7 @@ class I2C(Elaboratable):
                     self.scl_o.eq(1),
                 ]
 
-                with m.If(
-                    self.bus.i_stb
-                    & self._in_fifo.r_rdy
-                    & (self._in_fifo_r_data.kind == Transfer.Kind.START)
-                ):
+                with m.If(self.bus.i_stb & self._in_fifo.r_rdy):
                     m.d.sync += [
                         self.bus.o_busy.eq(1),
                         self.bus.o_ack.eq(1),
@@ -274,11 +279,15 @@ class I2C(Elaboratable):
                         self.byte.eq(self._in_fifo_r_data),
                         self.byte_ix.eq(0),
                     ]
+                    if self.formal_start is not None:
+                        m.d.sync += self.formal_start.eq(1)
 
                     m.next = "START: WAIT SCL"
 
             with m.State("START: WAIT SCL"):
                 m.d.sync += self._in_fifo.r_en.eq(0)
+                if self.formal_start is not None:
+                    m.d.sync += self.formal_start.eq(0)
                 # SDA is low.
                 with m.If(c.o_full):
                     m.next = "WRITE DATA BIT: SCL LOW"
@@ -444,9 +453,13 @@ class I2C(Elaboratable):
                     m.next = "FIN: SCL HIGH"
 
             with m.State("FIN: SCL HIGH"):
+                if self.formal_stop is not None:
+                    m.d.sync += self.formal_stop.eq(0)
                 with m.If(c.o_half):
                     # Bring SDA high during SCL high to finish.
                     m.d.sync += self.sda_o.eq(1)
+                    if self.formal_stop is not None:
+                        m.d.sync += self.formal_stop.eq(1)
                 with m.Elif(c.o_full):
                     # Turn off the clock to keep SCL high.
                     m.d.sync += [
