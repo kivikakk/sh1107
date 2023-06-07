@@ -1,0 +1,44 @@
+[*]
+[*] GTKWave Analyzer v3.3.100 (w)1999-2019 BSI
+[*] Wed Jun 07 01:12:03 2023
+[*]
+[dumpfile] "C:\Users\kivikakk\Code\sh1107\build\sh1107_cover\engine_0\trace1.vcd"
+[dumpfile_mtime] "Wed Jun 07 01:09:49 2023"
+[dumpfile_size] 6257
+[savefile] "C:\Users\kivikakk\Code\sh1107\cover_trace1.gtkw"
+[timestart] 0
+[size] 1701 1398
+[pos] -462 -1
+*-3.699733 1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] formal_top.
+[sst_width] 234
+[signals_width] 262
+[sst_expanded] 1
+[sst_vpaned_height] 433
+@28
+smt_clock
+@420
+smt_step
+@28
+formal_top.init
+formal_top.rst
+formal_top.clk
+formal_top.I2CBus__i_stb
+formal_top.dut.in_fifo_w_en
+@22
+formal_top.dut.in_fifo_w_data[8:0]
+@28
+formal_top.dut.in_fifo_r_rdy
+@22
+formal_top.dut.in_fifo_r_data[8:0]
+@28
+formal_top.dut.in_fifo_r_en
+formal_top.dut.rw
+@29
+formal_top.dut.scl__o
+@22
+formal_top.dut.byte[8:0]
+@28
+formal_top.dut.byte_ix[2:0]
+[pattern_trace] 1
+[pattern_trace] 0

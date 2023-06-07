@@ -30,7 +30,7 @@ echo "--- Building Virtual SH1107"
 "$PYTHON" driver.py vsh -ci
 "$PYTHON" driver.py vsh -c
 
-# echo "--- Formal verification"
-# "$PYTHON" driver.py formal
+echo "--- Formal verification"
+"$PYTHON" driver.py formal
 
 echo "+++ All passed."

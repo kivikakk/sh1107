@@ -145,18 +145,23 @@ class I2C(Elaboratable):
 
     next_byte: Signal
 
-    def __init__(self, *, speed: Hz):
+    def __init__(self, *, speed: Hz, formal: bool = False):
         assert speed.value in self.VALID_SPEEDS
         self.speed = speed
 
-        self._in_fifo = SyncFIFO(width=9, depth=1)
+        # NOTE(Ch): formal hack for https://github.com/YosysHQ/yosys/issues/2577
+        self._in_fifo = SyncFIFO(width=9, depth=2 if formal else 1)
         self._in_fifo_r_data = Transfer(target=self._in_fifo.r_data)
 
-        self._out_fifo = SyncFIFO(width=8, depth=1)
+        self._out_fifo = SyncFIFO(width=8, depth=2 if formal else 1)
 
         self.bus = I2CBus()
 
         self.assign(scl=Pin(1, "io", name="scl"), sda=Pin(1, "io", name="sda"))
+        self.scl_o.reset = 1
+        self.scl_oe.reset = 1
+        self.sda_oe.reset = 1
+        self.sda_o.reset = 1
         self.sda_i.reset = 1
 
         self.rw = Signal(RW)
