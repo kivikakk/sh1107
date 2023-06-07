@@ -311,7 +311,6 @@ def full_sequence(
                 check_next = sequence[i + 1]
                 if check_next & 0x100:
                     # We may not have the next byte in FIFO yet in all cases.
-                    # XXX(Ch): is this OK? Or is this the Scroller bug?
                     check_next = None
             else:
                 check_next = "STOP"
