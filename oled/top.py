@@ -2,6 +2,7 @@ from typing import Optional, cast
 
 from amaranth import Elaboratable, Memory, Module, Record, Signal
 from amaranth.build import Platform
+from amaranth.build.res import ResourceError
 from amaranth.hdl.mem import ReadPort
 from amaranth_boards.icebreaker import ICEBreakerPlatform
 from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
@@ -175,10 +176,14 @@ class Top(Elaboratable):
                 platform.add_resources(platform.break_off_pmod)
 
                 for i, _ in enumerate(self.switches):
-                    switch = cast(Signal, platform.request("button", i).i)
-                    m.submodules[f"button_{i}"] = button = Button()
-                    m.d.comb += button.i.eq(switch)
-                    button_up_signals.append(button.o_up)
+                    try:
+                        switch = cast(Signal, platform.request("button", i).i)
+                    except ResourceError:
+                        break
+                    else:
+                        m.submodules[f"button_{i}"] = button = Button()
+                        m.d.comb += button.i.eq(switch)
+                        button_up_signals.append(button.o_up)
 
                 # led_l = platform.request("led_g", 1)
                 # led_m = platform.request("led_r", 1)
@@ -204,10 +209,14 @@ class Top(Elaboratable):
                     m.d.sync += program.eq(1)
 
                 for i, _ in list(enumerate(self.switches))[1:]:
-                    switch = cast(Signal, platform.request("button", i).i)
-                    m.submodules[f"button_{i}"] = button = Button()
-                    m.d.comb += button.i.eq(switch)
-                    button_up_signals.append(button.o_up)
+                    try:
+                        switch = cast(Signal, platform.request("button", i).i)
+                    except ResourceError:
+                        break
+                    else:
+                        m.submodules[f"button_{i}"] = button = Button()
+                        m.d.comb += button.i.eq(switch)
+                        button_up_signals.append(button.o_up)
 
             case None:
                 for i, switch in enumerate(self.switches):
