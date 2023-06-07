@@ -7,7 +7,7 @@ prove
 bmc: mode bmc
 cover: mode cover
 prove: mode prove
-depth 20
+depth 30
 multiclock on
 
 [engines]

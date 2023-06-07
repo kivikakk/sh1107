@@ -96,8 +96,7 @@ class I2C(Elaboratable):
     I2C controller.
 
     FIFO is 9 bits wide and one word deep; to start, write in Cat(rw<1>,
-    addr<7>, 1<1>) (the MSB is ignored here, though, since you need to start
-    with an address), and strobe i_stb on the cycle after.
+    addr<7>, 1<1>) and strobe i_stb.
 
     Write: Feed data one byte at a time into the FIFO as it's emptied, with MSB
     low (i.e. Cat(data<8>, 0<1>)).  If o_ack goes low, there's been a NACK, and
@@ -259,7 +258,11 @@ class I2C(Elaboratable):
                     self.scl_o.eq(1),
                 ]
 
-                with m.If(self.bus.i_stb):
+                with m.If(
+                    self.bus.i_stb
+                    & self._in_fifo.r_rdy
+                    & (self._in_fifo_r_data.kind == Transfer.Kind.START)
+                ):
                     m.d.sync += [
                         self.bus.o_busy.eq(1),
                         self.bus.o_ack.eq(1),

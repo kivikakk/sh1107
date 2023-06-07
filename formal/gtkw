@@ -1,20 +1,21 @@
 [*]
-[*] GTKWave Analyzer v3.3.100 (w)1999-2019 BSI
-[*] Wed Jun 07 01:12:03 2023
+[*] GTKWave Analyzer v3.4.0 (w)1999-2022 BSI
+[*] Wed Jun 07 01:50:14 2023
 [*]
-[dumpfile] "C:\Users\kivikakk\Code\sh1107\build\sh1107_cover\engine_0\trace1.vcd"
-[dumpfile_mtime] "Wed Jun 07 01:09:49 2023"
-[dumpfile_size] 6257
-[savefile] "C:\Users\kivikakk\Code\sh1107\cover_trace1.gtkw"
+[dumpfile] "C:\Users\kivikakk\Code\sh1107\build\sh1107_cover\engine_0\trace3.vcd"
+[dumpfile_mtime] "Wed Jun 07 01:49:21 2023"
+[dumpfile_size] 15947
+[savefile] "C:\Users\kivikakk\Code\sh1107\formal\gtkw"
 [timestart] 0
-[size] 1701 1398
-[pos] -462 -1
-*-3.699733 1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[size] 1803 1439
+[pos] 1402 203
+*-4.483754 210 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] formal_top.
-[sst_width] 234
-[signals_width] 262
+[treeopen] formal_top.dut.
+[sst_width] 310
+[signals_width] 296
 [sst_expanded] 1
-[sst_vpaned_height] 433
+[sst_vpaned_height] 448
 @28
 smt_clock
 @420
@@ -24,18 +25,23 @@ formal_top.init
 formal_top.rst
 formal_top.clk
 formal_top.I2CBus__i_stb
-formal_top.dut.in_fifo_w_en
+formal_top.dut.I2CBus__o_busy
+formal_top.dut.in_fifo.w_en
 @22
-formal_top.dut.in_fifo_w_data[8:0]
+formal_top.dut.in_fifo.w_data[8:0]
 @28
-formal_top.dut.in_fifo_r_rdy
+formal_top.dut.in_fifo.r_level[1:0]
+formal_top.dut.in_fifo.r_rdy
 @22
-formal_top.dut.in_fifo_r_data[8:0]
+formal_top.dut.in_fifo.r_data[8:0]
 @28
-formal_top.dut.in_fifo_r_en
+formal_top.dut.in_fifo.r_en
 formal_top.dut.rw
-@29
 formal_top.dut.scl__o
+@29
+formal_top.dut.sda__o
+@28
+formal_top.dut.next_byte[1:0]
 @22
 formal_top.dut.byte[8:0]
 @28
