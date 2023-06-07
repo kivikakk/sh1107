@@ -3,7 +3,7 @@
 
 /**
  * NOTE: This file is **only** used if using the blackbox.  If launching vsh
- * with "driver.py vsh -i", build/sh1107.cc is used directly instead.
+ * with "main.py vsh -i", build/sh1107.cc is used directly instead.
  *
  * This code is officially Not Poggers(tm).
  *

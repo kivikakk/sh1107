@@ -185,7 +185,7 @@ def vsh(args: Namespace):
 
 
 def main():
-    parser = ArgumentParser(prog="driver")
+    parser = ArgumentParser(prog="main")
     subparsers = parser.add_subparsers(required=True)
 
     test_parser = subparsers.add_parser(
@@ -248,7 +248,7 @@ def main():
 
     rom_parser = subparsers.add_parser(
         "rom",
-        help="build the ROM image, and optionally program it",
+        help="(WIP) build the ROM image, and optionally program it",
     )
     rom_parser.set_defaults(func=rom)
     rom_parser.add_argument(

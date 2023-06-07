@@ -15,22 +15,22 @@ echo "+++ Unit tests"
 (
 	trap 'buildkite-agent artifact upload "build/*.vcd"' ERR
 	
-	env CI=1 "$PYTHON" driver.py test
+	env CI=1 "$PYTHON" main.py test
 )
 
 
 for board in "${BOARDS[@]}"; do
 	for speed in "${SPEEDS[@]}"; do
 		echo "--- Building $board @ $speed"
-		"$PYTHON" driver.py build "$board" -s "$speed"
+		"$PYTHON" main.py build "$board" -s "$speed"
 	done
 done
 
 echo "--- Building Virtual SH1107"
-"$PYTHON" driver.py vsh -ci
-"$PYTHON" driver.py vsh -c
+"$PYTHON" main.py vsh -ci
+"$PYTHON" main.py vsh -c
 
 echo "--- Formal verification"
-"$PYTHON" driver.py formal
+"$PYTHON" main.py formal
 
 echo "+++ All passed."

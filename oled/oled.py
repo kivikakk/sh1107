@@ -191,8 +191,6 @@ class OLED(Elaboratable):
                         m.next = "ROM WRITE SINGLE: STROBED ROM WRITER"
 
                     with m.Case(OLED.Command.CLS):
-                        # TODO: we should either restore page/col after CLS, or
-                        # define it as resetting the location
                         m.d.sync += self.clser.i_stb.eq(1)
                         m.next = "CLSER: STROBED"
 
@@ -229,6 +227,19 @@ class OLED(Elaboratable):
 
             with m.State("CLSER: UNSTROBED"):
                 with m.If(~self.clser.o_busy):
+                    m.d.sync += [
+                        self.locator.i_row.eq(self.row),
+                        self.locator.i_col.eq(self.col),
+                        self.locator.i_stb.eq(1),
+                    ]
+                    m.next = "CLSER: STROBED LOCATOR"
+
+            with m.State("CLSER: STROBED LOCATOR"):
+                m.d.sync += self.locator.i_stb.eq(0)
+                m.next = "CLSER: UNSTROBED LOCATOR"
+
+            with m.State("CLSER: UNSTROBED LOCATOR"):
+                with m.If(~self.locator.o_busy):
                     m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
                     m.next = "IDLE"
 

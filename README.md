@@ -2,28 +2,26 @@
 
 [![Build status](https://badge.buildkite.com/50b21967ee2e88d80db0bd35a97173a66f322b5d2141d21060.svg)](https://buildkite.com/hrzn/sh1107)
 
-Chawwo!
-
-I'm just learning to write gateware. This repository is a testbed for exploring
-[Amaranth](https://github.com/amaranth-lang/amaranth) while doing so. It
-contains a read/write I²C controller, plus a basic controller for SH1107-type
+Hiy! I'm just learning to write gateware. This repository is a testbed for
+exploring [Amaranth](https://github.com/amaranth-lang/amaranth) while doing so.
+It contains a read/write I²C controller, plus a basic driver for SH1107-type
 OLEDs over I²C, such as the [Pimoroni 1.12" 128x128 monochrome
-OLED](https://shop.pimoroni.com/products/1-12-oled-breakout). The controller
-supports simple commands akin to old BASIC: `CLS`, `PRINT`, `LOCATE`. The old
-IBM 8x8 font is used to this end.
+OLED](https://shop.pimoroni.com/products/1-12-oled-breakout). The driver
+supports simple commands akin to old BASIC: `CLS`, `PRINT`, `LOCATE`. The
+classic IBM 8x8 font is used to this end.
 
-There's a driver in the root which exposes the various things it can do:
+There's an entry-point in the root which exposes the various things it can do:
 
 ```console
-$ ./driver.py -h
-usage: driver [-h] {test,formal,build,rom,vsh} ...
+$ ./main.py -h
+usage: main [-h] {test,formal,build,rom,vsh} ...
 
 positional arguments:
   {test,formal,build,rom,vsh}
     test                run the unit tests and sim tests
     formal              formally verify the design
     build               build the design, and optionally program it
-    rom                 build the ROM image, and optionally program it
+    rom                 (WIP) build the ROM image, and optionally program it
     vsh                 run the Virtual SH1107
 
 options:
@@ -32,10 +30,8 @@ options:
 
 TODOs:
 
-- Formal verification of some key components
 - Read the ROM image (with command sequences and character data) from the flash
   over SPI (currently just encoded into the bitstream)
-- ?
 
 The current test deployment target is the iCEBreaker ([Crowd
 Supply](https://www.crowdsupply.com/1bitsquared/icebreaker-fpga),
