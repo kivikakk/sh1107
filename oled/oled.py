@@ -10,7 +10,7 @@ from common import Hz
 from i2c import I2C, I2CBus
 from .clser import Clser
 from .locator import Locator
-from .rom import OFFSET_CHAR, OFFSET_DISPLAY_OFF, OFFSET_DISPLAY_ON
+from .rom import OFFSET_CHAR, OFFSET_DISPLAY_OFF, OFFSET_DISPLAY_ON, OFFSET_INIT
 from .rom_writer import ROMWriter
 from .scroller import Scroller
 
@@ -43,14 +43,15 @@ class OLED(Elaboratable):
 
     class Command(IntEnum, shape=8):
         NOP = 0x00
-        DISPLAY_ON = 0x01
-        DISPLAY_OFF = 0x02
-        CLS = 0x03
-        LOCATE = 0x04
-        PRINT = 0x05
-        CURSOR_ON = 0x06
-        CURSOR_OFF = 0x07
-        ID = 0x08
+        INIT = 0x01
+        DISPLAY_ON = 0x02
+        DISPLAY_OFF = 0x03
+        CLS = 0x04
+        LOCATE = 0x05
+        PRINT = 0x06
+        CURSOR_ON = 0x07
+        CURSOR_OFF = 0x08
+        ID = 0x09
 
     class Result(IntEnum, shape=2):
         SUCCESS = 0
@@ -175,13 +176,20 @@ class OLED(Elaboratable):
                         m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
                         m.next = "IDLE"
 
+                    with m.Case(OLED.Command.INIT):
+                        m.d.sync += [
+                            self.rom_writer.i_index.eq(OFFSET_INIT),
+                            self.rom_writer.i_stb.eq(1),
+                            self.scroller.i_rst.eq(1),
+                        ]
+                        m.next = "INIT: STROBED ROM WRITER"
+
                     with m.Case(OLED.Command.DISPLAY_ON):
                         m.d.sync += [
                             self.rom_writer.i_index.eq(OFFSET_DISPLAY_ON),
                             self.rom_writer.i_stb.eq(1),
-                            self.scroller.i_rst.eq(1),
                         ]
-                        m.next = "DISPLAY ON: STROBED ROM WRITER"
+                        m.next = "ROM WRITE SINGLE: STROBED ROM WRITER"
 
                     with m.Case(OLED.Command.DISPLAY_OFF):
                         m.d.sync += [
@@ -243,7 +251,7 @@ class OLED(Elaboratable):
                     m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
                     m.next = "IDLE"
 
-            with m.State("DISPLAY ON: STROBED ROM WRITER"):
+            with m.State("INIT: STROBED ROM WRITER"):
                 m.d.sync += [
                     self.rom_writer.i_stb.eq(0),
                     self.scroller.i_rst.eq(0),

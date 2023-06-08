@@ -16,91 +16,57 @@ SEQUENCES: list[list[int]] = []
 
 # msg1 = ("1234567890abcdef" * 15) + "1234567890abcde"
 # SEQUENCES.append([
-#     0x02,  # DISPLAY_OFF
-#     0x03,  # CLS
-#     0x01,  # DISPLAY_ON
-#     0x04,
+#     0x03,  # DISPLAY_OFF
+#     0x04,  # CLS
+#     0x01,  # INIT
+#     0x05,
 #     0x01,
 #     0x01,  # LOCATE 1, 1
-#     0x05,
+#     0x06,
 #     len(msg1),
 #     *[ord(c) for c in msg1],  # PRINT msg1
-# ])
-
-# msg1 = "123.123.ID: "
-# msg2 = "/"
-# SEQUENCES.append([
-#     0x02,  # DISPLAY_OFF
-#     0x03,  # CLS
-#     0x01,  # DISPLAY_ON
-#     0x04,
-#     0x01,
-#     0x01,  # LOCATE 1, 1
-#     0x05,
-#     len(msg1),
-#     *[ord(c) for c in msg1],  # PRINT msg1
-#     0x08,  # ID
-#     0x05,
-#     len(msg2),
-#     *[ord(c) for c in msg2],  # PRINT msg2
-#     0x02,  # DISPLAY_OFF
-#     0x08,  # ID
-#     0x01,  # DISPLAY_ON
 # ])
 
 msg1 = "Nyonk\n plonk"
 msg2 = "14: Hej\n 15: Mm\n  16: Z!\n   17: :)"
 SEQUENCES.append(
     [
-        0x02,  # DISPLAY_OFF
-        0x03,  # CLS
-        0x01,  # DISPLAY_ON
-        0x04,
+        0x03,  # DISPLAY_OFF
+        0x04,  # CLS
+        0x01,  # INIT
+        0x05,
         0x01,
         0x01,  # LOCATE 1, 1
-        0x05,
+        0x06,
         len(msg1),
         *[ord(c) for c in msg1],  # PRINT msg1
-        0x04,
+        0x05,
         0x0E,
         0x01,  # LOCATE 14, 1
-        0x05,
+        0x06,
         len(msg2),
         *[ord(c) for c in msg2],  # PRINT msg2
-        0x06,  # CURSOR_ON
+        0x07,  # CURSOR_ON
     ]
 )
 
-SEQUENCES.append([0x05, 0x01, 0x0A])  # PRINT "\n"
+SEQUENCES.append([0x06, 0x01, 0x0A])  # PRINT "\n"
 
 msg3 = "SHOMK"
-SEQUENCES.append([0x05, len(msg3), *[ord(c) for c in msg3]])  # PRINT msg3
+SEQUENCES.append([0x06, len(msg3), *[ord(c) for c in msg3]])  # PRINT msg3
 
-# msg = "Hello, world! This should wrap correctly."
-# SEQUENCES.append([
-#     0x02,  # DISPLAY_OFF
-#     0x03,  # CLS
-#     0x01,  # DISPLAY_ON
-#     0x04,
-#     0x01,
-#     0x01,  # LOCATE 1, 1
-#     0x05,
-#     0x01,
-#     0x01,  # PRINT smiley
-#     0x04,
-#     0x02,
-#     0x02,  # LOCATE 2, 2
-#     0x05,
-#     0x01,
-#     0x01,  # PRINT smiley
-#     0x04,
-#     0x03,
-#     0x03,  # LOCATE 3, 3
-#     0x05,
-#     len(msg),
-#     *[ord(c) for c in msg],  # PRINT msg
-#     0x06,  # CURSOR_ON
-# ])
+msg4 = "/"
+SEQUENCES.append(
+    [
+        0x09,  # ID
+        0x06,
+        len(msg4),
+        *[ord(c) for c in msg4],  # PRINT msg4
+        0x03,  # DISPLAY_OFF
+        0x09,  # ID
+        0x02,  # DISPLAY_ON
+    ]
+)
 
 
 class Top(Elaboratable):

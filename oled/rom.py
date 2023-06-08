@@ -6,6 +6,7 @@ from .sh1107 import Cmd, DataBytes
 __all__ = [
     "ROM",
     "SEQ_COUNT",
+    "OFFSET_INIT",
     "OFFSET_DISPLAY_ON",
     "OFFSET_DISPLAY_OFF",
     "OFFSET_SCROLL",
@@ -13,7 +14,7 @@ __all__ = [
 ]
 
 
-DISPLAY_ON_SEQUENCE: list[list[int]] = Cmd.compose(
+INIT_SEQUENCE = Cmd.compose(
     [
         Cmd.DisplayOn(False),
         Cmd.SetDisplayClockFrequency(1, "Zero"),
@@ -35,6 +36,7 @@ DISPLAY_ON_SEQUENCE: list[list[int]] = Cmd.compose(
     ]
 )
 
+DISPLAY_ON_SEQUENCE = Cmd.compose([Cmd.DisplayOn(True)])
 
 DISPLAY_OFF_SEQUENCE = Cmd.compose([Cmd.DisplayOn(False)])
 
@@ -68,6 +70,7 @@ assert len(CHAR_SEQUENCES) == 256
 NULL_SEQUENCE: list[list[int]] = [[]]
 
 seqs = (
+    INIT_SEQUENCE,
     DISPLAY_ON_SEQUENCE,
     DISPLAY_OFF_SEQUENCE,
     SCROLL_SEQUENCE,
@@ -76,10 +79,11 @@ seqs = (
 )
 SEQ_COUNT = len(seqs)
 
-OFFSET_DISPLAY_ON = 0x00
-OFFSET_DISPLAY_OFF = 0x01
-OFFSET_SCROLL = 0x02
-OFFSET_CHAR = 0x03
+OFFSET_INIT = 0x00
+OFFSET_DISPLAY_ON = 0x01
+OFFSET_DISPLAY_OFF = 0x02
+OFFSET_SCROLL = 0x03
+OFFSET_CHAR = 0x04
 
 rom_offset = SEQ_COUNT * 2 * 2
 
