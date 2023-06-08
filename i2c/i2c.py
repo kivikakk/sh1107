@@ -174,9 +174,8 @@ class I2C(Elaboratable):
 
         self.next_byte = Signal(I2C.NextByte)
 
-        if formal:
-            self.formal_start = Signal()
-            self.formal_stop = Signal()
+        self.formal_start = Signal() if formal else None
+        self.formal_stop = Signal() if formal else None
 
     def assign(self, *, scl: Pin, sda: Pin):
         self.scl = scl
