@@ -173,6 +173,8 @@ def send(
     assert not (yield i2c.scl_o)
     assert (yield i2c.sda_oe)
     for bit in range(8):
+        yield from wait_scl(i2c, 1)
+
         if bit == 0:
             if isinstance(next, int):
                 assert (yield i2c.bus.o_in_fifo_r_rdy)
@@ -183,8 +185,6 @@ def send(
                 assert not (
                     yield i2c.bus.o_in_fifo_r_rdy
                 ), f"checking next: expected empty FIFO, contained ({(yield i2c.bus.i_in_fifo_w_data):02x})"
-
-        yield from wait_scl(i2c, 1)
 
         if bit == 0 and isinstance(next, int):
             assert not (yield i2c.bus.i_in_fifo_w_en)

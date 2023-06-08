@@ -135,7 +135,7 @@ class I2C(Elaboratable):
     sda_i: Signal
 
     rw: Signal
-    byte: Transfer
+    byte: Signal
     byte_ix: Signal
 
     formal_scl: Optional[Signal]
@@ -163,8 +163,8 @@ class I2C(Elaboratable):
         self.sda_i.reset = 1
 
         self.rw = Signal(RW)
-        self.byte = Transfer()  # NextByte caches the whole FIFO word here.
-        self.byte_ix = Signal(range(8))  # ... but we never write the whole thing out.
+        self.byte = Signal(8)
+        self.byte_ix = Signal(range(8))
 
         self.formal_scl = Signal(reset=1) if formal else None
         self.formal_start = Signal() if formal else None
@@ -255,7 +255,7 @@ class I2C(Elaboratable):
                         c.en.eq(1),
                         self._in_fifo.r_en.eq(1),
                         self.rw.eq(self._in_fifo_r_data.payload.start.rw),
-                        self.byte.eq(self._in_fifo_r_data),
+                        self.byte.eq(self._in_fifo_r_data.payload.data),
                         self.byte_ix.eq(0),
                     ]
                     fh(m, self.formal_start, True)
@@ -273,9 +273,7 @@ class I2C(Elaboratable):
             with m.State("WRITE DATA BIT: SCL LOW"):
                 with m.If(c.o_half):
                     # Set SDA in prep for SCL high. (MSB)
-                    m.d.sync += self.sda_o.eq(
-                        (self.byte.payload.data >> (7 - self.byte_ix)) & 0x1
-                    )
+                    m.d.sync += self.sda_o.eq((self.byte >> (7 - self.byte_ix)) & 0x1)
                 with m.Elif(c.o_full):
                     fh(m, self.formal_scl, True)
                     m.next = "WRITE DATA BIT: SCL HIGH"
@@ -316,8 +314,7 @@ class I2C(Elaboratable):
                     with m.If(self.byte_ix == 7):
                         m.d.sync += [
                             self._out_fifo.w_data.eq(
-                                self.byte.payload.data
-                                | (self.sda_i << (7 - self.byte_ix))
+                                self.byte | (self.sda_i << (7 - self.byte_ix))
                             ),
                             self._out_fifo.w_en.eq(1),
                         ]
@@ -326,9 +323,8 @@ class I2C(Elaboratable):
                     with m.Else():
                         m.d.sync += [
                             self.byte_ix.eq(self.byte_ix + 1),
-                            self.byte.payload.data.eq(
-                                self.byte.payload.data
-                                | (self.sda_i << (7 - self.byte_ix))
+                            self.byte.eq(
+                                self.byte | (self.sda_i << (7 - self.byte_ix))
                             ),
                         ]
 
@@ -369,7 +365,7 @@ class I2C(Elaboratable):
                             & (self.rw == RW.W)
                         ):
                             m.d.sync += [
-                                self.byte.eq(self._in_fifo_r_data),
+                                self.byte.eq(self._in_fifo_r_data.payload.data),
                                 self.byte_ix.eq(0),
                                 self._in_fifo.r_en.eq(1),
                                 self.sda_oe.eq(1),
@@ -382,7 +378,7 @@ class I2C(Elaboratable):
                             & (self.rw == RW.R)
                         ):
                             m.d.sync += [
-                                self.byte.payload.data.eq(0),
+                                self.byte.eq(0),
                                 self.byte_ix.eq(0),
                                 self._in_fifo.r_en.eq(1),
                                 self.sda_oe.eq(0),
@@ -395,7 +391,7 @@ class I2C(Elaboratable):
                         ):
                             m.d.sync += [
                                 self.rw.eq(self._in_fifo_r_data.payload.start.rw),
-                                self.byte.eq(self._in_fifo_r_data),
+                                self.byte.eq(self._in_fifo_r_data.payload.data),
                                 self.byte_ix.eq(0),
                                 self._in_fifo.r_en.eq(1),
                                 self.sda_oe.eq(1),
