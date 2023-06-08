@@ -68,6 +68,12 @@ SEQUENCES.append(
     ]
 )
 
+SEQUENCES.append(
+    [
+        0x04,  # CLS
+    ]
+)
+
 
 class Top(Elaboratable):
     oled: OLED

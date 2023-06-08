@@ -180,6 +180,8 @@ class OLED(Elaboratable):
                         m.d.sync += [
                             self.rom_writer.i_index.eq(OFFSET_INIT),
                             self.rom_writer.i_stb.eq(1),
+                            self.row.eq(1),
+                            self.col.eq(1),
                             self.scroller.i_rst.eq(1),
                         ]
                         m.next = "INIT: STROBED ROM WRITER"
@@ -199,7 +201,11 @@ class OLED(Elaboratable):
                         m.next = "ROM WRITE SINGLE: STROBED ROM WRITER"
 
                     with m.Case(OLED.Command.CLS):
-                        m.d.sync += self.clser.i_stb.eq(1)
+                        m.d.sync += [
+                            self.clser.i_stb.eq(1),
+                            self.row.eq(1),
+                            self.col.eq(1),
+                        ]
                         m.next = "CLSER: STROBED"
 
                     with m.Case(OLED.Command.LOCATE):
