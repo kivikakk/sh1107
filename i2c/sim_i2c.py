@@ -175,19 +175,6 @@ def send(
     for bit in range(8):
         yield from wait_scl(i2c, 1)
 
-        if bit == 0:
-            if isinstance(next, int):
-                assert (yield i2c.bus.o_in_fifo_r_rdy)
-                assert (
-                    yield i2c.bus.i_in_fifo_w_data
-                ) == next, f"checking next: expected {next:02x}, got {(yield i2c.bus.i_in_fifo_w_data):02x}"
-            elif next == "STOP":
-                assert not (
-                    yield i2c.bus.o_in_fifo_r_rdy
-                ), f"checking next: expected empty FIFO, contained ({(yield i2c.bus.i_in_fifo_w_data):02x})"
-
-        if bit == 0 and isinstance(next, int):
-            assert not (yield i2c.bus.i_in_fifo_w_en)
         actual = (actual << 1) | (yield i2c.sda_o)
 
         yield from wait_scl(
@@ -196,6 +183,18 @@ def send(
             sda_o=ValueChange.STEADY,
             sda_oe=ValueChange.STEADY if bit < 7 else ValueChange.FALL,
         )
+
+        if bit == 0:
+            if isinstance(next, int):
+                assert (yield i2c.bus.o_in_fifo_r_rdy)
+                assert (
+                    yield i2c.bus.i_in_fifo_w_data
+                ) == next, f"checking next: expected {next:02x}, got {(yield i2c.bus.i_in_fifo_w_data):02x}"
+                assert not (yield i2c.bus.i_in_fifo_w_en)
+            elif next == "STOP":
+                assert not (
+                    yield i2c.bus.o_in_fifo_r_rdy
+                ), f"checking next: expected empty FIFO, contained ({(yield i2c.bus.i_in_fifo_w_data):02x})"
 
     assert actual == byte, f"expected {byte:02x}, got {actual:02x}"
 
@@ -309,9 +308,6 @@ def full_sequence(
             check_byte = byte & 0xFF
             if i < len(sequence) - 1:
                 check_next = sequence[i + 1]
-                if check_next & 0x100:
-                    # We may not have the next byte in FIFO yet in all cases.
-                    check_next = None
             else:
                 check_next = "STOP"
             yield from send(i2c, check_byte, next=check_next)

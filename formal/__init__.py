@@ -81,12 +81,10 @@ def formal() -> Tuple[Module, list[Signal | Value]]:
     with m.If(Initial()):
         m.d.comb += Assume(~i_stb & ~in_fifo_w_en)
 
-    # Don't strobe when already busy, and assume the next_byte loop is idle.
-    # After strobe, we should either pop the FIFO and start activity, or do
-    # neither.
+    # Don't strobe when already busy. After strobe, we should either pop the
+    # FIFO and start activity, or do neither.
     with m.If(i_stb):
         m.d.comb += Assume(~o_busy & ~in_fifo_r_en)
-        m.d.comb += Assume(dut.next_byte == I2C.NextByte.IDLE)
         m.d.sync += Assert(in_fifo_r_en == o_busy)
 
     m.d.comb += Assume(o_busy == dut.c.en)
@@ -128,7 +126,6 @@ def formal() -> Tuple[Module, list[Signal | Value]]:
     # No repeated START for now.
     m.d.comb += Assume((in_fifo_w_data & 0x100) == 0)
     m.d.comb += Assume((in_fifo_r_data & 0x100) == 0)
-    m.d.comb += Assume(dut.byte.kind == Transfer.Kind.DATA)
 
     return m, [
         sync_clk,
