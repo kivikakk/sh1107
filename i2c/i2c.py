@@ -145,6 +145,7 @@ class I2C(Elaboratable):
 
     next_byte: Signal
 
+    formal_scl: Optional[Signal]
     formal_start: Optional[Signal]
     formal_stop: Optional[Signal]
 
@@ -174,6 +175,7 @@ class I2C(Elaboratable):
 
         self.next_byte = Signal(I2C.NextByte)
 
+        self.formal_scl = Signal(reset=1) if formal else None
         self.formal_start = Signal() if formal else None
         self.formal_stop = Signal() if formal else None
 
@@ -289,6 +291,7 @@ class I2C(Elaboratable):
                     m.d.sync += self.formal_start.eq(0)
                 # SDA is low.
                 with m.If(c.o_full):
+                    self.f_scl(m, False)
                     m.next = "WRITE DATA BIT: SCL LOW"
 
             # This comes from "START: WAIT SCL" or "WRITE ACK BIT: SCL HIGH".
@@ -299,10 +302,12 @@ class I2C(Elaboratable):
                         (self.byte.payload.data >> (7 - self.byte_ix)) & 0x1
                     )
                 with m.Elif(c.o_full):
+                    self.f_scl(m, True)
                     m.next = "WRITE DATA BIT: SCL HIGH"
 
             with m.State("WRITE DATA BIT: SCL HIGH"):
                 with m.If(c.o_full):
+                    self.f_scl(m, False)
                     with m.If(self.byte_ix == 7):
                         # Let go of SDA.
                         m.d.sync += [
@@ -318,6 +323,7 @@ class I2C(Elaboratable):
 
             with m.State("WRITE ACK BIT: SCL LOW"):
                 with m.If(c.o_full):
+                    self.f_scl(m, True)
                     m.next = "WRITE ACK BIT: SCL HIGH"
 
             with m.State("WRITE ACK BIT: SCL HIGH"):
@@ -330,6 +336,7 @@ class I2C(Elaboratable):
 
             with m.State("READ DATA BIT: SCL LOW"):
                 with m.If(c.o_full):
+                    self.f_scl(m, True)
                     m.next = "READ DATA BIT: SCL HIGH"
 
             with m.State("READ DATA BIT: SCL HIGH"):
@@ -355,11 +362,13 @@ class I2C(Elaboratable):
                         ]
 
                 with m.If(c.o_full):
+                    self.f_scl(m, False)
                     m.next = "READ DATA BIT: SCL LOW"
 
             with m.State("READ DATA BIT (LAST): SCL HIGH"):
                 m.d.sync += self._out_fifo.w_en.eq(0)
                 with m.If(c.o_full):
+                    self.f_scl(m, False)
                     m.next = "READ ACK BIT: SCL LOW"
 
             with m.State("READ ACK BIT: SCL LOW"):
@@ -376,10 +385,12 @@ class I2C(Elaboratable):
                         ),
                     ]
                 with m.Elif(c.o_full):
+                    self.f_scl(m, True)
                     m.next = "COMMON ACK BIT: SCL HIGH"
 
             with m.State("COMMON ACK BIT: SCL HIGH"):
                 with m.If(c.o_full):
+                    self.f_scl(m, False)
                     with m.If(self.next_byte == I2C.NextByte.READY):
                         with m.If(
                             self.bus.o_ack
@@ -434,6 +445,7 @@ class I2C(Elaboratable):
                     # period.
                     m.d.sync += self.sda_o.eq(1)
                 with m.If(c.o_full):
+                    self.f_scl(m, True)
                     m.next = "REP START: SCL HIGH"
 
             with m.State("REP START: SCL HIGH"):
@@ -442,6 +454,7 @@ class I2C(Elaboratable):
                     # Bring SDA low mid SCL-high to repeat start.
                     m.d.sync += self.sda_o.eq(0)
                 with m.Elif(c.o_full):
+                    self.f_scl(m, False)
                     m.next = "WRITE DATA BIT: SCL LOW"
 
             with m.State("FIN: SCL LOW"):
@@ -449,6 +462,7 @@ class I2C(Elaboratable):
                     # Bring SDA low during SCL low.
                     m.d.sync += self.sda_o.eq(0)
                 with m.Elif(c.o_full):
+                    self.f_scl(m, True)
                     m.next = "FIN: SCL HIGH"
 
             with m.State("FIN: SCL HIGH"):
@@ -469,3 +483,7 @@ class I2C(Elaboratable):
                     m.next = "IDLE"
 
         return m
+
+    def f_scl(self, m: Module, high: bool):
+        if self.formal_scl is not None:
+            m.d.sync += self.formal_scl.eq(high)

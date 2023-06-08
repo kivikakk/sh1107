@@ -109,6 +109,7 @@ def formal() -> Tuple[Module, list[Signal | Value]]:
     # START condition: SDA falls while SCL high
     start_cond = scl_o_past & scl_o & sda_o_past & ~sda_o
     m.d.comb += Cover(start_cond)
+    m.d.comb += Assert(scl_o == dut.formal_scl)
     m.d.comb += Assert(start_cond == dut.formal_start)
 
     # SDA released to look for ACK
