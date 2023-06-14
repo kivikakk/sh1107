@@ -52,6 +52,7 @@ class OLED(Elaboratable):
         CURSOR_ON = 0x07
         CURSOR_OFF = 0x08
         ID = 0x09
+        PRINT_BYTE = 0x0A
 
     class Result(IntEnum, shape=2):
         SUCCESS = 0
@@ -253,9 +254,13 @@ class OLED(Elaboratable):
                     with m.Case(OLED.Command.ID):
                         m.next = "ID: START"
 
+                    with m.Case(OLED.Command.PRINT_BYTE):
+                        m.next = "PRINT_BYTE: START"
+
             self.locate_states(m)
             self.print_states(m)
             self.id_states(m)
+            self.print_byte_states(m)
 
             with m.State("CLSER: STROBED"):
                 m.d.sync += self.clser.i_stb.eq(0)
@@ -473,7 +478,8 @@ class OLED(Elaboratable):
                     m.next = "IDLE"
 
     def id_states(self, m: Module):
-        # XXX(Ch): hack just to test read capability
+        # XXX(Ch): hack just to test read capability The hex printing is
+        # duplicated in the print_byte states.
 
         id_recvd = Signal(8)
 
@@ -592,6 +598,46 @@ class OLED(Elaboratable):
                 m.next = "ID: SECOND HALF: CHPR RUNNING"
 
         with m.State("ID: SECOND HALF: CHPR RUNNING"):
+            with m.If(~self.chpr_run):
+                m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
+                m.next = "IDLE"
+
+    def print_byte_states(self, m: Module):
+        second_half = Signal(4)
+
+        with m.State("PRINT_BYTE: START"):
+            with m.If(self.i_fifo.r_rdy):
+                first_half = self.i_fifo.r_data[4:8]
+                m.d.sync += [
+                    second_half.eq(self.i_fifo.r_data[:4]),
+                    self.i_fifo.r_en.eq(1),
+                    self.chpr_data.eq(
+                        Mux(
+                            first_half > 9,
+                            ord("A") + first_half - 10,
+                            ord("0") + first_half,
+                        )
+                    ),
+                    self.chpr_run.eq(1),
+                ]
+                m.next = "PRINT_BYTE: STROBED R_EN, CHPR RUNNING"
+
+        with m.State("PRINT_BYTE: STROBED R_EN, CHPR RUNNING"):
+            m.d.sync += self.i_fifo.r_en.eq(0)
+            with m.If(~self.chpr_run):
+                m.d.sync += [
+                    self.chpr_data.eq(
+                        Mux(
+                            second_half > 9,
+                            ord("A") + second_half - 10,
+                            ord("0") + second_half,
+                        )
+                    ),
+                    self.chpr_run.eq(1),
+                ]
+                m.next = "PRINT_BYTE: SECOND HALF: CHPR RUNNING"
+
+        with m.State("PRINT_BYTE: SECOND HALF: CHPR RUNNING"):
             with m.If(~self.chpr_run):
                 m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
                 m.next = "IDLE"

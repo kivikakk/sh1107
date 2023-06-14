@@ -74,6 +74,27 @@ SEQUENCES.append(
     ]
 )
 
+SEQUENCES.append(
+    [
+        0x0A,
+        0x01,  # PRINT_BYTE 0x01
+        0x0A,
+        0x23,  # PRINT_BYTE 0x23
+        0x0A,
+        0x45,  # PRINT_BYTE 0x45
+        0x0A,
+        0x67,  # PRINT_BYTE 0x67
+        0x0A,
+        0x89,  # PRINT_BYTE 0x89
+        0x0A,
+        0xAB,  # PRINT_BYTE 0xAB
+        0x0A,
+        0xCD,  # PRINT_BYTE 0xCD
+        0x0A,
+        0xEF,  # PRINT_BYTE 0xEF
+    ]
+)
+
 
 class Top(Elaboratable):
     oled: OLED
