@@ -2,7 +2,6 @@ from typing import Optional, cast
 
 from amaranth import Cat, Elaboratable, Memory, Module, Signal
 from amaranth.build import Platform
-from amaranth.hdl.mem import ReadPort
 
 from i2c import RW, I2CBus, Transfer
 from oled import rom
@@ -15,37 +14,29 @@ class ROMWriter(Elaboratable):
 
     i_index: Signal
     i_stb: Signal
-
     o_busy: Signal
 
     i2c_bus: I2CBus
+    rom_bus: rom.ROMBus
 
-    rom_rd: ReadPort
     offset: Signal
     remain: Signal
 
-    def __init__(self, *, addr: int):
+    def __init__(self, *, memory: Memory, addr: int):
         self.addr = addr
 
         self.i_index = Signal(range(rom.SEQ_COUNT))
         self.i_stb = Signal()
-
         self.o_busy = Signal()
 
         self.i2c_bus = I2CBus()
+        self.rom_bus = rom.ROMBus(memory)
 
-        self.rom_rd = Memory(
-            width=8,
-            depth=len(rom.ROM),
-            init=rom.ROM,
-        ).read_port(transparent=False)
         self.offset = Signal(range(len(rom.ROM)))
         self.remain = Signal(range(len(rom.ROM)))
 
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
-
-        m.submodules.rom_rd = self.rom_rd
 
         transfer = Transfer(self.i2c_bus.i_in_fifo_w_data)
 
@@ -53,39 +44,39 @@ class ROMWriter(Elaboratable):
             with m.State("IDLE"):
                 with m.If(self.i_stb):
                     m.d.sync += [
-                        self.rom_rd.addr.eq(self.i_index * 4),
+                        self.rom_bus.i_addr.eq(self.i_index * 4),
                         self.o_busy.eq(1),
                     ]
                     m.next = "START: ADDRESSED OFFSET[0]"
 
             with m.State("START: ADDRESSED OFFSET[0]"):
-                m.d.sync += self.rom_rd.addr.eq(self.rom_rd.addr + 1)
+                m.d.sync += self.rom_bus.i_addr.eq(self.rom_bus.i_addr + 1)
                 m.next = "START: ADDRESSED OFFSET[1], OFFSET[0] AVAILABLE"
 
             with m.State("START: ADDRESSED OFFSET[1], OFFSET[0] AVAILABLE"):
                 m.d.sync += [
-                    self.rom_rd.addr.eq(self.rom_rd.addr + 1),
-                    self.offset.eq(self.rom_rd.data),
+                    self.rom_bus.i_addr.eq(self.rom_bus.i_addr + 1),
+                    self.offset.eq(self.rom_bus.o_data),
                 ]
                 m.next = "START: ADDRESSED LEN[0], OFFSET[1] AVAILABLE"
 
             with m.State("START: ADDRESSED LEN[0], OFFSET[1] AVAILABLE"):
                 m.d.sync += [
-                    self.rom_rd.addr.eq(self.rom_rd.addr + 1),
-                    self.offset.eq(self.offset | self.rom_rd.data.shift_left(8)),
+                    self.rom_bus.i_addr.eq(self.rom_bus.i_addr + 1),
+                    self.offset.eq(self.offset | self.rom_bus.o_data.shift_left(8)),
                 ]
                 m.next = "START: ADDRESSED LEN[1], LEN[0] AVAILABLE"
 
             with m.State("START: ADDRESSED LEN[1], LEN[0] AVAILABLE"):
                 m.d.sync += [
-                    self.remain.eq(self.rom_rd.data),
-                    self.rom_rd.addr.eq(self.offset),
+                    self.remain.eq(self.rom_bus.o_data),
+                    self.rom_bus.i_addr.eq(self.offset),
                 ]
                 m.next = "START: ADDRESSED *OFFSET, LEN[1] AVAILABLE"
 
             with m.State("START: ADDRESSED *OFFSET, LEN[1] AVAILABLE"):
                 m.d.sync += [
-                    self.remain.eq(self.remain | self.rom_rd.data.shift_left(8)),
+                    self.remain.eq(self.remain | self.rom_bus.o_data.shift_left(8)),
                     transfer.kind.eq(Transfer.Kind.START),
                     transfer.payload.start.addr.eq(self.addr),
                     transfer.payload.start.rw.eq(RW.W),
@@ -104,7 +95,7 @@ class ROMWriter(Elaboratable):
                 m.d.sync += self.i2c_bus.i_stb.eq(0)
                 with m.If(self.remain == 0):
                     m.d.sync += [
-                        self.rom_rd.addr.eq(self.offset + 1),
+                        self.rom_bus.i_addr.eq(self.offset + 1),
                         self.offset.eq(self.offset + 1),
                     ]
                     m.next = "SEQ BREAK: ADDRESSED NEXTLEN[1], NEXTLEN[0] AVAILABLE"
@@ -113,12 +104,12 @@ class ROMWriter(Elaboratable):
                         self.offset.eq(self.offset + 1),
                         self.remain.eq(self.remain - 1),
                         transfer.kind.eq(Transfer.Kind.DATA),
-                        transfer.payload.data.eq(self.rom_rd.data),
+                        transfer.payload.data.eq(self.rom_bus.o_data),
                         self.i2c_bus.i_in_fifo_w_en.eq(1),
                     ]
 
                     # Prepare next read, whether it's data or NEXTLEN[0].
-                    m.d.sync += self.rom_rd.addr.eq(self.offset + 1)
+                    m.d.sync += self.rom_bus.i_addr.eq(self.offset + 1)
                     m.next = "SEND: LATCHED W_EN"
 
             with m.State("SEND: LATCHED W_EN"):
@@ -139,14 +130,14 @@ class ROMWriter(Elaboratable):
 
             with m.State("SEQ BREAK: ADDRESSED NEXTLEN[1], NEXTLEN[0] AVAILABLE"):
                 m.d.sync += [
-                    self.remain.eq(self.rom_rd.data),
-                    self.rom_rd.addr.eq(self.offset + 1),
+                    self.remain.eq(self.rom_bus.o_data),
+                    self.rom_bus.i_addr.eq(self.offset + 1),
                     self.offset.eq(self.offset + 1),
                 ]
                 m.next = "SEQ BREAK: ADDRESSED FOLLOWING, NEXTLEN[1] AVAILABLE"
 
             with m.State("SEQ BREAK: ADDRESSED FOLLOWING, NEXTLEN[1] AVAILABLE"):
-                remain = self.remain | cast(Cat, self.rom_rd.data.shift_left(8))
+                remain = self.remain | cast(Cat, self.rom_bus.o_data.shift_left(8))
                 with m.If(remain == 0):
                     m.next = "FIN: WAIT I2C DONE"
                 with m.Else():

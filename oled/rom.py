@@ -1,9 +1,13 @@
 import struct
 
+from amaranth import Memory, Record, Signal
+from amaranth.hdl.rec import DIR_FANIN, DIR_FANOUT
+
 from .chars import CHARS
 from .sh1107 import Cmd, DataBytes
 
 __all__ = [
+    "ROMBus",
     "ROM",
     "SEQ_COUNT",
     "OFFSET_INIT",
@@ -12,6 +16,19 @@ __all__ = [
     "OFFSET_SCROLL",
     "OFFSET_CHAR",
 ]
+
+
+class ROMBus(Record):
+    i_addr: Signal
+    o_data: Signal
+
+    def __init__(self, memory: Memory):
+        super().__init__(
+            [
+                ("i_addr", range(memory.depth), DIR_FANIN),
+                ("o_data", memory.width, DIR_FANOUT),
+            ]
+        )
 
 
 INIT_SEQUENCE = Cmd.compose(

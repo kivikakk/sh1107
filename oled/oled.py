@@ -1,16 +1,24 @@
 from typing import Final, Optional
 
-from amaranth import Mux  # pyright: ignore[reportUnknownVariableType]
-from amaranth import ClockSignal, Elaboratable, Instance, Module, Signal
+from amaranth import (  # pyright: ignore[reportUnknownVariableType]
+    ClockSignal,
+    Elaboratable,
+    Instance,
+    Memory,
+    Module,
+    Mux,
+    Signal,
+)
 from amaranth.build import Platform
+from amaranth.hdl.mem import ReadPort
 from amaranth.lib.enum import IntEnum
 from amaranth.lib.fifo import SyncFIFO
 
 from common import Hz
 from i2c import I2C, I2CBus
+from oled import rom
 from .clser import Clser
 from .locator import Locator
-from .rom import OFFSET_CHAR, OFFSET_DISPLAY_OFF, OFFSET_DISPLAY_ON, OFFSET_INIT
 from .rom_writer import ROMWriter
 from .scroller import Scroller
 
@@ -63,6 +71,9 @@ class OLED(Elaboratable):
     i2c: I2C | Instance
     i2c_bus: I2CBus
 
+    rom_rd: ReadPort
+    rom_bus: rom.ROMBus
+
     rom_writer: ROMWriter
     locator: Locator
     clser: Clser
@@ -95,10 +106,17 @@ class OLED(Elaboratable):
             self.i_i2c_bb_in_out_fifo_stb = Signal()
         self.i2c_bus = I2CBus()
 
-        self.rom_writer = ROMWriter(addr=OLED.ADDR)
+        self.rom_rd = Memory(
+            width=8,
+            depth=len(rom.ROM),
+            init=rom.ROM,
+        ).read_port(transparent=False)
+        self.rom_bus = rom.ROMBus(self.rom_rd.memory)
+
+        self.rom_writer = ROMWriter(memory=self.rom_rd.memory, addr=OLED.ADDR)
         self.locator = Locator(addr=OLED.ADDR)
         self.clser = Clser(addr=OLED.ADDR)
-        self.scroller = Scroller(addr=OLED.ADDR)
+        self.scroller = Scroller(memory=self.rom_rd.memory, addr=OLED.ADDR)
         self.own_i2c_bus = I2CBus()
 
         self.i_fifo = SyncFIFO(width=8, depth=1)
@@ -135,6 +153,7 @@ class OLED(Elaboratable):
             )
 
         m.submodules.i2c = self.i2c
+        m.submodules.rom_rd = self.rom_rd
         m.submodules.rom_writer = self.rom_writer
         m.submodules.locator = self.locator
         m.submodules.clser = self.clser
@@ -142,14 +161,25 @@ class OLED(Elaboratable):
 
         m.submodules.i_fifo = self.i_fifo
 
+        m.d.comb += [
+            self.rom_rd.addr.eq(self.rom_bus.i_addr),
+            self.rom_bus.o_data.eq(self.rom_rd.data),
+        ]
+
         with m.If(self.rom_writer.o_busy):
-            m.d.comb += self.i2c_bus.connect(self.rom_writer.i2c_bus)
+            m.d.comb += [
+                self.i2c_bus.connect(self.rom_writer.i2c_bus),
+                self.rom_bus.connect(self.rom_writer.rom_bus),
+            ]
         with m.Elif(self.locator.o_busy):
             m.d.comb += self.i2c_bus.connect(self.locator.i2c_bus)
         with m.Elif(self.clser.o_busy):
             m.d.comb += self.i2c_bus.connect(self.clser.i2c_bus)
         with m.Elif(self.scroller.o_busy):
-            m.d.comb += self.i2c_bus.connect(self.scroller.i2c_bus)
+            m.d.comb += [
+                self.i2c_bus.connect(self.scroller.i2c_bus),
+                self.rom_bus.connect(self.scroller.rom_bus),
+            ]
         with m.Else():
             m.d.comb += self.i2c_bus.connect(self.own_i2c_bus)
 
@@ -178,7 +208,7 @@ class OLED(Elaboratable):
 
                     with m.Case(OLED.Command.INIT):
                         m.d.sync += [
-                            self.rom_writer.i_index.eq(OFFSET_INIT),
+                            self.rom_writer.i_index.eq(rom.OFFSET_INIT),
                             self.rom_writer.i_stb.eq(1),
                             self.row.eq(1),
                             self.col.eq(1),
@@ -188,14 +218,14 @@ class OLED(Elaboratable):
 
                     with m.Case(OLED.Command.DISPLAY_ON):
                         m.d.sync += [
-                            self.rom_writer.i_index.eq(OFFSET_DISPLAY_ON),
+                            self.rom_writer.i_index.eq(rom.OFFSET_DISPLAY_ON),
                             self.rom_writer.i_stb.eq(1),
                         ]
                         m.next = "ROM WRITE SINGLE: STROBED ROM WRITER"
 
                     with m.Case(OLED.Command.DISPLAY_OFF):
                         m.d.sync += [
-                            self.rom_writer.i_index.eq(OFFSET_DISPLAY_OFF),
+                            self.rom_writer.i_index.eq(rom.OFFSET_DISPLAY_OFF),
                             self.rom_writer.i_stb.eq(1),
                         ]
                         m.next = "ROM WRITE SINGLE: STROBED ROM WRITER"
@@ -391,7 +421,9 @@ class OLED(Elaboratable):
                             m.next = "CHPR: STROBED LOCATOR"
                     with m.Else():
                         m.d.sync += [
-                            self.rom_writer.i_index.eq(OFFSET_CHAR + self.chpr_data),
+                            self.rom_writer.i_index.eq(
+                                rom.OFFSET_CHAR + self.chpr_data
+                            ),
                             self.rom_writer.i_stb.eq(1),
                         ]
                         m.next = "CHPR: STROBED ROM WRITER"
