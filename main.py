@@ -21,7 +21,7 @@ from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
 
 from common import Hz
 from formal import formal as prep_formal
-from oled import OLED, ROM
+from oled import OLED, ROM_CONTENT, ROM_OFFSET
 
 BOARDS: Dict[str, Type[Platform]] = {
     "icebreaker": ICEBreakerPlatform,
@@ -116,10 +116,10 @@ def build(args: Namespace):
 def rom(args: Namespace):
     path = Path(__file__).parent / "rom.bin"
     with open(path, "wb") as f:
-        f.write(ROM)
+        f.write(ROM_CONTENT)
 
     if args.program:
-        subprocess.run(["iceprog", "-o", "0x800000", path], check=True)
+        subprocess.run(["iceprog", "-o", hex(ROM_OFFSET), path], check=True)
 
 
 def vsh(args: Namespace):

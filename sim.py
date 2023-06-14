@@ -7,7 +7,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Callable, Iterator, Optional, Self, Tuple
 
-from amaranth import Elaboratable, Record, Signal
+from amaranth import Elaboratable, Record, ResetInserter, Signal
 from amaranth.hdl.ast import Operator, Statement
 from amaranth.sim import Delay, Settle, Simulator
 
@@ -102,6 +102,9 @@ class TestCase(unittest.TestCase):
 
                 def bench() -> Generator:
                     yield from sim_test(self, dut)
+
+                if hasattr(dut, "rst"):
+                    dut = ResetInserter(dut.rst)(dut)
 
                 sim = Simulator(dut)
                 sim.add_clock(clock())

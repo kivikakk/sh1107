@@ -1,6 +1,6 @@
 from typing import Optional, cast
 
-from amaranth import Elaboratable, Memory, Module, Record, Signal
+from amaranth import Cat, Elaboratable, Memory, Module, Record, Signal
 from amaranth.build import Platform
 from amaranth.build.res import ResourceError
 from amaranth.hdl.mem import ReadPort
@@ -50,18 +50,13 @@ SEQUENCES.append(
     ]
 )
 
-SEQUENCES.append([0x06, 0x01, 0x0A])  # PRINT "\n"
-
-msg3 = "SHOMK"
-SEQUENCES.append([0x06, len(msg3), *[ord(c) for c in msg3]])  # PRINT msg3
-
-msg4 = "/"
+msg3 = "/"
 SEQUENCES.append(
     [
         0x09,  # ID
         0x06,
-        len(msg4),
-        *[ord(c) for c in msg4],  # PRINT msg4
+        len(msg3),
+        *[ord(c) for c in msg3],  # PRINT msg4
         0x03,  # DISPLAY_OFF
         0x09,  # ID
         0x02,  # DISPLAY_ON
@@ -76,22 +71,23 @@ SEQUENCES.append(
 
 SEQUENCES.append(
     [
-        0x0A,
-        0x01,  # PRINT_BYTE 0x01
-        0x0A,
-        0x23,  # PRINT_BYTE 0x23
-        0x0A,
-        0x45,  # PRINT_BYTE 0x45
-        0x0A,
-        0x67,  # PRINT_BYTE 0x67
-        0x0A,
-        0x89,  # PRINT_BYTE 0x89
-        0x0A,
-        0xAB,  # PRINT_BYTE 0xAB
-        0x0A,
-        0xCD,  # PRINT_BYTE 0xCD
-        0x0A,
-        0xEF,  # PRINT_BYTE 0xEF
+        # 0x0A,
+        # 0x01,  # PRINT_BYTE 0x01
+        # 0x0A,
+        # 0x23,  # PRINT_BYTE 0x23
+        # 0x0A,
+        # 0x45,  # PRINT_BYTE 0x45
+        # 0x0A,
+        # 0x67,  # PRINT_BYTE 0x67
+        # 0x0A,
+        # 0x89,  # PRINT_BYTE 0x89
+        # 0x0A,
+        # 0xAB,  # PRINT_BYTE 0xAB
+        # 0x0A,
+        # 0xCD,  # PRINT_BYTE 0xCD
+        # 0x0A,
+        # 0xEF,  # PRINT_BYTE 0xEF
+        0x0B,  # SPI_TEST
     ]
 )
 
@@ -178,9 +174,11 @@ class Top(Elaboratable):
                         m.d.comb += button.i.eq(switch)
                         button_up_signals.append(button.o_up)
 
-                # led_l = platform.request("led_g", 1)
-                # led_m = platform.request("led_r", 1)
-                # led_r = platform.request("led_g", 2)
+                led_l = platform.request("led_g", 1)
+                led_m = platform.request("led_r", 1)
+                led_r = platform.request("led_g", 2)
+
+                m.d.comb += Cat(led_r, led_m, led_l).eq(self.oled.o_result)
 
             case OrangeCrabR0_2_85FPlatform():
                 rgb = platform.request("rgb_led")

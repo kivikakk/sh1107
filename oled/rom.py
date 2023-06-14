@@ -8,7 +8,9 @@ from .sh1107 import Cmd, DataBytes
 
 __all__ = [
     "ROMBus",
-    "ROM",
+    "ROM_OFFSET",
+    "ROM_LENGTH",
+    "ROM_CONTENT",
     "SEQ_COUNT",
     "OFFSET_INIT",
     "OFFSET_DISPLAY_ON",
@@ -16,6 +18,9 @@ __all__ = [
     "OFFSET_SCROLL",
     "OFFSET_CHAR",
 ]
+
+# XXX(Ch): this will be platform-specific.
+ROM_OFFSET = 0x800000
 
 
 class ROMBus(Record):
@@ -117,7 +122,9 @@ for parts in seqs:
             assert nextlen > 0
             rom.extend(struct.pack("<H", nextlen))
 
-ROM = index + bytes(rom)
+ROM_CONTENT = index + bytes(rom)
+
+ROM_LENGTH = len(ROM_CONTENT)
 
 # ROM structure:
 # "Commands" are 1 or more sequences of bytes to send as individual I2C transmissions.

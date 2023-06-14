@@ -32,8 +32,8 @@ class ROMWriter(Elaboratable):
         self.i2c_bus = I2CBus()
         self.rom_bus = rom.ROMBus(memory)
 
-        self.offset = Signal(range(len(rom.ROM)))
-        self.remain = Signal(range(len(rom.ROM)))
+        self.offset = Signal(range(rom.ROM_LENGTH))
+        self.remain = Signal(range(rom.ROM_LENGTH))
 
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
