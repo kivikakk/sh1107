@@ -5,7 +5,7 @@ from amaranth.asserts import Assert, Assume, Cover, Initial
 from amaranth.hdl.ast import ValueCastable
 
 from common import Hz
-from i2c import I2C, RW, Transfer
+from i2c import RW, I2CFormal
 
 
 def past(
@@ -31,7 +31,7 @@ def past(
 
 def formal() -> Tuple[Module, list[Signal | Value]]:
     m = Module()
-    m.submodules.dut = dut = I2C(speed=Hz(2_000_000), formal=True)
+    m.submodules.dut = dut = I2CFormal(speed=Hz(2_000_000))
 
     in_fifo = dut._in_fifo  # pyright: ignore[reportPrivateUsage]
 
@@ -61,10 +61,8 @@ def formal() -> Tuple[Module, list[Signal | Value]]:
     in_fifo_r_en = in_fifo.r_en
     in_fifo_r_en_past = past(m, in_fifo_r_en)
 
-    in_fifo_r_data = in_fifo.r_data
-
     o_busy = dut.bus.o_busy
-    o_busy_past = past(m, o_busy)
+    # o_busy_past = past(m, o_busy)
 
     byte_ix = dut.byte_ix
 
@@ -72,7 +70,7 @@ def formal() -> Tuple[Module, list[Signal | Value]]:
     scl_o_past = past(m, scl_o)
 
     sda_oe = dut.sda_oe
-    sda_oe_past = past(m, sda_oe)
+    # sda_oe_past = past(m, sda_oe)
 
     sda_o = dut.sda_o
     sda_o_past = past(m, sda_o)
@@ -108,7 +106,10 @@ def formal() -> Tuple[Module, list[Signal | Value]]:
     start_cond = scl_o_past & scl_o & sda_o_past & ~sda_o
     m.d.comb += Cover(start_cond)
     m.d.comb += Assert(scl_o == dut.formal_scl)
-    m.d.comb += Assert(start_cond == dut.formal_start)
+    m.d.comb += Assert(
+        (~start_cond & ~dut.formal_start & ~dut.formal_repeated_start)
+        | ((start_cond == dut.formal_start) ^ (start_cond == dut.formal_repeated_start))
+    )
 
     # SDA released to look for ACK
     # m.d.comb += Cover(sda_oe_past & ~sda_oe)
@@ -119,13 +120,18 @@ def formal() -> Tuple[Module, list[Signal | Value]]:
     # STOP condition: SDA rises while SCL high
     # m.d.comb += Cover(scl_o_past & scl_o & ~sda_o_past & sda_o)
 
-    # SDA should be stable when SCL is high, unless START or STOP.
-    with m.If(scl_o & pasts_valid):
-        m.d.comb += Assert((sda_o_past == sda_o) | dut.formal_start | dut.formal_stop)
+    # Cover repeated START.
+    # m.d.comb += Cover(dut.formal_repeated_start)
 
-    # No repeated START for now.
-    m.d.comb += Assume((in_fifo_w_data & 0x100) == 0)
-    m.d.comb += Assume((in_fifo_r_data & 0x100) == 0)
+    # SDA should be stable when SCL is high, unless START or STOP.
+    # NOTE: pasts_valid doesn't seem to be necessary.
+    with m.If(scl_o & pasts_valid):
+        m.d.comb += Assert(
+            (sda_o_past == sda_o)
+            | dut.formal_start
+            | dut.formal_repeated_start
+            | dut.formal_stop
+        )
 
     return m, [
         sync_clk,

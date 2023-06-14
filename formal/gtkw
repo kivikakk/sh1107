@@ -1,14 +1,14 @@
 [*]
 [*] GTKWave Analyzer v3.4.0 (w)1999-2022 BSI
-[*] Wed Jun 07 07:15:43 2023
+[*] Wed Jun 14 01:25:40 2023
 [*]
 [dumpfile] "C:\Users\kivikakk\Code\sh1107\build\sh1107_prove\engine_0\trace_induct.vcd"
-[dumpfile_mtime] "Wed Jun 07 07:13:41 2023"
-[dumpfile_size] 50866
+[dumpfile_mtime] "Wed Jun 14 01:25:27 2023"
+[dumpfile_size] 39072
 [savefile] "C:\Users\kivikakk\Code\sh1107\formal\gtkw"
 [timestart] 0
 [size] 2283 1439
-[pos] 596 59
+[pos] -1 -1
 *-5.731102 407 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] formal_top.
 [treeopen] formal_top.dut.
@@ -32,10 +32,11 @@ formal_top.dut.fsm_state[3:0]
 @28
 formal_top.dut.c.en
 formal_top.dut.c.o_half
-@29
 formal_top.dut.c.o_full
-@28
 formal_top.dut.formal_start
+@29
+formal_top.dut.formal_repeated_start
+@28
 formal_top.dut.formal_stop
 formal_top.dut.in_fifo.w_en
 @22
@@ -52,8 +53,6 @@ formal_top.dut.scl__o
 formal_top.dut.sda__o
 formal_top.dut.sda__oe
 formal_top.dut.sda__i
-formal_top.dut.next_byte[1:0]
-formal_top.dut.byte[8:0]
 @24
 formal_top.dut.byte_ix[2:0]
 [pattern_trace] 1

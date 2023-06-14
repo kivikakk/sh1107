@@ -8,13 +8,11 @@ from amaranth.lib.fifo import SyncFIFO
 from amaranth.lib.io import Pin
 from amaranth_boards.icebreaker import ICEBreakerPlatform
 from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
-from amaranth_boards.resources import (
-    I2CResource,  # pyright: ignore[reportUnknownVariableType]
-)
+from amaranth_boards.resources import I2CResource
 
 from common import Counter, Hz
 
-__all__ = ["I2C", "I2CBus", "RW", "Transfer"]
+__all__ = ["I2C", "I2CFormal", "I2CBus", "RW", "Transfer"]
 
 
 class RW(enum.IntEnum, shape=1):
@@ -140,6 +138,7 @@ class I2C(Elaboratable):
 
     formal_scl: Optional[Signal]
     formal_start: Optional[Signal]
+    formal_repeated_start: Optional[Signal]
     formal_stop: Optional[Signal]
 
     def __init__(self, *, speed: Hz, formal: bool = False):
@@ -166,9 +165,10 @@ class I2C(Elaboratable):
         self.byte = Signal(8)
         self.byte_ix = Signal(range(8))
 
-        self.formal_scl = Signal(reset=1) if formal else None
-        self.formal_start = Signal() if formal else None
-        self.formal_stop = Signal() if formal else None
+        self.formal_scl = None
+        self.formal_start = None
+        self.formal_repeated_start = None
+        self.formal_stop = None
 
     def assign(self, *, scl: Pin, sda: Pin):
         self.scl = scl
@@ -239,6 +239,10 @@ class I2C(Elaboratable):
 
         m.d.sync += self._in_fifo.r_en.eq(0)
 
+        fh(m, self.formal_start, False)
+        fh(m, self.formal_repeated_start, False)
+        fh(m, self.formal_stop, False)
+
         with m.FSM():
             with m.State("IDLE"):
                 m.d.sync += [
@@ -263,7 +267,6 @@ class I2C(Elaboratable):
                     m.next = "START: WAIT SCL"
 
             with m.State("START: WAIT SCL"):
-                fh(m, self.formal_start, False)
                 # SDA is low.
                 with m.If(c.o_full):
                     fh(m, self.formal_scl, False)
@@ -423,6 +426,7 @@ class I2C(Elaboratable):
                 # SDA is high.
                 with m.If(c.o_half):
                     # Bring SDA low mid SCL-high to repeat start.
+                    fh(m, self.formal_repeated_start, True)
                     m.d.sync += self.sda_o.eq(0)
                 with m.Elif(c.o_full):
                     fh(m, self.formal_scl, False)
@@ -437,7 +441,6 @@ class I2C(Elaboratable):
                     m.next = "FIN: SCL HIGH"
 
             with m.State("FIN: SCL HIGH"):
-                fh(m, self.formal_stop, False)
                 with m.If(c.o_half):
                     # Bring SDA high during SCL high to finish.
                     m.d.sync += self.sda_o.eq(1)
@@ -457,3 +460,17 @@ class I2C(Elaboratable):
 def fh(m: Module, s: Optional[Signal], high: bool):
     if s is not None:
         m.d.sync += s.eq(high)
+
+
+class I2CFormal(I2C):
+    formal_scl: Signal
+    formal_start: Signal
+    formal_repeated_start: Signal
+    formal_stop: Signal
+
+    def __init__(self, *, speed: Hz):
+        super().__init__(speed=speed, formal=True)
+        self.formal_scl = Signal(reset=1, name="formal_scl")
+        self.formal_start = Signal(name="formal_start")
+        self.formal_repeated_start = Signal(name="formal_repeated_start")
+        self.formal_stop = Signal(name="formal_stop")

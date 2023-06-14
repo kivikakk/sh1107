@@ -1,14 +1,6 @@
 from typing import Final, Optional
 
-from amaranth import (  # pyright: ignore[reportUnknownVariableType]
-    ClockSignal,
-    Elaboratable,
-    Instance,
-    Memory,
-    Module,
-    Mux,
-    Signal,
-)
+from amaranth import ClockSignal, Elaboratable, Instance, Memory, Module, Mux, Signal
 from amaranth.build import Platform
 from amaranth.hdl.mem import ReadPort
 from amaranth.lib.enum import IntEnum

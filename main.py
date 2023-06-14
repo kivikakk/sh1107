@@ -12,10 +12,7 @@ from typing import Any, Dict, Optional, Type, cast
 from unittest import TestLoader, TextTestRunner
 
 from amaranth import Elaboratable
-from amaranth._toolchain.yosys import (
-    find_yosys,  # pyright: ignore[reportUnknownVariableType]
-)
-from amaranth._toolchain.yosys import YosysBinary
+from amaranth._toolchain.yosys import YosysBinary, find_yosys
 from amaranth.back import cxxrtl, rtlil
 from amaranth.build import Platform
 from amaranth.hdl import Fragment

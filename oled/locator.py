@@ -1,7 +1,6 @@
 from typing import Optional
 
-from amaranth import Mux  # pyright: ignore[reportUnknownVariableType]
-from amaranth import Elaboratable, Module, Signal
+from amaranth import Elaboratable, Module, Mux, Signal
 from amaranth.build import Platform
 
 from i2c import RW, I2CBus, Transfer
