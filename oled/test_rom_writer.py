@@ -53,8 +53,8 @@ class TestROMWriterTop(Elaboratable):
 
 class TestROMWriter(sim.TestCase):
     @sim.i2c_speeds
-    def test_sim_rom_writer_dispoff(self, dut: TestROMWriterTop) -> sim.Generator:
-        def trigger() -> sim.Generator:
+    def test_sim_rom_writer_dispoff(self, dut: TestROMWriterTop) -> sim.Procedure:
+        def trigger() -> sim.Procedure:
             assert not (yield dut.rom_writer.o_busy)
             yield dut.rom_writer.i_index.eq(OFFSET_DISPLAY_OFF)
             yield dut.rom_writer.i_stb.eq(1)
@@ -72,8 +72,8 @@ class TestROMWriter(sim.TestCase):
         )
 
     @sim.i2c_speeds
-    def test_sim_rom_writer_chara(self, dut: TestROMWriterTop) -> sim.Generator:
-        def trigger() -> sim.Generator:
+    def test_sim_rom_writer_chara(self, dut: TestROMWriterTop) -> sim.Procedure:
+        def trigger() -> sim.Procedure:
             assert not (yield dut.rom_writer.o_busy)
             yield dut.rom_writer.i_index.eq(OFFSET_CHAR + 0x41)
             yield dut.rom_writer.i_stb.eq(1)

@@ -15,8 +15,8 @@ class TestI2C(sim.TestCase):
         ]
     )
     @sim.i2c_speeds
-    def test_sim_i2c(self, dut: TestI2CTop) -> sim.Generator:
-        def trigger() -> sim.Generator:
+    def test_sim_i2c(self, dut: TestI2CTop) -> sim.Procedure:
+        def trigger() -> sim.Procedure:
             # Force the button push, we don't need to test it here.
             yield dut.switch.eq(1)
             yield Delay(sim.clock())
@@ -41,8 +41,8 @@ class TestI2C(sim.TestCase):
         ]
     )
     @sim.i2c_speeds
-    def test_sim_i2c_repeated_start(self, dut: TestI2CTop) -> sim.Generator:
-        def trigger() -> sim.Generator:
+    def test_sim_i2c_repeated_start(self, dut: TestI2CTop) -> sim.Procedure:
+        def trigger() -> sim.Procedure:
             yield dut.switch.eq(1)
             yield
             yield Settle()

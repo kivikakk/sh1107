@@ -24,7 +24,7 @@ def _tick(i2c: I2C) -> float:
     return 0.1 / i2c.speed.value
 
 
-def synchronise(i2c: I2C, start_value: int, *, wait_steps: int = 20) -> sim.Generator:
+def synchronise(i2c: I2C, start_value: int, *, wait_steps: int = 20) -> sim.Procedure:
     for i in range(wait_steps):
         if i > 0:
             yield Delay(sim.clock())
@@ -51,7 +51,7 @@ def synchronise(i2c: I2C, start_value: int, *, wait_steps: int = 20) -> sim.Gene
     yield Delay(sim.clock())
 
 
-def start(i2c: I2C) -> sim.Generator:
+def start(i2c: I2C) -> sim.Procedure:
     # Strobed.  I2C start condition.
     assert not (yield i2c.bus.i_stb)
     assert (yield i2c.scl_o)
@@ -63,7 +63,7 @@ def start(i2c: I2C) -> sim.Generator:
     assert not (yield i2c.sda_o)
 
 
-def repeated_start(i2c: I2C) -> sim.Generator:
+def repeated_start(i2c: I2C) -> sim.Procedure:
     assert not (yield i2c.scl_o)
     yield Delay(5 * _tick(i2c))
 
@@ -76,11 +76,11 @@ def repeated_start(i2c: I2C) -> sim.Generator:
 
 
 class ValueChangeWatcher:
-    def start(self) -> sim.Generator:
+    def start(self) -> sim.Procedure:
         return
         yield
 
-    def update(self) -> sim.Generator:
+    def update(self) -> sim.Procedure:
         return
         yield
 
@@ -94,10 +94,10 @@ class VCWSteady(ValueChangeWatcher):
     def __init__(self, source: Signal):
         self.source = source
 
-    def start(self) -> sim.Generator:
+    def start(self) -> sim.Procedure:
         self.value = yield self.source
 
-    def update(self) -> sim.Generator:
+    def update(self) -> sim.Procedure:
         new_value = yield self.source
         assert new_value == self.value
 
@@ -109,11 +109,11 @@ class VCWFall(ValueChangeWatcher):
     def __init__(self, source: Signal):
         self.source = source
 
-    def start(self) -> sim.Generator:
+    def start(self) -> sim.Procedure:
         self.value = yield self.source
         assert self.value
 
-    def update(self) -> sim.Generator:
+    def update(self) -> sim.Procedure:
         new_value = yield self.source
         if not self.value:
             assert not new_value
@@ -145,7 +145,7 @@ def wait_scl(
     *,
     sda_o: ValueChange = ValueChange.DONT_CARE,
     sda_oe: ValueChange = ValueChange.STEADY,
-) -> sim.Generator:
+) -> sim.Procedure:
     assert (yield i2c.scl_o) != level
 
     vcw_sda_o = sda_o.watcher_for(i2c.sda_o)
@@ -168,7 +168,7 @@ def wait_scl(
 
 def send(
     i2c: I2C, byte: int, *, next: int | Literal["STOP"] | None = None
-) -> sim.Generator:
+) -> sim.Procedure:
     actual = 0
     assert not (yield i2c.scl_o)
     assert (yield i2c.sda_oe)
@@ -199,7 +199,7 @@ def send(
     assert actual == byte, f"expected {byte:02x}, got {actual:02x}"
 
 
-def receive(i2c: I2C, byte: int) -> sim.Generator:
+def receive(i2c: I2C, byte: int) -> sim.Procedure:
     assert not (yield i2c.scl_o)
     for bit in range(8):
         yield i2c.sda_i.eq((byte >> (7 - bit)) & 1)
@@ -213,7 +213,7 @@ def receive(i2c: I2C, byte: int) -> sim.Generator:
 
 def ack(
     i2c: I2C, *, ack: bool = True, from_us: bool = False, retakes_sda: bool = True
-) -> sim.Generator:
+) -> sim.Procedure:
     if from_us:
         # Controller takes SDA.
         assert not (yield i2c.sda_oe)
@@ -246,11 +246,11 @@ def ack(
         assert ack == (yield i2c.bus.o_ack)
 
 
-def nack(i2c: I2C, *, from_us: bool = False) -> sim.Generator:
+def nack(i2c: I2C, *, from_us: bool = False) -> sim.Procedure:
     yield from ack(i2c, ack=False, from_us=from_us)
 
 
-def stop(i2c: I2C) -> sim.Generator:
+def stop(i2c: I2C) -> sim.Procedure:
     # While SCL is low, bring SDA low.
     sda_start = yield i2c.sda_o
     yield from wait_scl(
@@ -265,7 +265,7 @@ def stop(i2c: I2C) -> sim.Generator:
             break
 
 
-def steady_stopped(i2c: I2C, *, wait_steps: int = 5) -> sim.Generator:
+def steady_stopped(i2c: I2C, *, wait_steps: int = 5) -> sim.Procedure:
     for _ in range(wait_steps):
         yield Delay(_tick(i2c))
         assert (yield i2c.scl_o)
@@ -279,11 +279,11 @@ def steady_stopped(i2c: I2C, *, wait_steps: int = 5) -> sim.Generator:
 
 def full_sequence(
     i2c: I2C,
-    trigger: Callable[[], sim.Generator],
+    trigger: Callable[[], sim.Procedure],
     sequences: list[int | list[int]],
     *,
     test_nacks: bool = True,
-) -> sim.Generator:
+) -> sim.Procedure:
     sequence: list[int] = []
     for item in sequences:
         if isinstance(item, int):

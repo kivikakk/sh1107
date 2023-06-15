@@ -9,7 +9,7 @@ from .debounce import Debounce
 class TestDebounce(sim.TestCase):
     SIM_CLOCK = 1e-6
 
-    def test_sim_debounce(self, d: Debounce) -> sim.Generator:
+    def test_sim_debounce(self, d: Debounce) -> sim.Procedure:
         assert not (yield d.i)
         assert not (yield d.o)
 

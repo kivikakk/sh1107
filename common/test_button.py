@@ -9,7 +9,7 @@ from . import Button, ButtonWithHold
 class TestButton(sim.TestCase):
     SIM_CLOCK = 1e-6
 
-    def _button_down(self, b: Button) -> sim.Generator:
+    def _button_down(self, b: Button) -> sim.Procedure:
         assert not (yield b.i)
 
         assert not (yield b.o_down)
@@ -28,7 +28,7 @@ class TestButton(sim.TestCase):
         yield Settle()
         assert not (yield b.o_down)
 
-    def _button_up(self, b: Button) -> sim.Generator:
+    def _button_up(self, b: Button) -> sim.Procedure:
         assert (yield b.i)
         yield b.i.eq(0)
 
@@ -39,18 +39,18 @@ class TestButton(sim.TestCase):
         assert not (yield b.o_down)
         assert (yield b.o_up)
 
-    def _button_up_post(self, b: Button) -> sim.Generator:
+    def _button_up_post(self, b: Button) -> sim.Procedure:
         assert (yield b.o_up)
         yield
         yield Settle()
         assert not (yield b.o_up)
 
-    def test_sim_button(self, b: Button) -> sim.Generator:
+    def test_sim_button(self, b: Button) -> sim.Procedure:
         yield from self._button_down(b)
         yield from self._button_up(b)
         yield from self._button_up_post(b)
 
-    def test_sim_button_with_hold(self, b: ButtonWithHold) -> sim.Generator:
+    def test_sim_button_with_hold(self, b: ButtonWithHold) -> sim.Procedure:
         yield from self._button_down(b)
         # No delay
         yield from self._button_up(b)

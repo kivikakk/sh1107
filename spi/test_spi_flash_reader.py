@@ -93,11 +93,10 @@ class TestSPIFlashReaderTop(Elaboratable):
 
 
 class TestSPIFlashReader(sim.TestCase):
-    def test_sim_spifr(self, dut: TestSPIFlashReaderTop) -> sim.Generator:
-        yield dut.rst.eq(1)
-        for _ in range(20):
-            yield
-        yield dut.rst.eq(0)
+    def test_sim_spifr(self, dut: TestSPIFlashReaderTop) -> sim.Procedure:
+        yield dut.i_stb.eq(1)
+        yield
+        yield dut.i_stb.eq(0)
         yield
 
         while (yield dut.o_busy):

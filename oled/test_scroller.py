@@ -52,8 +52,8 @@ class TestScroller(sim.TestCase):
     @sim.args(speed=Hz(100_000), ci_only=True)
     @sim.args(speed=Hz(400_000), ci_only=True)
     @sim.args(speed=Hz(2_000_000))
-    def test_sim_scroller(self, dut: TestScrollerTop) -> sim.Generator:
-        def trigger() -> sim.Generator:
+    def test_sim_scroller(self, dut: TestScrollerTop) -> sim.Procedure:
+        def trigger() -> sim.Procedure:
             assert not (yield dut.scroller.o_busy)
             yield dut.scroller.i_stb.eq(1)
             yield Delay(sim.clock())

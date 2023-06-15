@@ -10,7 +10,7 @@ class TestTimer(sim.TestCase):
     SIM_CLOCK = 1e-6
 
     @sim.args(time=1e-4)
-    def test_sim_timer(self, d: Timer) -> sim.Generator:
+    def test_sim_timer(self, d: Timer) -> sim.Procedure:
         assert not (yield d.i)
         assert not (yield d.o)
 

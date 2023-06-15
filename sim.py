@@ -7,11 +7,12 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Callable, Iterator, Optional, Self, Tuple
 
-from amaranth import Elaboratable, Record, ResetInserter, Signal
+from amaranth import Elaboratable, Record, Signal
 from amaranth.hdl.ast import Operator, Statement
+from amaranth.lib.fifo import SyncFIFO
 from amaranth.sim import Delay, Settle, Simulator
 
-__all__ = ["clock", "Generator", "TestCase", "args", "i2c_speeds", "always_args"]
+__all__ = ["clock", "Procedure", "TestCase", "args", "i2c_speeds", "always_args"]
 
 _active_clock = 1 / 12e6
 
@@ -35,11 +36,11 @@ def override_clock(new_clock: Optional[float]) -> Iterator[None]:
         _active_clock = old_sim_clock
 
 
-Generator = typing.Generator[
-    Signal | Record | Delay | Settle | Statement | Operator | None,
-    bool | int,
-    None,
-]
+ValueLike = Signal | Record | Delay | Settle | Statement | Operator | None
+
+T = typing.TypeVar("T")
+Generator = typing.Generator[ValueLike, bool | int, T]
+Procedure = Generator[None]
 
 Args = list[Any]
 Kwargs = dict[str, Any]
@@ -58,7 +59,7 @@ class TestCase(unittest.TestCase):
     def _wrap_test(
         cls,
         name: str,
-        sim_test: Callable[[Self, Elaboratable], Generator],
+        sim_test: Callable[[Self, Elaboratable], Procedure],
     ) -> None:
         sig = inspect.signature(sim_test)
         assert len(sig.parameters) == 2
@@ -100,11 +101,8 @@ class TestCase(unittest.TestCase):
                 dutc_args, dutc_kwargs = sim_args
                 dut = dutc(*dutc_args, **dutc_kwargs)
 
-                def bench() -> Generator:
+                def bench() -> Procedure:
                     yield from sim_test(self, dut)
-
-                if hasattr(dut, "rst"):
-                    dut = ResetInserter(dut.rst)(dut)
 
                 sim = Simulator(dut)
                 sim.add_clock(clock())
@@ -140,7 +138,7 @@ class TestCase(unittest.TestCase):
 
 
 def args(*args: Any, **kwargs: Any):
-    def wrapper(sim_test: Callable[..., Generator]) -> Callable[..., Generator]:
+    def wrapper(sim_test: Callable[..., Procedure]) -> Callable[..., Procedure]:
         if not hasattr(sim_test, "_sim_args"):
             sim_test._sim_args = []  # pyright: ignore[reportFunctionMemberAccess]
         sim_test._sim_args.append(  # pyright: ignore[reportFunctionMemberAccess]
@@ -151,7 +149,7 @@ def args(*args: Any, **kwargs: Any):
     return wrapper
 
 
-def i2c_speeds(sim_test: Callable[..., Generator]) -> Callable[..., Generator]:
+def i2c_speeds(sim_test: Callable[..., Procedure]) -> Callable[..., Procedure]:
     from common import Hz
 
     if not hasattr(sim_test, "_sim_args"):
@@ -168,7 +166,7 @@ def i2c_speeds(sim_test: Callable[..., Generator]) -> Callable[..., Generator]:
 
 
 def always_args(*args: Any, **kwargs: Any):
-    def wrapper(sim_test: Callable[..., Generator]) -> Callable[..., Generator]:
+    def wrapper(sim_test: Callable[..., Procedure]) -> Callable[..., Procedure]:
         if not hasattr(sim_test, "_sim_always_args"):
             sim_test._sim_always_args = (  # pyright: ignore[reportFunctionMemberAccess]
                 []
@@ -179,3 +177,16 @@ def always_args(*args: Any, **kwargs: Any):
         return sim_test
 
     return wrapper
+
+
+def fifo_content(fifo: SyncFIFO) -> Generator[list[int]]:
+    content: list[int] = []
+
+    while (yield fifo.r_rdy):
+        content.append((yield fifo.r_data))
+        yield fifo.r_en.eq(1)
+        yield
+        yield fifo.r_en.eq(0)
+        yield
+
+    return content
