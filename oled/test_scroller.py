@@ -27,8 +27,8 @@ class TestScrollerTop(Elaboratable):
         self.i2c = I2C(speed=speed)
         self.rom_rd = Memory(
             width=8,
-            depth=len(rom.ROM),
-            init=rom.ROM,
+            depth=rom.ROM_LENGTH,
+            init=rom.ROM_CONTENT,
         ).read_port(transparent=False)
         self.scroller = Scroller(memory=self.rom_rd.memory, addr=TestScrollerTop.ADDR)
 

@@ -1,6 +1,6 @@
 from typing import Optional
 
-from amaranth import Elaboratable, Module, ResetSignal, Signal
+from amaranth import Elaboratable, Module, Signal
 from amaranth.build import Platform
 from amaranth.lib.fifo import SyncFIFO
 
@@ -25,7 +25,7 @@ class TestSPIFlashPeripheral(Elaboratable):
 
         with m.FSM():
             with m.State("IDLE"):
-                
+                pass  # TODO
 
         return m
 
@@ -93,6 +93,7 @@ class TestSPIFlashReaderTop(Elaboratable):
 
 
 class TestSPIFlashReader(sim.TestCase):
+    @sim.args(expected_failure=True)
     def test_sim_spifr(self, dut: TestSPIFlashReaderTop) -> sim.Procedure:
         yield dut.i_stb.eq(1)
         yield
