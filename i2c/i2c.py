@@ -276,7 +276,9 @@ class I2C(Elaboratable):
             with m.State("WRITE DATA BIT: SCL LOW"):
                 with m.If(c.o_half):
                     # Set SDA in prep for SCL high. (MSB)
-                    m.d.sync += self.sda_o.eq((self.byte >> (7 - self.byte_ix)) & 0x1)
+                    m.d.sync += self.sda_o.eq(
+                        (self.byte >> (7 - self.byte_ix)[:3]) & 0x1
+                    )
                 with m.Elif(c.o_full):
                     fh(m, self.formal_scl, True)
                     m.next = "WRITE DATA BIT: SCL HIGH"
@@ -317,7 +319,7 @@ class I2C(Elaboratable):
                     with m.If(self.byte_ix == 7):
                         m.d.sync += [
                             self._out_fifo.w_data.eq(
-                                self.byte | (self.sda_i << (7 - self.byte_ix))
+                                self.byte | (self.sda_i << (7 - self.byte_ix)[:3])
                             ),
                             self._out_fifo.w_en.eq(1),
                         ]
@@ -327,7 +329,7 @@ class I2C(Elaboratable):
                         m.d.sync += [
                             self.byte_ix.eq(self.byte_ix + 1),
                             self.byte.eq(
-                                self.byte | (self.sda_i << (7 - self.byte_ix))
+                                self.byte | (self.sda_i << (7 - self.byte_ix)[:3])
                             ),
                         ]
 
