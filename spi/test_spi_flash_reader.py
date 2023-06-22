@@ -146,7 +146,7 @@ class TestSPIFlashReaderTop(Elaboratable):
                         self.o_fifo.w_data.eq(self.spifr.bus.data),
                         self.o_fifo.w_en.eq(1),
                     ]
-                with m.Elif(~self.spifr.o_busy):
+                with m.Elif(~self.spifr.bus.busy):
                     m.next = "IDLE"
 
         return m
