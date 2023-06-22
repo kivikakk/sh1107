@@ -247,7 +247,7 @@ def main():
 
     rom_parser = subparsers.add_parser(
         "rom",
-        help="(WIP) build the ROM image, and optionally program it",
+        help="build the ROM image, and optionally program it",
     )
     rom_parser.set_defaults(func=rom)
     rom_parser.add_argument(

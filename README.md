@@ -21,7 +21,7 @@ positional arguments:
     test                run the unit tests and sim tests
     formal              formally verify the design
     build               build the design, and optionally program it
-    rom                 (WIP) build the ROM image, and optionally program it
+    rom                 build the ROM image, and optionally program it
     vsh                 run the Virtual SH1107
 
 options:
@@ -30,13 +30,21 @@ options:
 
 TODOs:
 
-- Read the ROM image (with command sequences and character data) from the flash
-  over SPI (currently just encoded into the bitstream)
+- SPI flash blackbox for vsh
+- SPI flash whitebox for vsh
+- OrangeCrab:
+  - program/read flash
+  - try on-board DDR3 instead of EBR
+- pack 16-bit data for 16-bit wide memories
+- try QSPI
 
 The current test deployment target is the iCEBreaker ([Crowd
 Supply](https://www.crowdsupply.com/1bitsquared/icebreaker-fpga),
 [1BitSquared](https://1bitsquared.com/products/icebreaker)). Connect PMOD1 A1 to
 SDA, A2 to SCL.
+
+Shortly I'll begin testing with the OrangeCrab
+([1BitSquared](https://1bitsquared.com/products/orangecrab)).
 
 ## vsh
 
