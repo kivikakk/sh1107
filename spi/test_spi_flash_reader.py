@@ -9,7 +9,7 @@ import sim
 from .spi_flash_reader import SPIFlashReader
 
 
-class TestSPIFlashPeripheral(Elaboratable):
+class MockSPIFlashPeripheral(Elaboratable):
     data: Value
 
     spi_copi: Signal
@@ -93,7 +93,7 @@ class TestSPIFlashReaderTop(Elaboratable):
     o_busy: Signal
 
     spifr: SPIFlashReader
-    peripheral: TestSPIFlashPeripheral
+    peripheral: MockSPIFlashPeripheral
 
     def __init__(self, *, data: ValueCastable):
         self.data = Value.cast(data)
@@ -104,7 +104,7 @@ class TestSPIFlashReaderTop(Elaboratable):
         self.o_busy = Signal()
 
         self.spifr = SPIFlashReader()
-        self.peripheral = TestSPIFlashPeripheral(data=self.data)
+        self.peripheral = MockSPIFlashPeripheral(data=self.data)
 
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
