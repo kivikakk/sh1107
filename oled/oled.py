@@ -1,10 +1,11 @@
 import math
 from typing import Final, Optional
 
-from amaranth import C, ClockSignal, Elaboratable, Instance, Module, Mux, Repl, Signal
+from amaranth import C, ClockSignal, Elaboratable, Instance, Memory, Module, Mux, Signal
 from amaranth.build import Platform
 from amaranth.lib.enum import IntEnum
 from amaranth.lib.fifo import SyncFIFO
+from amaranth_boards.icebreaker import ICEBreakerPlatform
 
 from common import Hz
 from i2c import I2C, I2CBus
@@ -72,7 +73,7 @@ class OLED(Elaboratable):
     rom_wr_data: Signal
     rom_bus: rom.ROMBus
     own_rom_bus: rom.ROMBus
-    rom_mem: Instance
+    rom_mem: Instance | Memory
 
     rom_writer: ROMWriter
     locator: Locator
@@ -129,33 +130,6 @@ class OLED(Elaboratable):
         abits = math.ceil(math.log2(rom.ROM_LENGTH))
         self.rom_bus = rom.ROMBus(abits, 8)
         self.own_rom_bus = self.rom_bus.clone()
-        # TODO: we only use the first 8 bits of the SPRAM's 16-bit words.
-        # It'd be better if we packed the bytes in together.
-        self.rom_mem = Instance(
-            "$mem",
-            a_ram_style="huge",
-            p_MEMID="\\rom_mem",
-            p_SIZE=rom.ROM_LENGTH,
-            p_ABITS=abits,
-            p_WIDTH=8,
-            p_INIT=C(0, 0),
-            p_OFFSET=0,
-            p_RD_PORTS=1,
-            p_RD_CLK_ENABLE=C(1, 1),
-            p_RD_CLK_POLARITY=C(1, 1),
-            p_RD_TRANSPARENT=C(1, 1),
-            p_WR_PORTS=1,
-            p_WR_CLK_ENABLE=C(1, 1),
-            p_WR_CLK_POLARITY=C(1, 1),
-            i_RD_CLK=ClockSignal(),
-            i_RD_EN=1,
-            i_RD_ADDR=self.rom_bus.addr,
-            o_RD_DATA=self.rom_bus.data,
-            i_WR_CLK=ClockSignal(),
-            i_WR_EN=Repl(self.rom_wr_en, 8),
-            i_WR_ADDR=self.rom_bus.addr,
-            i_WR_DATA=self.rom_wr_data,
-        )
 
         self.rom_writer = ROMWriter(rom_bus=self.rom_bus, addr=OLED.ADDR)
         self.locator = Locator(addr=OLED.ADDR)
@@ -176,12 +150,54 @@ class OLED(Elaboratable):
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
 
+        match platform:
+            case ICEBreakerPlatform():
+                # TODO: we only use the first 8 bits of the SPRAM's 16-bit words.
+                # It'd be better if we packed the bytes in together.
+                self.rom_mem = Instance(
+                    "$mem",
+                    a_ram_style="huge",
+                    p_MEMID="\\rom_mem",
+                    p_SIZE=rom.ROM_LENGTH,
+                    p_ABITS=len(self.rom_bus.addr),
+                    p_WIDTH=8,
+                    p_INIT=C(0, 0),
+                    p_OFFSET=0,
+                    p_RD_PORTS=1,
+                    p_RD_CLK_ENABLE=C(1, 1),
+                    p_RD_CLK_POLARITY=C(1, 1),
+                    p_RD_TRANSPARENT=C(1, 1),
+                    p_WR_PORTS=1,
+                    p_WR_CLK_ENABLE=C(1, 1),
+                    p_WR_CLK_POLARITY=C(1, 1),
+                    i_RD_CLK=ClockSignal(),
+                    i_RD_EN=1,
+                    i_RD_ADDR=self.rom_bus.addr,
+                    o_RD_DATA=self.rom_bus.data,
+                    i_WR_CLK=ClockSignal(),
+                    i_WR_EN=self.rom_wr_en.replicate(8),
+                    i_WR_ADDR=self.rom_bus.addr,
+                    i_WR_DATA=self.rom_wr_data,
+                )
+                m.submodules.rom_mem = self.rom_mem
+            case _:
+                # OrangeCrab, simulation, etc.
+                self.rom_mem = Memory(width=8, depth=rom.ROM_LENGTH)
+                m.submodules.rom_rd = rom_rd = self.rom_mem.read_port()
+                m.submodules.rom_wr = rom_wr = self.rom_mem.write_port()
+                m.d.comb += [
+                    rom_rd.addr.eq(self.rom_bus.addr),
+                    self.rom_bus.data.eq(rom_rd.data),
+                    rom_wr.addr.eq(self.rom_bus.addr),
+                    rom_wr.data.eq(self.rom_wr_data),
+                    rom_wr.en.eq(self.rom_wr_en),
+                ]
+
         if self.build_i2c:
             m.d.comb += self.i2c.bus.connect(self.i2c_bus)
 
         m.submodules.i2c = self.i2c
         m.submodules.spifr = self.spifr
-        m.submodules.rom_mem = self.rom_mem
         m.submodules.rom_writer = self.rom_writer
         m.submodules.locator = self.locator
         m.submodules.clser = self.clser
