@@ -38,6 +38,8 @@ Supply](https://www.crowdsupply.com/1bitsquared/icebreaker-fpga),
 [1BitSquared](https://1bitsquared.com/products/icebreaker)). Connect PMOD1 A1 to
 SDA, A2 to SCL.
 
+## vsh
+
 Maybe the most interesting thing right now is the Virtual SH1107 for testing the
 gateware. It emulates the internal state of the SH1107 device — what you see
 rendered is what you should see on the display.

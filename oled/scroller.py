@@ -1,6 +1,6 @@
 from typing import Optional, cast
 
-from amaranth import Cat, Elaboratable, Memory, Module, Mux, Signal
+from amaranth import Cat, Elaboratable, Module, Mux, Signal
 from amaranth.build import Platform
 
 from i2c import RW, I2CBus, Transfer
@@ -24,7 +24,7 @@ class Scroller(Elaboratable):
     remain: Signal
     written: Signal
 
-    def __init__(self, *, memory: Memory, addr: int):
+    def __init__(self, *, rom_bus: rom.ROMBus, addr: int):
         self.addr = addr
 
         self.i_stb = Signal()
@@ -33,7 +33,7 @@ class Scroller(Elaboratable):
         self.o_adjusted = Signal(range(16))
 
         self.i2c_bus = I2CBus()
-        self.rom_bus = rom.ROMBus(memory)
+        self.rom_bus = rom_bus.clone()
 
         self.offset = Signal(range(rom.ROM_LENGTH))
         self.remain = Signal(range(rom.ROM_LENGTH))
@@ -49,7 +49,7 @@ class Scroller(Elaboratable):
             with m.State("IDLE"):
                 with m.If(self.i_stb):
                     m.d.sync += [
-                        self.rom_bus.i_addr.eq(rom.OFFSET_SCROLL * 4),
+                        self.rom_bus.addr.eq(rom.OFFSET_SCROLL * 4),
                         self.o_busy.eq(1),
                         self.written.eq(0),
                     ]
@@ -58,33 +58,33 @@ class Scroller(Elaboratable):
                     m.d.sync += self.o_adjusted.eq(0)
 
             with m.State("START: ADDRESSED OFFSET[0]"):
-                m.d.sync += self.rom_bus.i_addr.eq(self.rom_bus.i_addr + 1)
+                m.d.sync += self.rom_bus.addr.eq(self.rom_bus.addr + 1)
                 m.next = "START: ADDRESSED OFFSET[1], OFFSET[0] AVAILABLE"
 
             with m.State("START: ADDRESSED OFFSET[1], OFFSET[0] AVAILABLE"):
                 m.d.sync += [
-                    self.rom_bus.i_addr.eq(self.rom_bus.i_addr + 1),
-                    self.offset.eq(self.rom_bus.o_data),
+                    self.rom_bus.addr.eq(self.rom_bus.addr + 1),
+                    self.offset.eq(self.rom_bus.data),
                 ]
                 m.next = "START: ADDRESSED LEN[0], OFFSET[1] AVAILABLE"
 
             with m.State("START: ADDRESSED LEN[0], OFFSET[1] AVAILABLE"):
                 m.d.sync += [
-                    self.rom_bus.i_addr.eq(self.rom_bus.i_addr + 1),
-                    self.offset.eq(self.offset | self.rom_bus.o_data.shift_left(8)),
+                    self.rom_bus.addr.eq(self.rom_bus.addr + 1),
+                    self.offset.eq(self.offset | self.rom_bus.data.shift_left(8)),
                 ]
                 m.next = "START: ADDRESSED LEN[1], LEN[0] AVAILABLE"
 
             with m.State("START: ADDRESSED LEN[1], LEN[0] AVAILABLE"):
                 m.d.sync += [
-                    self.remain.eq(self.rom_bus.o_data),
-                    self.rom_bus.i_addr.eq(self.offset),
+                    self.remain.eq(self.rom_bus.data),
+                    self.rom_bus.addr.eq(self.offset),
                 ]
                 m.next = "START: ADDRESSED *OFFSET, LEN[1] AVAILABLE"
 
             with m.State("START: ADDRESSED *OFFSET, LEN[1] AVAILABLE"):
                 m.d.sync += [
-                    self.remain.eq(self.remain | self.rom_bus.o_data.shift_left(8)),
+                    self.remain.eq(self.remain | self.rom_bus.data.shift_left(8)),
                     transfer.kind.eq(Transfer.Kind.START),
                     transfer.payload.start.addr.eq(self.addr),
                     transfer.payload.start.rw.eq(RW.W),
@@ -103,7 +103,7 @@ class Scroller(Elaboratable):
                 m.d.sync += self.i2c_bus.i_stb.eq(0)
                 with m.If(self.remain == 0):
                     m.d.sync += [
-                        self.rom_bus.i_addr.eq(self.offset + 1),
+                        self.rom_bus.addr.eq(self.offset + 1),
                         self.offset.eq(self.offset + 1),
                     ]
                     m.next = "SEQ BREAK: ADDRESSED NEXTLEN[1], NEXTLEN[0] AVAILABLE"
@@ -120,14 +120,14 @@ class Scroller(Elaboratable):
                         self.written == rom.SCROLL_OFFSETS["InitialHigherColumnAddress"]
                     ):
                         m.d.sync += transfer.payload.data.eq(
-                            self.rom_bus.o_data + (self.o_adjusted >> 1)
+                            self.rom_bus.data + (self.o_adjusted >> 1)
                         )
                     for i in range(8):
                         with m.Elif(
                             self.written == rom.SCROLL_OFFSETS[f"LowerColumnAddress{i}"]
                         ):
                             m.d.sync += transfer.payload.data.eq(
-                                self.rom_bus.o_data + (self.o_adjusted[0] << 3)
+                                self.rom_bus.data + (self.o_adjusted[0] << 3)
                             )
                     with m.Elif(
                         self.written == rom.SCROLL_OFFSETS["DisplayStartLine"] + 1
@@ -136,10 +136,10 @@ class Scroller(Elaboratable):
                             Mux(self.o_adjusted == 15, 0, 8 + self.o_adjusted * 8)
                         )
                     with m.Else():
-                        m.d.sync += transfer.payload.data.eq(self.rom_bus.o_data)
+                        m.d.sync += transfer.payload.data.eq(self.rom_bus.data)
 
                     # Prepare next read, whether it's data or NEXTLEN[0].
-                    m.d.sync += self.rom_bus.i_addr.eq(self.offset + 1)
+                    m.d.sync += self.rom_bus.addr.eq(self.offset + 1)
                     m.next = "SEND: LATCHED W_EN"
 
             with m.State("SEND: LATCHED W_EN"):
@@ -160,14 +160,14 @@ class Scroller(Elaboratable):
 
             with m.State("SEQ BREAK: ADDRESSED NEXTLEN[1], NEXTLEN[0] AVAILABLE"):
                 m.d.sync += [
-                    self.remain.eq(self.rom_bus.o_data),
-                    self.rom_bus.i_addr.eq(self.offset + 1),
+                    self.remain.eq(self.rom_bus.data),
+                    self.rom_bus.addr.eq(self.offset + 1),
                     self.offset.eq(self.offset + 1),
                 ]
                 m.next = "SEQ BREAK: ADDRESSED FOLLOWING, NEXTLEN[1] AVAILABLE"
 
             with m.State("SEQ BREAK: ADDRESSED FOLLOWING, NEXTLEN[1] AVAILABLE"):
-                remain = self.remain | cast(Cat, self.rom_bus.o_data.shift_left(8))
+                remain = self.remain | cast(Cat, self.rom_bus.data.shift_left(8))
                 with m.If(remain == 0):
                     m.next = "FIN: WAIT I2C DONE"
                 with m.Else():

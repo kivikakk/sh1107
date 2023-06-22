@@ -6,6 +6,9 @@
 		{
 			"path": "../amaranth",
 		},
+		{
+			"path": "../yosysvs/yosys",
+		},
 	],
 	"settings": {
 		// autoComplete

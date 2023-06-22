@@ -63,14 +63,13 @@ class SPIFlashReader(Elaboratable):
         TRES1_TDP_CYCLES = math.floor(freq / 1_000_000 * 3) + 1
 
         sr = Signal(32)
-        # TODO: fix up the +1s by using 0, letting it wrap
-        snd_bitcount = Signal(range(max(32, TRES1_TDP_CYCLES) + 1))
+        snd_bitcount = Signal(range(max(32, TRES1_TDP_CYCLES)))
 
-        rcv_bitcount = Signal(range(9))
+        rcv_bitcount = Signal(range(8))
         rcv_bytecount = Signal.like(self.i_len)
 
         m.d.comb += [
-            self.spi_copi.eq(sr[31]),
+            self.spi_copi.eq(sr[-1]),
             self.spi_clk.eq(self.spi_cs & ~clk),
             self.o_data.eq(sr[:8]),
         ]
@@ -85,7 +84,7 @@ class SPIFlashReader(Elaboratable):
                     m.d.sync += [
                         self.spi_cs.eq(1),
                         sr.eq(0xAB000000),
-                        snd_bitcount.eq(32),
+                        snd_bitcount.eq(31),
                     ]
                     m.next = "POWER-DOWN RELEASE"
 
@@ -94,10 +93,10 @@ class SPIFlashReader(Elaboratable):
                     snd_bitcount.eq(snd_bitcount - 1),
                     sr.eq(Cat(C(0b1, 1), sr[:-1])),
                 ]
-                with m.If(snd_bitcount == 1):
+                with m.If(snd_bitcount == 0):
                     m.d.sync += [
                         self.spi_cs.eq(0),
-                        snd_bitcount.eq(TRES1_TDP_CYCLES),
+                        snd_bitcount.eq(TRES1_TDP_CYCLES - 1),
                     ]
                     m.next = "WAIT TRES1"
 
@@ -108,8 +107,8 @@ class SPIFlashReader(Elaboratable):
                     m.d.sync += [
                         self.spi_cs.eq(1),
                         sr.eq(Cat(self.i_addr, C(0x03, 8))),
-                        snd_bitcount.eq(32),
-                        rcv_bitcount.eq(8),
+                        snd_bitcount.eq(31),
+                        rcv_bitcount.eq(7),
                         rcv_bytecount.eq(self.i_len),
                     ]
                     m.next = "SEND CMD"
@@ -119,7 +118,7 @@ class SPIFlashReader(Elaboratable):
                     snd_bitcount.eq(snd_bitcount - 1),
                     sr.eq(Cat(C(0b1, 1), sr[:-1])),
                 ]
-                with m.If(snd_bitcount == 1):
+                with m.If(snd_bitcount == 0):
                     m.next = "RECEIVING"
 
             with m.State("RECEIVING"):
@@ -127,16 +126,16 @@ class SPIFlashReader(Elaboratable):
                     rcv_bitcount.eq(rcv_bitcount - 1),
                     sr.eq(Cat(self.spi_cipo, sr[:-1])),
                 ]
-                with m.If(rcv_bitcount == 1):
+                with m.If(rcv_bitcount == 0):
                     m.d.sync += [
                         rcv_bytecount.eq(rcv_bytecount - 1),
-                        rcv_bitcount.eq(8),
+                        rcv_bitcount.eq(7),
                         self.o_valid.eq(1),
                     ]
-                    with m.If(rcv_bytecount == 1):
+                    with m.If(rcv_bytecount == 0):
                         m.d.sync += [
                             self.spi_cs.eq(0),
-                            snd_bitcount.eq(TRES1_TDP_CYCLES),
+                            snd_bitcount.eq(TRES1_TDP_CYCLES - 1),
                         ]
                         m.next = "POWER DOWN"
                     with m.Else():

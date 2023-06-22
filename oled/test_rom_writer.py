@@ -32,7 +32,8 @@ class TestROMWriterTop(Elaboratable):
             init=rom.ROM_CONTENT,
         ).read_port(transparent=False)
         self.rom_writer = ROMWriter(
-            memory=self.rom_rd.memory, addr=TestROMWriterTop.ADDR
+            rom_bus=rom.ROMBus.for_read_port(self.rom_rd),
+            addr=TestROMWriterTop.ADDR,
         )
 
     def elaborate(self, platform: Optional[Platform]) -> Module:
@@ -44,8 +45,7 @@ class TestROMWriterTop(Elaboratable):
 
         m.d.comb += [
             self.i2c.bus.connect(self.rom_writer.i2c_bus),
-            self.rom_rd.addr.eq(self.rom_writer.rom_bus.i_addr),
-            self.rom_writer.rom_bus.o_data.eq(self.rom_rd.data),
+            self.rom_writer.rom_bus.connect_read_port(self.rom_rd),
         ]
 
         return m

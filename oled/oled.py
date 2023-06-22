@@ -1,10 +1,11 @@
+import math
 from typing import Final, Optional
 
-from amaranth import ClockSignal, Elaboratable, Instance, Memory, Module, Mux, Signal
+from amaranth import C, ClockSignal, Elaboratable, Instance, Memory, Module, Mux, Signal
 from amaranth.build import Platform
-from amaranth.hdl.mem import ReadPort, WritePort
 from amaranth.lib.enum import IntEnum
 from amaranth.lib.fifo import SyncFIFO
+from amaranth_boards.icebreaker import ICEBreakerPlatform
 
 from common import Hz
 from i2c import I2C, I2CBus
@@ -63,14 +64,16 @@ class OLED(Elaboratable):
 
     build_i2c: bool
 
-    i2c: I2C | Instance
     i2c_bus: I2CBus
+    i2c: I2C | Instance
 
     spifr: SPIFlashReader
-    rom: Memory
-    rom_wr: WritePort
-    rom_rd: ReadPort
+
+    rom_wr_en: Signal
+    rom_wr_data: Signal
     rom_bus: rom.ROMBus
+    own_rom_bus: rom.ROMBus
+    rom_mem: Instance | Memory
 
     rom_writer: ROMWriter
     locator: Locator
@@ -96,42 +99,13 @@ class OLED(Elaboratable):
 
         self.build_i2c = build_i2c
 
+        self.i2c_bus = I2CBus()
         if build_i2c:
             self.i2c = I2C(speed=speed)
         else:
             self.i_i2c_bb_in_ack = Signal()
             self.i_i2c_bb_in_out_fifo_data = Signal(8)
             self.i_i2c_bb_in_out_fifo_stb = Signal()
-        self.i2c_bus = I2CBus()
-
-        self.spifr = SPIFlashReader()
-        self.rom = Memory(width=8, depth=rom.ROM_LENGTH)
-        self.rom_wr = self.rom.write_port()
-        self.rom_rd = self.rom.read_port(transparent=False)
-        self.rom_bus = rom.ROMBus(self.rom)
-
-        self.rom_writer = ROMWriter(memory=self.rom, addr=OLED.ADDR)
-        self.locator = Locator(addr=OLED.ADDR)
-        self.clser = Clser(addr=OLED.ADDR)
-        self.scroller = Scroller(memory=self.rom, addr=OLED.ADDR)
-        self.own_i2c_bus = I2CBus()
-
-        self.i_fifo = SyncFIFO(width=8, depth=1)
-        self.o_result = Signal(OLED.Result, reset=OLED.Result.BUSY)
-
-        self.row = Signal(range(1, 17), reset=1)
-        self.col = Signal(range(1, 17), reset=1)
-        self.cursor = Signal()
-
-        self.chpr_data = Signal(8)
-        self.chpr_run = Signal()
-
-    def elaborate(self, platform: Optional[Platform]) -> Module:
-        m = Module()
-
-        if self.build_i2c:
-            m.d.comb += self.i2c.bus.connect(self.i2c_bus)
-        else:
             self.i2c = Instance(
                 "i2c",
                 i_clk=ClockSignal(),
@@ -149,21 +123,92 @@ class OLED(Elaboratable):
                 o_out_fifo_r_data=self.i2c_bus.o_out_fifo_r_data,
             )
 
+        self.spifr = SPIFlashReader()
+
+        self.rom_wr_en = Signal()
+        self.rom_wr_data = Signal(8)
+        abits = math.ceil(math.log2(rom.ROM_LENGTH))
+        self.rom_bus = rom.ROMBus(abits, 8)
+        self.own_rom_bus = self.rom_bus.clone()
+
+        self.rom_writer = ROMWriter(rom_bus=self.rom_bus, addr=OLED.ADDR)
+        self.locator = Locator(addr=OLED.ADDR)
+        self.clser = Clser(addr=OLED.ADDR)
+        self.scroller = Scroller(rom_bus=self.rom_bus, addr=OLED.ADDR)
+        self.own_i2c_bus = I2CBus()
+
+        self.i_fifo = SyncFIFO(width=8, depth=1)
+        self.o_result = Signal(OLED.Result, reset=OLED.Result.BUSY)
+
+        self.row = Signal(range(1, 17), reset=1)
+        self.col = Signal(range(1, 17), reset=1)
+        self.cursor = Signal()
+
+        self.chpr_data = Signal(8)
+        self.chpr_run = Signal()
+
+    def elaborate(self, platform: Optional[Platform]) -> Module:
+        m = Module()
+
+        match platform:
+            case ICEBreakerPlatform():
+                # TODO: we only use the first 8 bits of the SPRAM's 16-bit words.
+                # It'd be better if we packed the bytes in together.
+                self.rom_mem = Instance(
+                    "$mem",
+                    a_ram_style="huge",
+                    p_MEMID="\\rom_mem",
+                    p_SIZE=rom.ROM_LENGTH,
+                    p_ABITS=len(self.rom_bus.addr),
+                    p_WIDTH=8,
+                    p_INIT=C(0, 0),
+                    p_OFFSET=0,
+                    p_RD_PORTS=1,
+                    p_RD_CLK_ENABLE=C(1, 1),
+                    p_RD_CLK_POLARITY=C(1, 1),
+                    p_RD_TRANSPARENT=C(1, 1),
+                    p_WR_PORTS=1,
+                    p_WR_CLK_ENABLE=C(1, 1),
+                    p_WR_CLK_POLARITY=C(1, 1),
+                    i_RD_CLK=ClockSignal(),
+                    i_RD_EN=1,
+                    i_RD_ADDR=self.rom_bus.addr,
+                    o_RD_DATA=self.rom_bus.data,
+                    i_WR_CLK=ClockSignal(),
+                    i_WR_EN=self.rom_wr_en.replicate(8),
+                    i_WR_ADDR=self.rom_bus.addr,
+                    i_WR_DATA=self.rom_wr_data,
+                )
+                m.submodules.rom_mem = self.rom_mem
+            case _:
+                # OrangeCrab, simulation, etc.
+                # TODO: This gets mapped to DP16KD on OrangeCrab which is also
+                # 16 bits wide. As above.
+                # Also, as is typical, zero-init ends up making the bitstream
+                # larger than if we'd put actual data in it, so this is very
+                # much for Fun(tm).
+                self.rom_mem = Memory(width=8, depth=rom.ROM_LENGTH)
+                m.submodules.rom_rd = rom_rd = self.rom_mem.read_port()
+                m.submodules.rom_wr = rom_wr = self.rom_mem.write_port()
+                m.d.comb += [
+                    rom_rd.addr.eq(self.rom_bus.addr),
+                    self.rom_bus.data.eq(rom_rd.data),
+                    rom_wr.addr.eq(self.rom_bus.addr),
+                    rom_wr.data.eq(self.rom_wr_data),
+                    rom_wr.en.eq(self.rom_wr_en),
+                ]
+
+        if self.build_i2c:
+            m.d.comb += self.i2c.bus.connect(self.i2c_bus)
+
         m.submodules.i2c = self.i2c
         m.submodules.spifr = self.spifr
-        m.submodules.rom_wr = self.rom_wr
-        m.submodules.rom_rd = self.rom_rd
         m.submodules.rom_writer = self.rom_writer
         m.submodules.locator = self.locator
         m.submodules.clser = self.clser
         m.submodules.scroller = self.scroller
 
         m.submodules.i_fifo = self.i_fifo
-
-        m.d.comb += [
-            self.rom_rd.addr.eq(self.rom_bus.i_addr),
-            self.rom_bus.o_data.eq(self.rom_rd.data),
-        ]
 
         with m.If(self.rom_writer.o_busy):
             m.d.comb += [
@@ -180,7 +225,10 @@ class OLED(Elaboratable):
                 self.rom_bus.connect(self.scroller.rom_bus),
             ]
         with m.Else():
-            m.d.comb += self.i2c_bus.connect(self.own_i2c_bus)
+            m.d.comb += [
+                self.i2c_bus.connect(self.own_i2c_bus),
+                self.rom_bus.connect(self.own_rom_bus),
+            ]
 
         m.d.comb += self.locator.i_adjust.eq(self.scroller.o_adjusted)
 
@@ -191,7 +239,7 @@ class OLED(Elaboratable):
         with m.FSM():
             with m.State("INIT: BEGIN"):
                 m.d.sync += [
-                    self.rom_wr.addr.eq(0),
+                    self.own_rom_bus.addr.eq(0),
                     self.spifr.i_addr.eq(rom.ROM_OFFSET),
                     self.spifr.i_len.eq(rom.ROM_LENGTH),
                     self.spifr.i_stb.eq(1),
@@ -205,8 +253,8 @@ class OLED(Elaboratable):
             with m.State("INIT: WAIT SPIFR"):
                 with m.If(self.spifr.o_valid):
                     m.d.sync += [
-                        self.rom_wr.data.eq(self.spifr.o_data),
-                        self.rom_wr.en.eq(1),
+                        self.rom_wr_data.eq(self.spifr.o_data),
+                        self.rom_wr_en.eq(0b1),
                     ]
                     m.next = "INIT: STROBED ROM_WR"
                 with m.Elif(~self.spifr.o_busy):
@@ -215,8 +263,8 @@ class OLED(Elaboratable):
 
             with m.State("INIT: STROBED ROM_WR"):
                 m.d.sync += [
-                    self.rom_wr.en.eq(0),
-                    self.rom_wr.addr.eq(self.rom_wr.addr + 1),
+                    self.rom_wr_en.eq(0),
+                    self.own_rom_bus.addr.eq(self.own_rom_bus.addr + 1),
                 ]
                 m.next = "INIT: WAIT SPIFR"
 
