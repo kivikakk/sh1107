@@ -15,80 +15,82 @@ __all__ = ["Top"]
 
 SEQUENCES: list[list[int]] = []
 
+Cm = OLED.Command
+
 # msg1 = ("1234567890abcdef" * 15) + "1234567890abcde"
 # SEQUENCES.append([
-#     0x03,  # DISPLAY_OFF
-#     0x04,  # CLS
-#     0x01,  # INIT
-#     0x05,
+#     Cm.DISPLAY_OFF,
+#     Cm.CLS,
+#     Cm.INIT,
+#     Cm.LOCATE,
 #     0x01,
-#     0x01,  # LOCATE 1, 1
-#     0x06,
+#     0x01,
+#     Cm.PRINT,
 #     len(msg1),
-#     *[ord(c) for c in msg1],  # PRINT msg1
+#     *[ord(c) for c in msg1],
 # ])
 
 msg1 = "Nyonk\n plonk"
 msg2 = "14: Hej\n 15: Mm\n  16: Z!\n   17: :)"
 SEQUENCES.append(
     [
-        0x03,  # DISPLAY_OFF
-        0x04,  # CLS
-        0x01,  # INIT
-        0x05,
+        Cm.DISPLAY_OFF,
+        Cm.CLS,
+        Cm.INIT,
+        Cm.LOCATE,
         0x01,
-        0x01,  # LOCATE 1, 1
-        0x06,
+        0x01,
+        Cm.PRINT,
         len(msg1),
-        *[ord(c) for c in msg1],  # PRINT msg1
-        0x05,
+        *[ord(c) for c in msg1],
+        Cm.LOCATE,
         0x0E,
-        0x01,  # LOCATE 14, 1
-        0x06,
+        0x01,
+        Cm.PRINT,
         len(msg2),
-        *[ord(c) for c in msg2],  # PRINT msg2
-        0x07,  # CURSOR_ON
+        *[ord(c) for c in msg2],
+        Cm.CURSOR_ON,
     ]
 )
 
 msg3 = "/"
 SEQUENCES.append(
     [
-        0x09,  # ID
-        0x06,
+        Cm.ID,
+        Cm.PRINT,
         len(msg3),
-        *[ord(c) for c in msg3],  # PRINT msg4
-        0x03,  # DISPLAY_OFF
-        0x09,  # ID
-        0x02,  # DISPLAY_ON
+        *[ord(c) for c in msg3],
+        Cm.DISPLAY_OFF,
+        Cm.ID,
+        Cm.DISPLAY_ON,
     ]
 )
 
 SEQUENCES.append(
     [
-        0x04,  # CLS
+        Cm.CLS,
     ]
 )
 
 SEQUENCES.append(
     [
-        # 0x0A,
-        # 0x01,  # PRINT_BYTE 0x01
-        # 0x0A,
-        # 0x23,  # PRINT_BYTE 0x23
-        # 0x0A,
-        # 0x45,  # PRINT_BYTE 0x45
-        # 0x0A,
-        # 0x67,  # PRINT_BYTE 0x67
-        # 0x0A,
-        # 0x89,  # PRINT_BYTE 0x89
-        # 0x0A,
-        # 0xAB,  # PRINT_BYTE 0xAB
-        # 0x0A,
-        # 0xCD,  # PRINT_BYTE 0xCD
-        # 0x0A,
-        # 0xEF,  # PRINT_BYTE 0xEF
-        0x0B,  # SPI_TEST
+        # Cm.PRINT_BYTE,
+        # 0x01,
+        # Cm.PRINT_BYTE,
+        # 0x23,
+        # Cm.PRINT_BYTE,
+        # 0x45,
+        # Cm.PRINT_BYTE,
+        # 0x67,
+        # Cm.PRINT_BYTE,
+        # 0x89,
+        # Cm.PRINT_BYTE,
+        # 0xAB,
+        # Cm.PRINT_BYTE,
+        # 0xCD,
+        # Cm.PRINT_BYTE,
+        # 0xEF,
+        Cm.SPI_TEST,
     ]
 )
 
@@ -123,7 +125,7 @@ class Top(Elaboratable):
             width=8,
             depth=self.rom_len,
             init=[i for seq in sequences for i in seq],
-        ).read_port(transparent=False)
+        ).read_port()
 
     @property
     def ports(self) -> list[Signal]:

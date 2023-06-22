@@ -40,9 +40,9 @@ def _build_top(args: Namespace, **kwargs: Any) -> Elaboratable:
         kwargs["speed"] = Hz(args.speed)
 
     kwargs["blackboxes"] = blackboxes = kwargs.get("blackboxes", Blackboxes())
-    if kwargs.get("blackbox_i2c", args.blackbox_i2c):
+    if kwargs.get("blackbox_i2c", getattr(args, "blackbox_i2c", False)):
         blackboxes.add(Blackbox.I2C)
-    if kwargs.get("blackbox_spifr", args.blackbox_spifr):
+    if kwargs.get("blackbox_spifr", getattr(args, "blackbox_spifr", False)):
         blackboxes.add(Blackbox.SPIFR)
 
     return klass(**kwargs)
