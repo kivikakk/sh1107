@@ -182,6 +182,11 @@ class OLED(Elaboratable):
                 m.submodules.rom_mem = self.rom_mem
             case _:
                 # OrangeCrab, simulation, etc.
+                # TODO: This gets mapped to DP16KD on OrangeCrab which is also
+                # 16 bits wide. As above.
+                # Also, as is typical, zero-init ends up making the bitstream
+                # larger than if we'd put actual data in it, so this is very
+                # much for Fun(tm).
                 self.rom_mem = Memory(width=8, depth=rom.ROM_LENGTH)
                 m.submodules.rom_rd = rom_rd = self.rom_mem.read_port()
                 m.submodules.rom_wr = rom_wr = self.rom_mem.write_port()
