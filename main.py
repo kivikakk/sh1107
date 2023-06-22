@@ -102,6 +102,7 @@ def build(args: Namespace):
         elaboratable,
         do_program=args.program,
         debug_verilog=args.verilog,
+        yosys_opts="-g",
     )
 
     heading = re.compile(r"^\d+\.\d+\. Printing statistics\.$", flags=re.MULTILINE)

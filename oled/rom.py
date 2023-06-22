@@ -1,6 +1,7 @@
 import struct
 
-from amaranth import Memory, Record, Signal
+from amaranth import Record, Signal
+from amaranth.hdl.ast import ShapeCastable
 from amaranth.hdl.rec import DIR_FANIN, DIR_FANOUT
 
 from .chars import CHARS
@@ -27,11 +28,11 @@ class ROMBus(Record):
     i_addr: Signal
     o_data: Signal
 
-    def __init__(self, memory: Memory):
+    def __init__(self, addr: ShapeCastable, width: ShapeCastable):
         super().__init__(
             [
-                ("i_addr", range(memory.depth), DIR_FANIN),
-                ("o_data", memory.width, DIR_FANOUT),
+                ("i_addr", addr, DIR_FANIN),
+                ("o_data", width, DIR_FANOUT),
             ]
         )
 
