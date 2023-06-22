@@ -6,6 +6,7 @@ import os
 import re
 import subprocess
 import sys
+import warnings
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
 from typing import Any, Dict, Optional, Type, cast
@@ -303,4 +304,5 @@ def main():
 
 
 if __name__ == "__main__":
+    warnings.simplefilter("default")
     main()
