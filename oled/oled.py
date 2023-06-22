@@ -128,7 +128,7 @@ class OLED(Elaboratable):
         self.rom_wr_data = Signal(8)
         abits = math.ceil(math.log2(rom.ROM_LENGTH))
         self.rom_bus = rom.ROMBus(abits, 8)
-        self.own_rom_bus = rom.ROMBus.like(self.rom_bus)
+        self.own_rom_bus = self.rom_bus.clone()
         # TODO: we only use the first 8 bits of the SPRAM's 16-bit words.
         # It'd be better if we packed the bytes in together.
         self.rom_mem = Instance(
@@ -149,11 +149,11 @@ class OLED(Elaboratable):
             p_WR_CLK_POLARITY=C(1, 1),
             i_RD_CLK=ClockSignal(),
             i_RD_EN=1,
-            i_RD_ADDR=self.rom_bus.i_addr,
-            o_RD_DATA=self.rom_bus.o_data,
+            i_RD_ADDR=self.rom_bus.addr,
+            o_RD_DATA=self.rom_bus.data,
             i_WR_CLK=ClockSignal(),
             i_WR_EN=Repl(self.rom_wr_en, 8),
-            i_WR_ADDR=self.rom_bus.i_addr,
+            i_WR_ADDR=self.rom_bus.addr,
             i_WR_DATA=self.rom_wr_data,
         )
 
@@ -218,7 +218,7 @@ class OLED(Elaboratable):
         with m.FSM():
             with m.State("INIT: BEGIN"):
                 m.d.sync += [
-                    self.own_rom_bus.i_addr.eq(0),
+                    self.own_rom_bus.addr.eq(0),
                     self.spifr.i_addr.eq(rom.ROM_OFFSET),
                     self.spifr.i_len.eq(rom.ROM_LENGTH),
                     self.spifr.i_stb.eq(1),
@@ -243,7 +243,7 @@ class OLED(Elaboratable):
             with m.State("INIT: STROBED ROM_WR"):
                 m.d.sync += [
                     self.rom_wr_en.eq(0),
-                    self.own_rom_bus.i_addr.eq(self.own_rom_bus.i_addr + 1),
+                    self.own_rom_bus.addr.eq(self.own_rom_bus.addr + 1),
                 ]
                 m.next = "INIT: WAIT SPIFR"
 
