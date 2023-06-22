@@ -121,7 +121,7 @@ class TestSPIFlashReaderTop(Elaboratable):
         ]
 
         m.d.sync += [
-            self.spifr.i_stb.eq(0),
+            self.spifr.bus.stb.eq(0),
             self.o_fifo.w_en.eq(0),
         ]
 
@@ -131,9 +131,9 @@ class TestSPIFlashReaderTop(Elaboratable):
             with m.State("IDLE"):
                 with m.If(self.i_stb):
                     m.d.sync += [
-                        self.spifr.i_addr.eq(0x00CAFE),
-                        self.spifr.i_len.eq(self.len),
-                        self.spifr.i_stb.eq(1),
+                        self.spifr.bus.addr.eq(0x00CAFE),
+                        self.spifr.bus.len.eq(self.len),
+                        self.spifr.bus.stb.eq(1),
                     ]
                     m.next = "STROBED SPIFR"
 
@@ -141,9 +141,9 @@ class TestSPIFlashReaderTop(Elaboratable):
                 m.next = "WAITING SPIFR"
 
             with m.State("WAITING SPIFR"):
-                with m.If(self.spifr.o_valid):
+                with m.If(self.spifr.bus.valid):
                     m.d.sync += [
-                        self.o_fifo.w_data.eq(self.spifr.o_data),
+                        self.o_fifo.w_data.eq(self.spifr.bus.data),
                         self.o_fifo.w_en.eq(1),
                     ]
                 with m.Elif(~self.spifr.o_busy):

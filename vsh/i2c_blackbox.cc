@@ -2,9 +2,6 @@
 #include <iostream>
 
 /**
- * NOTE: This file is **only** used if using the blackbox.  If launching vsh
- * with "main.py vsh -i", build/sh1107.cc is used directly instead.
- *
  * This code is officially Not Poggers(tm).
  *
  * We emulate the external interface of i2c.py's I2C module for the benefit of
@@ -48,11 +45,11 @@ struct bb_p_i2c_impl : public bb_p_i2c {
   uint8_t out_fifo_value;
 
   void reset() override {
-    state = STATE_IDLE;
-    in_fifo_state = IN_FIFO_STATE_EMPTY;
-    in_fifo_value = 0u;
-    out_fifo_state = OUT_FIFO_STATE_EMPTY;
-    out_fifo_value = 0u;
+    this->state = STATE_IDLE;
+    this->in_fifo_state = IN_FIFO_STATE_EMPTY;
+    this->in_fifo_value = 0u;
+    this->out_fifo_state = OUT_FIFO_STATE_EMPTY;
+    this->out_fifo_value = 0u;
 
     p_busy = wire<1>{0u};
     p_ack = wire<1>{1u};

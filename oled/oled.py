@@ -11,7 +11,7 @@ from common import Hz
 from i2c import I2C, I2CBus
 from oled import rom
 from options import Blackbox, Blackboxes
-from spi import SPIFlashReader
+from spi import SPIFlashReader, SPIFlashReaderBus
 from .clser import Clser
 from .locator import Locator
 from .rom_writer import ROMWriter
@@ -68,8 +68,13 @@ class OLED(Elaboratable):
     i2c_bus: I2CBus
     own_i2c_bus: I2CBus
     i2c: I2C | Instance
+    # For blackbox simulation only; not defined otherwise.
+    i_i2c_bb_in_ack: Signal
+    i_i2c_bb_in_out_fifo_data: Signal
+    i_i2c_bb_in_out_fifo_stb: Signal
 
-    spifr: SPIFlashReader
+    spifr_bus: SPIFlashReaderBus
+    spifr: SPIFlashReader | Instance
 
     rom_wr_en: Signal
     rom_wr_data: Signal
@@ -83,9 +88,6 @@ class OLED(Elaboratable):
     scroller: Scroller
 
     i_fifo: SyncFIFO
-    i_i2c_bb_in_ack: Signal  # For blackbox simulation only
-    i_i2c_bb_in_out_fifo_data: Signal  # For blackbox simulation only
-    i_i2c_bb_in_out_fifo_stb: Signal  # For blackbox simulation only
     o_result: Signal
 
     row: Signal
@@ -125,7 +127,20 @@ class OLED(Elaboratable):
                 o_out_fifo_r_data=self.i2c_bus.o_out_fifo_r_data,
             )
 
-        self.spifr = SPIFlashReader()
+        self.spifr_bus = SPIFlashReaderBus()
+        if Blackbox.SPIFR not in blackboxes:
+            self.spifr = SPIFlashReader()
+        else:
+            self.spifr = Instance(
+                "spifr",
+                i_clk=ClockSignal(),
+                i_addr=self.spifr_bus.addr,
+                i_len=self.spifr_bus.len,
+                i_stb=self.spifr_bus.stb,
+                o_busy=self.spifr_bus.busy,
+                o_data=self.spifr_bus.data,
+                o_valid=self.spifr_bus.valid,
+            )
 
         self.rom_wr_en = Signal()
         self.rom_wr_data = Signal(8)
@@ -192,8 +207,7 @@ class OLED(Elaboratable):
                 m.submodules.rom_rd = rom_rd = self.rom_mem.read_port()
                 m.submodules.rom_wr = rom_wr = self.rom_mem.write_port()
                 m.d.comb += [
-                    rom_rd.addr.eq(self.rom_bus.addr),
-                    self.rom_bus.data.eq(rom_rd.data),
+                    self.rom_bus.connect_read_port(rom_rd),
                     rom_wr.addr.eq(self.rom_bus.addr),
                     rom_wr.data.eq(self.rom_wr_data),
                     rom_wr.en.eq(self.rom_wr_en),
@@ -201,6 +215,9 @@ class OLED(Elaboratable):
 
         if Blackbox.I2C not in self.blackboxes:
             m.d.comb += self.i2c.bus.connect(self.i2c_bus)
+
+        if Blackbox.SPIFR not in self.blackboxes:
+            m.d.comb += self.spifr.bus.connect(self.spifr_bus)
 
         m.submodules.i2c = self.i2c
         m.submodules.spifr = self.spifr
@@ -241,31 +258,37 @@ class OLED(Elaboratable):
             with m.State("INIT: BEGIN"):
                 m.d.sync += [
                     self.own_rom_bus.addr.eq(0),
-                    self.spifr.i_addr.eq(rom.ROM_OFFSET),
-                    self.spifr.i_len.eq(rom.ROM_LENGTH),
-                    self.spifr.i_stb.eq(1),
+                    self.spifr_bus.addr.eq(rom.ROM_OFFSET),
+                    self.spifr_bus.len.eq(rom.ROM_LENGTH),
+                    self.spifr_bus.stb.eq(1),
                 ]
                 m.next = "INIT: STROBED SPIFR"
 
             with m.State("INIT: STROBED SPIFR"):
-                m.d.sync += self.spifr.i_stb.eq(0)
+                m.d.sync += self.spifr_bus.stb.eq(0)
                 m.next = "INIT: WAIT SPIFR"
 
             with m.State("INIT: WAIT SPIFR"):
-                with m.If(self.spifr.o_valid):
+                with m.If(self.spifr_bus.valid):
                     m.d.sync += [
-                        self.rom_wr_data.eq(self.spifr.o_data),
+                        self.rom_wr_data.eq(self.spifr_bus.data),
                         self.rom_wr_en.eq(0b1),
                     ]
                     m.next = "INIT: STROBED ROM_WR"
-                with m.Elif(~self.spifr.o_busy):
+                with m.Elif(~self.spifr_bus.busy):
                     m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
                     m.next = "IDLE"
 
             with m.State("INIT: STROBED ROM_WR"):
                 m.d.sync += [
                     self.rom_wr_en.eq(0),
-                    self.own_rom_bus.addr.eq(self.own_rom_bus.addr + 1),
+                    self.own_rom_bus.addr.eq(
+                        Mux(
+                            self.own_rom_bus.addr == rom.ROM_LENGTH - 1,
+                            0,
+                            self.own_rom_bus.addr + 1,
+                        )
+                    ),
                 ]
                 m.next = "INIT: WAIT SPIFR"
 
@@ -741,22 +764,22 @@ class OLED(Elaboratable):
 
         with m.State("SPI_TEST: START"):
             m.d.sync += [
-                self.spifr.i_addr.eq(rom.ROM_OFFSET),
-                self.spifr.i_len.eq(0x100),
-                self.spifr.i_stb.eq(1),
+                self.spifr_bus.addr.eq(rom.ROM_OFFSET),
+                self.spifr_bus.len.eq(0x100),
+                self.spifr_bus.stb.eq(1),
             ]
             m.next = "SPI_TEST: WAIT"
 
         with m.State("SPI_TEST: WAIT"):
             m.d.sync += [
-                self.spifr.i_stb.eq(0),
+                self.spifr_bus.stb.eq(0),
                 fifo.w_en.eq(0),
             ]
             with m.If(fifo.r_level == TO_READ):
                 m.next = "SPI_TEST: WRITE LOOP"
-            with m.Elif(self.spifr.o_valid):
+            with m.Elif(self.spifr_bus.valid):
                 m.d.sync += [
-                    fifo.w_data.eq(self.spifr.o_data),
+                    fifo.w_data.eq(self.spifr_bus.data),
                     fifo.w_en.eq(1),
                 ]
 

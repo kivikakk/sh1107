@@ -75,9 +75,12 @@
 			"--ignore=E501,E203,W503,F821",
 		],
 		"clangd.fallbackFlags": [
-			"-I${workspaceFolder}/../osscad/share/yosys/include",
+			"-IC:/Users/kivikakk/Code/Python3/Lib/site-packages/amaranth_yosys/share/include",
 			"-I${workspaceFolder}/../oss-cad-suite/share/yosys/include",
 			"-I${workspaceFolder}",
 		],
+		"[cpp]": {
+			"editor.indentSize": 2,
+		}
 	}
 }

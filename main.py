@@ -39,11 +39,11 @@ def _build_top(args: Namespace, **kwargs: Any) -> Elaboratable:
     if "speed" in sig.parameters and "speed" in args:
         kwargs["speed"] = Hz(args.speed)
 
-    if "blackboxes" not in kwargs:
-        blackboxes = Blackboxes()
-        if not kwargs.get("whitebox_i2c", args.whitebox_i2c):
-            blackboxes.add(Blackbox.I2C)
-        kwargs["blackboxes"] = blackboxes
+    kwargs["blackboxes"] = blackboxes = kwargs.get("blackboxes", Blackboxes())
+    if kwargs.get("blackbox_i2c", args.blackbox_i2c):
+        blackboxes.add(Blackbox.I2C)
+    if kwargs.get("blackbox_spifr", args.blackbox_spifr):
+        blackboxes.add(Blackbox.SPIFR)
 
     return klass(**kwargs)
 
@@ -159,12 +159,17 @@ def vsh(args: Namespace):
     os.environ["AMARANTH_USE_YOSYS"] = "builtin"
     yosys = cast(YosysBinary, find_yosys(lambda _: True))
 
+    args.blackbox_spifr = True  # XXX: until we add an spifr whitebox
+
     design = _build_top(args)
 
     black_boxes = {}
-    if not args.whitebox_i2c:
+    if args.blackbox_i2c:
         with open(_path("vsh/i2c_blackbox.il"), "r") as f:
             black_boxes["i2c"] = f.read()
+    if args.blackbox_spifr:
+        with open(_path("vsh/spifr_blackbox.il"), "r") as f:
+            black_boxes["spifr"] = f.read()
 
     cxxrtl_cc_path = _path("build/sh1107.cc")
     _cxxrtl_convert_with_header(
@@ -175,8 +180,10 @@ def vsh(args: Namespace):
     )
 
     cc_o_paths = {cxxrtl_cc_path: cxxrtl_cc_path.with_suffix(".o")}
-    if not args.whitebox_i2c:
+    if args.blackbox_i2c:
         cc_o_paths[_path("vsh/i2c_blackbox.cc")] = _path("build/i2c_blackbox.o")
+    if args.blackbox_spifr:
+        cc_o_paths[_path("vsh/spifr_blackbox.cc")] = _path("build/spifr_blackbox.o")
 
     for cc_path, o_path in cc_o_paths.items():
         subprocess.run(
@@ -194,6 +201,9 @@ def vsh(args: Namespace):
             ],
             check=True,
         )
+
+    with open(Path(__file__).parent / "vsh" / "src" / "rom.bin", "wb") as f:
+        f.write(ROM_CONTENT)
 
     cmd: list[str] = ["zig", "build"]
     if not args.compile:
@@ -293,7 +303,8 @@ def main():
     vsh_parser.add_argument(
         "-i",
         "--whitebox-i2c",
-        action="store_true",
+        dest="blackbox_i2c",
+        action="store_false",
         help="simulate the full I2C protocol; by default it is replaced with a blackbox for speed",
     )
     vsh_parser.add_argument(
