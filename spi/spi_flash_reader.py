@@ -70,7 +70,7 @@ class SPIFlashReader(Elaboratable):
         rcv_bytecount = Signal.like(self.i_len)
 
         m.d.comb += [
-            self.spi_copi.eq(sr[31]),
+            self.spi_copi.eq(sr[-1]),
             self.spi_clk.eq(self.spi_cs & ~clk),
             self.o_data.eq(sr[:8]),
         ]
