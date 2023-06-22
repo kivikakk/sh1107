@@ -10,6 +10,7 @@ from amaranth_boards.icebreaker import ICEBreakerPlatform
 from common import Hz
 from i2c import I2C, I2CBus
 from oled import rom
+from options import Blackbox, Blackboxes
 from spi import SPIFlashReader
 from .clser import Clser
 from .locator import Locator
@@ -62,9 +63,10 @@ class OLED(Elaboratable):
         BUSY = 1
         FAILURE = 2
 
-    build_i2c: bool
+    blackboxes: Blackboxes
 
     i2c_bus: I2CBus
+    own_i2c_bus: I2CBus
     i2c: I2C | Instance
 
     spifr: SPIFlashReader
@@ -79,7 +81,6 @@ class OLED(Elaboratable):
     locator: Locator
     clser: Clser
     scroller: Scroller
-    own_i2c_bus: I2CBus
 
     i_fifo: SyncFIFO
     i_i2c_bb_in_ack: Signal  # For blackbox simulation only
@@ -94,13 +95,14 @@ class OLED(Elaboratable):
     chpr_data: Signal
     chpr_run: Signal
 
-    def __init__(self, *, speed: Hz, build_i2c: bool):
+    def __init__(self, *, speed: Hz, blackboxes: Blackboxes):
         assert speed.value in self.VALID_SPEEDS
 
-        self.build_i2c = build_i2c
+        self.blackboxes = blackboxes
 
         self.i2c_bus = I2CBus()
-        if build_i2c:
+        self.own_i2c_bus = I2CBus()
+        if Blackbox.I2C not in blackboxes:
             self.i2c = I2C(speed=speed)
         else:
             self.i_i2c_bb_in_ack = Signal()
@@ -135,7 +137,6 @@ class OLED(Elaboratable):
         self.locator = Locator(addr=OLED.ADDR)
         self.clser = Clser(addr=OLED.ADDR)
         self.scroller = Scroller(rom_bus=self.rom_bus, addr=OLED.ADDR)
-        self.own_i2c_bus = I2CBus()
 
         self.i_fifo = SyncFIFO(width=8, depth=1)
         self.o_result = Signal(OLED.Result, reset=OLED.Result.BUSY)
@@ -198,7 +199,7 @@ class OLED(Elaboratable):
                     rom_wr.en.eq(self.rom_wr_en),
                 ]
 
-        if self.build_i2c:
+        if Blackbox.I2C not in self.blackboxes:
             m.d.comb += self.i2c.bus.connect(self.i2c_bus)
 
         m.submodules.i2c = self.i2c

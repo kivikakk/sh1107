@@ -1,4 +1,4 @@
-#include "sh1107.cc"
+#include "build/sh1107.h"
 #include <iostream>
 
 /**

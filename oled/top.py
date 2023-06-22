@@ -8,6 +8,7 @@ from amaranth_boards.icebreaker import ICEBreakerPlatform
 from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
 
 from common import Button, ButtonWithHold, Hz
+from options import Blackbox, Blackboxes
 from .oled import OLED
 
 __all__ = ["Top"]
@@ -96,7 +97,7 @@ class Top(Elaboratable):
     oled: OLED
     sequences: list[list[int]]
     speed: Hz
-    build_i2c: bool
+    blackboxes: Blackboxes
 
     switches: list[Signal]
 
@@ -108,12 +109,12 @@ class Top(Elaboratable):
         *,
         sequences: list[list[int]] = SEQUENCES,
         speed: Hz = Hz(400_000),
-        build_i2c: bool = False,
+        blackboxes: Blackboxes = set(),
     ):
-        self.oled = OLED(speed=speed, build_i2c=build_i2c)
+        self.oled = OLED(speed=speed, blackboxes=blackboxes)
         self.sequences = sequences
         self.speed = speed
-        self.build_i2c = build_i2c
+        self.blackboxes = blackboxes
 
         self.switches = [Signal(name=f"switch_{i}") for i, _ in enumerate(sequences)]
 
@@ -128,7 +129,7 @@ class Top(Elaboratable):
     def ports(self) -> list[Signal]:
         ports = self.switches[:]
 
-        if self.build_i2c:
+        if Blackbox.I2C not in self.blackboxes:
             ports += [
                 self.oled.i2c.scl_o,
                 self.oled.i2c.scl_oe,

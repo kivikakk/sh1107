@@ -77,7 +77,7 @@
 		"clangd.fallbackFlags": [
 			"-I${workspaceFolder}/../osscad/share/yosys/include",
 			"-I${workspaceFolder}/../oss-cad-suite/share/yosys/include",
-			"-I${workspaceFolder}/build",
+			"-I${workspaceFolder}",
 		],
 	}
 }

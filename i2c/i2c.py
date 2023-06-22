@@ -1,6 +1,6 @@
 from typing import Final, Optional, Self, cast
 
-from amaranth import C, Elaboratable, Module, Record, Signal
+from amaranth import Elaboratable, Module, Record, Signal
 from amaranth.build import Attrs, Platform
 from amaranth.hdl.rec import DIR_FANIN, DIR_FANOUT
 from amaranth.lib import data, enum

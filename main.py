@@ -12,9 +12,9 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Type, cast
 from unittest import TestLoader, TextTestRunner
 
-from amaranth import Elaboratable
+from amaranth import Elaboratable, Signal
 from amaranth._toolchain.yosys import YosysBinary, find_yosys
-from amaranth.back import cxxrtl, rtlil
+from amaranth.back import rtlil
 from amaranth.build import Platform
 from amaranth.hdl import Fragment
 from amaranth_boards.icebreaker import ICEBreakerPlatform
@@ -23,6 +23,7 @@ from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
 from common import Hz
 from formal import formal as prep_formal
 from oled import OLED, ROM_CONTENT, ROM_OFFSET
+from options import Blackbox, Blackboxes
 
 BOARDS: Dict[str, Type[Platform]] = {
     "icebreaker": ICEBreakerPlatform,
@@ -38,8 +39,11 @@ def _build_top(args: Namespace, **kwargs: Any) -> Elaboratable:
     if "speed" in sig.parameters and "speed" in args:
         kwargs["speed"] = Hz(args.speed)
 
-    if not kwargs.get("build_i2c") and args.i2c:
-        kwargs["build_i2c"] = True
+    if "blackboxes" not in kwargs:
+        blackboxes = Blackboxes()
+        if not kwargs.get("whitebox_i2c", args.whitebox_i2c):
+            blackboxes.add(Blackbox.I2C)
+        kwargs["blackboxes"] = blackboxes
 
     return klass(**kwargs)
 
@@ -96,7 +100,7 @@ def _print_file_between(
 
 
 def build(args: Namespace):
-    elaboratable = _build_top(args, build_i2c=True)
+    elaboratable = _build_top(args)
 
     BOARDS[args.board]().build(
         elaboratable,
@@ -124,48 +128,72 @@ def rom(args: Namespace):
         subprocess.run(["iceprog", "-o", hex(ROM_OFFSET), path], check=True)
 
 
+def _cxxrtl_convert_with_header(
+    cc_out: Path,
+    design: Elaboratable,
+    *,
+    black_boxes: dict[str, str],
+    ports: list[Signal],
+) -> None:
+    if cc_out.is_absolute():
+        try:
+            cc_out = cc_out.relative_to(Path.cwd())
+        except ValueError:
+            raise AssertionError(
+                "cc_out must be relative to cwd for builtin-yosys to write to it"
+            )
+    rtlil_text = rtlil.convert(design, ports=ports)
+    yosys = find_yosys(lambda ver: ver >= (0, 10))
+    script = []
+    for box_source in black_boxes.values():
+        script.append(f"read_rtlil <<rtlil\n{box_source}\nrtlil")
+    script.append(f"read_rtlil <<rtlil\n{rtlil_text}\nrtlil")
+    script.append(f"write_cxxrtl -header {cc_out}")
+    yosys.run(["-q", "-"], "\n".join(script))
+
+
 def vsh(args: Namespace):
-    design = _build_top(args)
-
-    # NOTE(ari): works better on Windows since osscad's yosys-config a) doesn't
-    # execute cleanly automatically (bash script), and b) its answers are wrong
-    # anyway.
+    # NOTE: builtin-yosys works better on Windows since osscad's yosys-config a)
+    # doesn't execute cleanly as-is (bash script), and b) its answers are wrong
+    # anyway (!!!).
     os.environ["AMARANTH_USE_YOSYS"] = "builtin"
-
     yosys = cast(YosysBinary, find_yosys(lambda _: True))
 
-    with open(_path("vsh/i2c_blackbox.il"), "r") as f:
-        i2c_blackbox_rtlil = f.read()
+    design = _build_top(args)
 
-    output = cast(
-        str,
-        cxxrtl.convert(
-            design,
-            black_boxes={} if args.i2c else {"i2c": i2c_blackbox_rtlil},
-            ports=getattr(design, "ports", []),
-        ),
+    black_boxes = {}
+    if not args.whitebox_i2c:
+        with open(_path("vsh/i2c_blackbox.il"), "r") as f:
+            black_boxes["i2c"] = f.read()
+
+    cxxrtl_cc_path = _path("build/sh1107.cc")
+    _cxxrtl_convert_with_header(
+        cxxrtl_cc_path,
+        design,
+        black_boxes=black_boxes,
+        ports=getattr(design, "ports", []),
     )
-    cxxrtl_cc_file = _path("build/sh1107.cc")
-    with open(cxxrtl_cc_file, "w") as f:
-        f.write(output)
 
-    cxxrtl_lib_path = _path("build/sh1107.o")
+    cc_o_paths = {cxxrtl_cc_path: cxxrtl_cc_path.with_suffix(".o")}
+    if not args.whitebox_i2c:
+        cc_o_paths[_path("vsh/i2c_blackbox.cc")] = _path("build/i2c_blackbox.o")
 
-    subprocess.run(
-        [
-            "zig",
-            "c++",
-            "-DCXXRTL_INCLUDE_CAPI_IMPL",
-            "-DCXXRTL_INCLUDE_VCD_CAPI_IMPL",
-            "-I" + str(_path("build")),
-            "-I" + str(cast(Path, yosys.data_dir()) / "include"),
-            "-c",
-            cxxrtl_cc_file if args.i2c else _path("vsh/i2c_blackbox.cc"),
-            "-o",
-            cxxrtl_lib_path,
-        ],
-        check=True,
-    )
+    for cc_path, o_path in cc_o_paths.items():
+        subprocess.run(
+            [
+                "zig",
+                "c++",
+                "-DCXXRTL_INCLUDE_CAPI_IMPL",
+                "-DCXXRTL_INCLUDE_VCD_CAPI_IMPL",
+                "-I" + str(_path(".")),
+                "-I" + str(cast(Path, yosys.data_dir()) / "include"),
+                "-c",
+                cc_path,
+                "-o",
+                o_path,
+            ],
+            check=True,
+        )
 
     cmd: list[str] = ["zig", "build"]
     if not args.compile:
@@ -173,7 +201,7 @@ def vsh(args: Namespace):
     cmd += [
         *(["-Doptimize=ReleaseFast"] if args.opt else []),
         f"-Dyosys_data_dir={yosys.data_dir()}",
-        f"-Dcxxrtl_lib_path={cxxrtl_lib_path}",
+        f"-Dcxxrtl_lib_paths={','.join(str(o_path) for o_path in cc_o_paths.values())}",
     ]
     if not args.compile:
         cmd += ["--"]
@@ -264,7 +292,7 @@ def main():
     vsh_parser.set_defaults(func=vsh)
     vsh_parser.add_argument(
         "-i",
-        "--i2c",
+        "--whitebox-i2c",
         action="store_true",
         help="simulate the full I2C protocol; by default it is replaced with a blackbox for speed",
     )

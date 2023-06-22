@@ -4,7 +4,7 @@ const gkBuild = @import("vendor/zig-gamekit/build.zig");
 pub fn build(b: *std.Build) void {
     const yosys_data_dir = b.option([]const u8, "yosys_data_dir", "yosys data dir (e.g. per yosys-config --datdir)") orelse
         guessYosysDataDir(b);
-    const cxxrtl_lib_path = b.option([]const u8, "cxxrtl_lib_path", "path to CXXRTL-compiled .o") orelse
+    const cxxrtl_lib_paths = b.option([]const u8, "cxxrtl_lib_paths", "comma-separated paths to .o files to link against, including CXXRTL") orelse
         "../build/sh1107.o";
 
     const target = b.standardTargetOptions(.{});
@@ -17,7 +17,11 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     exe.linkLibCpp();
-    exe.addObjectFile(cxxrtl_lib_path);
+
+    var it = std.mem.split(u8, cxxrtl_lib_paths, ",");
+    while (it.next()) |cxxrtl_lib_path| {
+        exe.addObjectFile(cxxrtl_lib_path);
+    }
     exe.addIncludePath(b.fmt("{s}/include", .{yosys_data_dir}));
     gkBuild.addGameKitToArtifact(b, exe, target, "vendor/zig-gamekit/");
     b.installArtifact(exe);
