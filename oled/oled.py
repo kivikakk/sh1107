@@ -129,7 +129,7 @@ class OLED(Elaboratable):
 
         self.spifr_bus = SPIFlashReaderBus()
         if Blackbox.SPIFR not in blackboxes:
-            self.spifr = SPIFlashReader()
+            self.spifr = SPIFlashReader(blackboxes=blackboxes)
         else:
             self.spifr = Instance(
                 "spifr",

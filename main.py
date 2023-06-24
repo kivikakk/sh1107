@@ -170,6 +170,9 @@ def vsh(args: Namespace):
     if args.blackbox_spifr:
         with open(_path("vsh/spifr_blackbox.il"), "r") as f:
             black_boxes["spifr"] = f.read()
+    else:
+        with open(_path("vsh/spifr_whitebox.il"), "r") as f:
+            black_boxes["spifr_whitebox"] = f.read()
 
     cxxrtl_cc_path = _path("build/sh1107.cc")
     _cxxrtl_convert_with_header(
@@ -184,6 +187,8 @@ def vsh(args: Namespace):
         cc_o_paths[_path("vsh/i2c_blackbox.cc")] = _path("build/i2c_blackbox.o")
     if args.blackbox_spifr:
         cc_o_paths[_path("vsh/spifr_blackbox.cc")] = _path("build/spifr_blackbox.o")
+    else:
+        cc_o_paths[_path("vsh/spifr_whitebox.cc")] = _path("build/spifr_whitebox.o")
 
     for cc_path, o_path in cc_o_paths.items():
         subprocess.run(

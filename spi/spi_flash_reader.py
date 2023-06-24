@@ -1,13 +1,14 @@
 import math
 from typing import Optional, cast
 
-from amaranth import C, Cat, ClockSignal, Elaboratable, Module, Record, Signal
-from amaranth.build import Platform
+from amaranth import C, Cat, ClockSignal, Elaboratable, Instance, Module, Record, Signal
+from amaranth.build import Attrs, Pins, PinsN, Platform, Resource, Subsignal
 from amaranth.hdl.rec import DIR_FANIN, DIR_FANOUT
 from amaranth_boards.icebreaker import ICEBreakerPlatform
 from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
 
 import sim
+from options import Blackbox, Blackboxes
 
 __all__ = ["SPIFlashReaderBus", "SPIFlashReader"]
 
@@ -41,7 +42,13 @@ class SPIFlashReader(Elaboratable):
 
     bus: SPIFlashReaderBus
 
-    def __init__(self):
+    def __init__(
+        self,
+        *,
+        blackboxes: Blackboxes = set(),
+    ):
+        self.blackboxes = blackboxes
+
         self.spi_copi = Signal()
         self.spi_cipo = Signal()
         self.spi_cs = Signal()
@@ -55,14 +62,52 @@ class SPIFlashReader(Elaboratable):
         clk = ClockSignal()
 
         match platform:
-            case ICEBreakerPlatform(), OrangeCrabR0_2_85FPlatform():
+            case ICEBreakerPlatform():
                 spi = platform.request("spi_flash_1x")
                 self.spi_copi = spi.copi.o
                 self.spi_cipo = spi.cipo.i
                 self.spi_cs = spi.cs.o
                 self.spi_clk = spi.clk.o
+
+            case OrangeCrabR0_2_85FPlatform():
+                # XXX(Ch): At least until I know what the hell I'm doing here
+                # *and* have tested it.
+                platform.add_resources(
+                    [
+                        Resource(
+                            "custom_spi_flash",
+                            0,
+                            Subsignal("cs", PinsN("U17", dir="o")),
+                            # Subsignal("clk", Pins("", dir="i")),    # driven through USRMCLK
+                            Subsignal("cipo", Pins("T18", dir="i")),
+                            Subsignal("copi", Pins("U18", dir="o")),
+                            Subsignal("wp", PinsN("R18", dir="o")),
+                            Subsignal("hold", PinsN("N18", dir="o")),
+                            Attrs(IO_TYPE="LVCMOS33"),
+                        ),
+                    ]
+                )
+
+                spi = platform.request("custom_spi_flash")
+                self.spi_copi = spi.copi.o
+                self.spi_cipo = spi.cipo.i
+                self.spi_cs = spi.cs.o
+
+                m.submodules.usrmclk = Instance(
+                    "USRMCLK",
+                    i_USRMCLKI=self.spi_clk,
+                    i_USRMCLKTS=0,
+                )
+
             case _:
-                pass
+                if Blackbox.SPIFR_WHITEBOX in self.blackboxes:
+                    m.submodules.spifr_whitebox = Instance(
+                        "spifr_whitebox",
+                        i_clk=ClockSignal(),
+                        i_copi=self.spi_copi,
+                        o_cipo=self.spi_cipo,
+                        i_cs=self.spi_cs,
+                    )
 
         freq = (
             cast(int, platform.default_clk_frequency)

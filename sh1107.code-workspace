@@ -7,7 +7,10 @@
 			"path": "../amaranth",
 		},
 		{
-			"path": "../yosysvs/yosys",
+			"path": "../amaranth-boards",
+		},
+		{
+			"path": "../yosys",
 		},
 	],
 	"settings": {
@@ -36,6 +39,7 @@
 				"depth": 3,
 			}
 		],
+		"python.analysis.indexing": true,
 		"python.analysis.extraPaths": [
 			"../amaranth",
 			"../amaranth-soc",
@@ -58,6 +62,7 @@
 		// formatting
 		"[python]": {
 			"editor.defaultFormatter": "ms-python.python",
+			"editor.formatOnSave": true,
 			"editor.codeActionsOnSave": {
 				"source.organizeImports": true
 			},
@@ -74,13 +79,13 @@
 		"python.linting.flake8Args": [
 			"--ignore=E501,E203,W503,F821",
 		],
+		// c++
 		"clangd.fallbackFlags": [
-			"-IC:/Users/kivikakk/Code/Python3/Lib/site-packages/amaranth_yosys/share/include",
-			"-I${workspaceFolder}/../oss-cad-suite/share/yosys/include",
 			"-I${workspaceFolder}",
+			"-I${workspaceFolder}/venv/lib/python3.11/site-packages/amaranth_yosys/share/include",
 		],
 		"[cpp]": {
 			"editor.indentSize": 2,
 		}
-	}
+	},
 }
