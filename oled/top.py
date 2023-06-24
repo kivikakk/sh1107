@@ -145,6 +145,15 @@ class Top(Elaboratable):
                 self.oled.i_i2c_bb_in_out_fifo_data,
                 self.oled.i_i2c_bb_in_out_fifo_stb,
             ]
+
+        if Blackbox.SPIFR_WHITEBOX in self.blackboxes:
+            ports += [
+                self.oled.spifr.spi_copi,
+                self.oled.spifr.spi_cipo,
+                self.oled.spifr.spi_cs,
+                self.oled.spifr.spi_clk,
+            ]
+
         return ports
 
     def elaborate(self, platform: Optional[Platform]):

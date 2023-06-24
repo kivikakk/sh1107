@@ -5,6 +5,7 @@ from amaranth import C, Cat, ClockSignal, Elaboratable, Module, Record, Signal
 from amaranth.build import Platform
 from amaranth.hdl.rec import DIR_FANIN, DIR_FANOUT
 from amaranth_boards.icebreaker import ICEBreakerPlatform
+from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
 
 import sim
 
@@ -54,7 +55,7 @@ class SPIFlashReader(Elaboratable):
         clk = ClockSignal()
 
         match platform:
-            case ICEBreakerPlatform():
+            case ICEBreakerPlatform(), OrangeCrabR0_2_85FPlatform():
                 spi = platform.request("spi_flash_1x")
                 self.spi_copi = spi.copi.o
                 self.spi_cipo = spi.cipo.i

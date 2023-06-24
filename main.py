@@ -44,6 +44,8 @@ def _build_top(args: Namespace, **kwargs: Any) -> Elaboratable:
         blackboxes.add(Blackbox.I2C)
     if kwargs.get("blackbox_spifr", getattr(args, "blackbox_spifr", False)):
         blackboxes.add(Blackbox.SPIFR)
+    else:
+        blackboxes.add(Blackbox.SPIFR_WHITEBOX)
 
     return klass(**kwargs)
 
@@ -158,8 +160,6 @@ def vsh(args: Namespace):
     # anyway (!!!).
     os.environ["AMARANTH_USE_YOSYS"] = "builtin"
     yosys = cast(YosysBinary, find_yosys(lambda _: True))
-
-    args.blackbox_spifr = True  # XXX: until we add an spifr whitebox
 
     design = _build_top(args)
 
@@ -306,6 +306,13 @@ def main():
         dest="blackbox_i2c",
         action="store_false",
         help="simulate the full I2C protocol; by default it is replaced with a blackbox for speed",
+    )
+    vsh_parser.add_argument(
+        "-f",
+        "--whitebox-spifr",
+        dest="blackbox_spifr",
+        action="store_false",
+        help="simulate the full SPI protocol for the flash reader; by default it is replaced with a blackbox for speed",
     )
     vsh_parser.add_argument(
         "-c",

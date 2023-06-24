@@ -7,6 +7,7 @@ __all__ = ["Blackbox", "Blackboxes"]
 class Blackbox(Enum):
     I2C = 1
     SPIFR = 2
+    SPIFR_WHITEBOX = 3
 
 
 Blackboxes: TypeAlias = set[Blackbox]
