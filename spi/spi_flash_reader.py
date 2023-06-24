@@ -119,7 +119,7 @@ class SPIFlashReader(Elaboratable):
                         sr.eq(Cat(self.bus.addr, C(0x03, 8))),
                         snd_bitcount.eq(31),
                         rcv_bitcount.eq(7),
-                        rcv_bytecount.eq(self.bus.len),
+                        rcv_bytecount.eq(self.bus.len - 1),
                     ]
                     m.next = "SEND CMD"
 
