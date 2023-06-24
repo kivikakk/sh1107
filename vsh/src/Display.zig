@@ -64,14 +64,14 @@ const TopDrawState = struct {
     pub fn start(display: *Display) TopDrawState {
         return .{
             .display = display,
-            .left = @intToFloat(f32, DisplayBase.padding),
-            .top = @intToFloat(f32, DisplayBase.padding),
+            .left = @floatFromInt(f32, DisplayBase.padding),
+            .top = @floatFromInt(f32, DisplayBase.padding),
         };
     }
 
     pub fn check(self: *TopDrawState, name: []const u8, value: bool) void {
         gk.gfx.draw.textOptions(name, self.display.base.fontbook, .{
-            .x = self.left + @intToFloat(f32, DisplayBase.checkbox_size + DisplayBase.checkbox_text_gap),
+            .x = self.left + @floatFromInt(f32, DisplayBase.checkbox_size + DisplayBase.checkbox_text_gap),
             .y = self.top,
             .alignment = .left_middle,
             .color = DisplayBase.white,
@@ -79,14 +79,14 @@ const TopDrawState = struct {
         if (value) {
             // "bold"
             gk.gfx.draw.textOptions(name, self.display.base.fontbook, .{
-                .x = self.left + @intToFloat(f32, DisplayBase.checkbox_size + DisplayBase.checkbox_text_gap) + 0.5,
+                .x = self.left + @floatFromInt(f32, DisplayBase.checkbox_size + DisplayBase.checkbox_text_gap) + 0.5,
                 .y = self.top,
                 .alignment = .left_middle,
                 .color = DisplayBase.white,
             });
         }
 
-        const y = self.top - @intToFloat(f32, DisplayBase.checkbox_up);
+        const y = self.top - @floatFromInt(f32, DisplayBase.checkbox_up);
 
         if (value) {
             gk.gfx.draw.rect(
@@ -130,7 +130,7 @@ const TopDrawState = struct {
             );
         }
 
-        self.top += @intToFloat(f32, DisplayBase.top_row_height);
+        self.top += @floatFromInt(f32, DisplayBase.top_row_height);
     }
 
     pub fn fmt(self: *TopDrawState, name: []const u8, comptime f: []const u8, args: anytype) void {
@@ -144,12 +144,12 @@ const TopDrawState = struct {
             .alignment = .left_middle,
             .color = DisplayBase.white,
         });
-        self.top += @intToFloat(f32, DisplayBase.top_row_height);
+        self.top += @floatFromInt(f32, DisplayBase.top_row_height);
     }
 
     pub fn row(self: *TopDrawState) void {
-        self.left += @intToFloat(f32, DisplayBase.top_col_width);
-        self.top = @intToFloat(f32, DisplayBase.padding);
+        self.left += @floatFromInt(f32, DisplayBase.top_col_width);
+        self.top = @floatFromInt(f32, DisplayBase.padding);
     }
 };
 
@@ -157,7 +157,7 @@ fn drawTop(self: *Display, sh1107: *const SH1107) void {
     var tds = TopDrawState.start(self);
     tds.check("power on", sh1107.power);
     tds.check("dc/dc on", sh1107.dcdc);
-    tds.fmt("dclk", "{d}% {d}x", .{ @enumToInt(sh1107.dclk_freq), sh1107.dclk_ratio });
+    tds.fmt("dclk", "{d}% {d}x", .{ @intFromEnum(sh1107.dclk_freq), sh1107.dclk_ratio });
     tds.fmt("pre/dis", "{d}/{d}", .{ sh1107.precharge_period, sh1107.discharge_period });
     tds.fmt("vcom desel", "{x:0>2}", .{sh1107.vcom_desel});
 
@@ -193,8 +193,8 @@ fn drawOLED(self: *Display, sh1107: *const SH1107) void {
     if (sh1107.power) {
         gk.gfx.draw.hollowRect(
             .{
-                .x = @intToFloat(f32, DisplayBase.padding),
-                .y = @intToFloat(f32, DisplayBase.padding + DisplayBase.top_area),
+                .x = @floatFromInt(f32, DisplayBase.padding),
+                .y = @floatFromInt(f32, DisplayBase.padding + DisplayBase.top_area),
             },
             DisplayBase.border_fill_width,
             DisplayBase.border_fill_height,
@@ -203,23 +203,23 @@ fn drawOLED(self: *Display, sh1107: *const SH1107) void {
         );
 
         const x_factor = if (sh1107.com_scan_dir == .Backwards) @as(f32, -1) else @as(f32, 1);
-        const x_scale = @intToFloat(f32, DisplayBase.display_scale) * x_factor;
-        const shift = if (sh1107.com_scan_dir == .Backwards) @intToFloat(f32, DisplayBase.i2c_width) else 0;
-        const display_scale = @intToFloat(f32, DisplayBase.display_scale);
+        const x_scale = @floatFromInt(f32, DisplayBase.display_scale) * x_factor;
+        const shift = if (sh1107.com_scan_dir == .Backwards) @floatFromInt(f32, DisplayBase.i2c_width) else 0;
+        const display_scale = @floatFromInt(f32, DisplayBase.display_scale);
 
         const start_line = sh1107.start_line +% sh1107.start_offset;
 
         gk.gfx.draw.texScaleXYRegionAngle(
             self.img,
             .{
-                .x = @intToFloat(f32, DisplayBase.padding + DisplayBase.border_width) + @intToFloat(f32, DisplayBase.i2c_width) * display_scale,
-                .y = @intToFloat(f32, DisplayBase.padding + DisplayBase.border_width + DisplayBase.top_area) + shift * display_scale,
+                .x = @floatFromInt(f32, DisplayBase.padding + DisplayBase.border_width) + @floatFromInt(f32, DisplayBase.i2c_width) * display_scale,
+                .y = @floatFromInt(f32, DisplayBase.padding + DisplayBase.border_width + DisplayBase.top_area) + shift * display_scale,
             },
             .{
-                .x = @intToFloat(f32, start_line),
+                .x = @floatFromInt(f32, start_line),
                 .y = 0,
-                .w = @intToFloat(f32, DisplayBase.i2c_width - start_line),
-                .h = @intToFloat(f32, DisplayBase.i2c_height),
+                .w = @floatFromInt(f32, DisplayBase.i2c_width - start_line),
+                .h = @floatFromInt(f32, DisplayBase.i2c_height),
             },
             x_scale,
             DisplayBase.display_scale,
@@ -229,14 +229,14 @@ fn drawOLED(self: *Display, sh1107: *const SH1107) void {
             gk.gfx.draw.texScaleXYRegionAngle(
                 self.img,
                 .{
-                    .x = @intToFloat(f32, DisplayBase.padding + DisplayBase.border_width) + @intToFloat(f32, DisplayBase.i2c_width) * display_scale,
-                    .y = @intToFloat(f32, DisplayBase.padding + DisplayBase.border_width + DisplayBase.top_area) + (shift + @intToFloat(f32, DisplayBase.i2c_width - start_line) * x_factor) * display_scale,
+                    .x = @floatFromInt(f32, DisplayBase.padding + DisplayBase.border_width) + @floatFromInt(f32, DisplayBase.i2c_width) * display_scale,
+                    .y = @floatFromInt(f32, DisplayBase.padding + DisplayBase.border_width + DisplayBase.top_area) + (shift + @floatFromInt(f32, DisplayBase.i2c_width - start_line) * x_factor) * display_scale,
                 },
                 .{
                     .x = 0,
                     .y = 0,
-                    .w = @intToFloat(f32, start_line),
-                    .h = @intToFloat(f32, DisplayBase.i2c_height),
+                    .w = @floatFromInt(f32, start_line),
+                    .h = @floatFromInt(f32, DisplayBase.i2c_height),
                 },
                 x_scale,
                 DisplayBase.display_scale,
@@ -246,8 +246,8 @@ fn drawOLED(self: *Display, sh1107: *const SH1107) void {
     } else {
         gk.gfx.draw.rect(
             .{
-                .x = @intToFloat(f32, DisplayBase.padding),
-                .y = @intToFloat(f32, DisplayBase.padding + DisplayBase.top_area),
+                .x = @floatFromInt(f32, DisplayBase.padding),
+                .y = @floatFromInt(f32, DisplayBase.padding + DisplayBase.top_area),
             },
             DisplayBase.border_fill_width,
             DisplayBase.border_fill_height,
@@ -255,8 +255,8 @@ fn drawOLED(self: *Display, sh1107: *const SH1107) void {
         );
         gk.gfx.draw.hollowRect(
             .{
-                .x = @intToFloat(f32, DisplayBase.padding),
-                .y = @intToFloat(f32, DisplayBase.padding + DisplayBase.top_area),
+                .x = @floatFromInt(f32, DisplayBase.padding),
+                .y = @floatFromInt(f32, DisplayBase.padding + DisplayBase.top_area),
             },
             DisplayBase.border_fill_width,
             DisplayBase.border_fill_height,

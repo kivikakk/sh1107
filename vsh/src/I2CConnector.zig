@@ -49,7 +49,7 @@ pub fn tick(self: *@This()) Tick {
             // addressses us.
             if (!self.addressed) {
                 const addr: u7 = @truncate(u7, byte >> 1);
-                const rw = @intToEnum(RW, @truncate(u1, byte));
+                const rw = @enumFromInt(RW, @truncate(u1, byte));
                 if (addr == self.addr and rw == .W) {
                     self.sda_i.next(false);
                     self.addressed = true;
@@ -146,7 +146,7 @@ const ByteTransmitter = struct {
             .WAIT_BIT_SCL_RISE => {
                 if (self.rw == .W) {
                     if (scl_oe.stable_high() and scl_o.rising() and sda_oe.stable_high() and sda_o.stable()) {
-                        self.byte = (self.byte << 1) | @boolToInt(sda_o.curr);
+                        self.byte = (self.byte << 1) | @intFromBool(sda_o.curr);
                         self.state = .WAIT_BIT_SCL_FALL;
                         return .Pass;
                     } else if (!scl_oe.stable_high() or !sda_oe.stable_high()) {

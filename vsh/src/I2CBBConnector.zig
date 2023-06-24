@@ -98,7 +98,7 @@ pub fn tick(self: *I2CBBConnector) Tick {
 
 fn handleAddress(self: *I2CBBConnector, fifo: u9) ?RW {
     const addr: u7 = @truncate(u7, fifo >> 1);
-    const rw = @intToEnum(RW, @truncate(u1, fifo));
+    const rw = @enumFromInt(RW, @truncate(u1, fifo));
     if (addr == self.addr) {
         self.addressed = rw;
         self.bb_in_ack.next(true);
