@@ -9,26 +9,19 @@ import sys
 import warnings
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
-from typing import Any, Dict, Optional, Type, cast
+from typing import Any, Optional, cast
 from unittest import TestLoader, TextTestRunner
 
 from amaranth import Elaboratable, Signal
 from amaranth._toolchain.yosys import YosysBinary, find_yosys
 from amaranth.back import rtlil
-from amaranth.build import Platform
 from amaranth.hdl import Fragment
-from amaranth_boards.icebreaker import ICEBreakerPlatform
-from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
 
 from common import Hz
 from formal import formal as prep_formal
-from oled import OLED, ROM_CONTENT, ROM_OFFSET
+from oled import OLED, ROM_CONTENT
 from options import Blackbox, Blackboxes
-
-BOARDS: Dict[str, Type[Platform]] = {
-    "icebreaker": ICEBreakerPlatform,
-    "orangecrab": OrangeCrabR0_2_85FPlatform,
-}
+from target import TARGETS
 
 
 def _build_top(args: Namespace, **kwargs: Any) -> Elaboratable:
@@ -104,7 +97,7 @@ def _print_file_between(
 def build(args: Namespace):
     elaboratable = _build_top(args)
 
-    BOARDS[args.board]().build(
+    TARGETS[args.board].amaranth_platform().build(
         elaboratable,
         do_program=args.program,
         debug_verilog=args.verilog,
@@ -126,8 +119,21 @@ def rom(args: Namespace):
     with open(path, "wb") as f:
         f.write(ROM_CONTENT)
 
-    if args.program:
-        subprocess.run(["iceprog", "-o", hex(ROM_OFFSET), path], check=True)
+    # TODO: move this into targets.
+    match args.program:
+        case "icebreaker":
+            iceprog = os.environ.get("ICEPROG", "iceprog")
+            subprocess.run(
+                [iceprog, "-o", hex(TARGETS["icebreaker"].flash_rom_base), path],
+                check=True,
+            )
+        case "orangecrab":
+            dfu_util = os.environ.get("DFU_UTIL", "dfu-util")
+            subprocess.run([dfu_util, "-a 1", "-D", path], check=True)
+        case None:
+            pass
+        case _:
+            raise ValueError(f"unknown board {args.program}")
 
 
 def _cxxrtl_convert_with_header(
@@ -265,7 +271,7 @@ def main():
     )
     build_parser.add_argument(
         "board",
-        choices=BOARDS.keys(),
+        choices=TARGETS.keys(),
         help="which board to build for",
     )
     build_parser.add_argument(
@@ -296,8 +302,8 @@ def main():
     rom_parser.add_argument(
         "-p",
         "--program",
-        action="store_true",
-        help="program the ROM onto the board",
+        choices=TARGETS.keys(),
+        help="program the ROM onto the specified board",
     )
 
     vsh_parser = subparsers.add_parser(

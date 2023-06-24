@@ -258,7 +258,7 @@ class OLED(Elaboratable):
             with m.State("INIT: BEGIN"):
                 m.d.sync += [
                     self.own_rom_bus.addr.eq(0),
-                    self.spifr_bus.addr.eq(rom.ROM_OFFSET),
+                    self.spifr_bus.addr.eq(rom.ROM_OFFSET),  # XXX TODO
                     self.spifr_bus.len.eq(rom.ROM_LENGTH),
                     self.spifr_bus.stb.eq(1),
                 ]
@@ -764,7 +764,7 @@ class OLED(Elaboratable):
 
         with m.State("SPI_TEST: START"):
             m.d.sync += [
-                self.spifr_bus.addr.eq(rom.ROM_OFFSET),
+                self.spifr_bus.addr.eq(rom.ROM_OFFSET),  # XXX TODO
                 self.spifr_bus.len.eq(0x100),
                 self.spifr_bus.stb.eq(1),
             ]
