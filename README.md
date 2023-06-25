@@ -1,6 +1,7 @@
 # sh1107
 
-[![Build status](https://badge.buildkite.com/50b21967ee2e88d80db0bd35a97173a66f322b5d2141d21060.svg?branch=main)](https://buildkite.com/hrzn/sh1107)
+[![Build
+status](https://badge.buildkite.com/50b21967ee2e88d80db0bd35a97173a66f322b5d2141d21060.svg?branch=main)](https://buildkite.com/hrzn/sh1107)
 
 Hiy! I'm just learning to write gateware. This repository is a testbed for
 exploring [Amaranth](https://github.com/amaranth-lang/amaranth) while doing so.
@@ -28,23 +29,22 @@ options:
   -h, --help            show this help message and exit
 ```
 
-TODOs:
+The current test deployment targets are:
 
-- SPI flash blackbox for vsh
-- SPI flash whitebox for vsh
-- OrangeCrab:
-  - program/read flash
-  - try on-board DDR3 instead of EBR
-- pack 16-bit data for 16-bit wide memories
-- try QSPI
+* iCEBreaker ([Crowd
+  Supply](https://www.crowdsupply.com/1bitsquared/icebreaker-fpga),
+  [1BitSquared](https://1bitsquared.com/products/icebreaker)).
+  * Connect PMOD1 A1 to SDA, A2 to SCL.
+* OrangeCrab ([1BitSquared](https://1bitsquared.com/products/orangecrab)).
+  * Connect the pins named SDA and SCL.
+  * The code currently expects you have rev 0.2 with an 85F like I do. It's
+    trivial to add support for rev 0.1 and/or the 25F.
 
-The current test deployment target is the iCEBreaker ([Crowd
-Supply](https://www.crowdsupply.com/1bitsquared/icebreaker-fpga),
-[1BitSquared](https://1bitsquared.com/products/icebreaker)). Connect PMOD1 A1 to
-SDA, A2 to SCL.
+## TODOs
 
-Shortly I'll begin testing with the OrangeCrab
-([1BitSquared](https://1bitsquared.com/products/orangecrab)).
+- OrangeCrab: try on-board DDR3 instead of EBR.
+- pack 16-bit data for 16-bit wide memories.
+- try QSPI.
 
 ## vsh
 
@@ -62,11 +62,51 @@ own simulator, like the unit tests, but it was pretty slow. It's now written in
 its own thread by compiling it to C++ through Yosys's [CXXRTL
 backend](https://github.com/YosysHQ/yosys/tree/master/backends/cxxrtl).
 
-At the most fine-grained level (`vsh -i`), it responds to the gateware just
-somewhat permissively — edge detection at I²C level. This method is less slow
-than the pure Python version.
+```console
+$ ./main.py vsh -h
+usage: main vsh [-h] [-i] [-f] [-c] [-s {100000,400000,2000000}] [-t TOP]
+                [-v] [-O]
 
-By default, though, the I²C circuit is stubbed out with a
+options:
+  -h, --help            show this help message and exit
+  -i, --whitebox-i2c    simulate the full I2C protocol; by default it is
+                        replaced with a blackbox for speed
+  -f, --whitebox-spifr  simulate the full SPI protocol for the flash reader;
+                        by default it is replaced with a blackbox for speed
+  -c, --compile         compile only; don't run
+  -s {100000,400000,2000000}, --speed {100000,400000,2000000}
+                        I2C bus speed to build at
+  -t TOP, --top TOP     which top-level module to simulate (default:
+                        oled.Top)
+  -v, --vcd             output a VCD file
+  -O, --opt             build with -Doptimize=ReleaseFast
+```
+
+### I²C
+
+By default, the I²C circuit is stubbed out with a
 [blackbox](vsh/i2c_blackbox.cc) that acts close enough to the real controller
-for the rest of the design, and the Virtual SH1107 spies on the inputs to the
-blackbox directly. This is _much_ faster.
+for the rest of the design, and the Virtual SH1107
+[spies](vsh/src/I2CBBConnector.zig) on the inputs to the blackbox directly. This
+is fast.
+
+At the most fine-grained level (`vsh -i`), it responds to the gateware by doing
+edge detection at I²C level, [spying](vsh/src/I2CConnector.zig) on the I²C
+lines. This method is faster than the pure Python version I started with, but
+still slow enough to take several seconds to clear the screen.
+
+### SPI flash
+
+Sequences of SH1107 commands used by the driver are packed into a ROM image
+which is separately programmed onto the on-board flash.  The driver reads the
+contents into RAM on startup over SPI.
+
+By default, the SPI flash reader component is stubbed out with a
+[blackbox](vsh/spifr_blackbox.cc), which emulates the component's
+[interface](vsh/spifr_blackbox.il), returning data bytes directly to the OLED
+driver from the ROM embedded in the build.
+
+This blackbox can be replaced with a [whitebox](vsh/spifr_whitebox.cc), which
+emulates at one level lower, emulating the [SPI
+interface](vsh/spifr_whitebox.il) itself, returning data bitwise to the [flash
+reader](spi/spi_flash_reader.py).
