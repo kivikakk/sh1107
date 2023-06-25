@@ -141,15 +141,14 @@ class I2C(Elaboratable):
     formal_repeated_start: Optional[Signal]
     formal_stop: Optional[Signal]
 
-    def __init__(self, *, speed: Hz, formal: bool = False):
+    def __init__(self, *, speed: Hz):
         assert speed.value in self.VALID_SPEEDS
         self.speed = speed
 
-        # NOTE(Ch): formal hack for https://github.com/YosysHQ/yosys/issues/2577
-        self._in_fifo = SyncFIFO(width=9, depth=2 if formal else 1)
+        self._in_fifo = SyncFIFO(width=9, depth=1)
         self._in_fifo_r_data = Transfer(target=self._in_fifo.r_data)
 
-        self._out_fifo = SyncFIFO(width=8, depth=2 if formal else 1)
+        self._out_fifo = SyncFIFO(width=8, depth=1)
 
         self.bus = I2CBus()
         self.c = Counter(hz=speed.value * 2)
@@ -471,7 +470,7 @@ class I2CFormal(I2C):
     formal_stop: Signal
 
     def __init__(self, *, speed: Hz):
-        super().__init__(speed=speed, formal=True)
+        super().__init__(speed=speed)
         self.formal_scl = Signal(reset=1, name="formal_scl")
         self.formal_start = Signal(name="formal_start")
         self.formal_repeated_start = Signal(name="formal_repeated_start")

@@ -43,6 +43,10 @@ class Target(metaclass=TargetRegistry):
     def flash_rom(self, path: Path) -> None:
         raise NotImplementedError()
 
+    @property
+    def simulation(self) -> bool:
+        return False
+
 
 class icebreaker(Target):
     def platform(self):
@@ -83,3 +87,7 @@ class test(Target):
     @property
     def flash_rom_base(self) -> int:
         return 0x00_CAFE
+
+    @property
+    def simulation(self) -> bool:
+        return True

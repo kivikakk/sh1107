@@ -3,12 +3,13 @@ from typing import Final, Optional
 from amaranth import Elaboratable, Module, Signal
 from amaranth.build import Platform
 
+from ..base import Config, ConfigElaboratable
 from .timer import Timer
 
 __all__ = ["Debounce"]
 
 
-class Debounce(Elaboratable):
+class Debounce(ConfigElaboratable):
     DEFAULT_HOLD_TIME: Final[float] = 1e-2
     SIM_HOLD_TIME: Final[float] = 1e-4
 
@@ -17,8 +18,10 @@ class Debounce(Elaboratable):
     i: Signal
     o: Signal
 
-    def __init__(self, *, in_sim: bool = False):
-        self.hold_time = self.SIM_HOLD_TIME if in_sim else self.DEFAULT_HOLD_TIME
+    def __init__(self, *, config: Config):
+        self.hold_time = (
+            self.SIM_HOLD_TIME if config.target.simulation else self.DEFAULT_HOLD_TIME
+        )
 
         self.i = Signal()
         self.o = Signal()

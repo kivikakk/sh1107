@@ -11,7 +11,17 @@ from amaranth.hdl.ast import Operator, Statement
 from amaranth.lib.fifo import SyncFIFO
 from amaranth.sim import Delay, Settle, Simulator
 
-__all__ = ["clock", "Procedure", "TestCase", "args", "i2c_speeds", "always_args"]
+from .base import Config, ConfigElaboratable, path
+
+__all__ = [
+    "clock",
+    "Procedure",
+    "TestCase",
+    "args",
+    "i2c_speeds",
+    "always_args",
+    "fifo_content",
+]
 
 _active_clock = 1 / 12e6
 
@@ -86,11 +96,8 @@ class TestCase(unittest.TestCase):
             else:
                 target = name
 
-            dutc_sig = inspect.signature(dutc)
-            in_simp = dutc_sig.parameters.get("in_sim")
-            if in_simp is not None:
-                assert in_simp.annotation is bool
-                sim_args[1]["in_sim"] = True
+            if issubclass(dutc, ConfigElaboratable):
+                sim_args[1]["config"] = Config.test
 
             for args, kwargs in sim_always_args:
                 sim_args = (args + sim_args[0], {**kwargs, **sim_args[1]})
@@ -106,8 +113,6 @@ class TestCase(unittest.TestCase):
                 sim = Simulator(dut)
                 sim.add_clock(clock())
                 sim.add_sync_process(bench)
-
-                from .base import path
 
                 vcd_path = path(f"build/{cls.__name__}.{target}.vcd")
                 sim_exc = None

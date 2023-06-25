@@ -1,15 +1,16 @@
 from typing import Final, Optional
 
-from amaranth import Elaboratable, Module, Signal
+from amaranth import Module, Signal
 from amaranth.build import Platform
 
+from ..base import Config, ConfigElaboratable
 from .debounce import Debounce
 from .timer import Timer
 
 __all__ = ["Button", "ButtonWithHold"]
 
 
-class Button(Elaboratable):
+class Button(ConfigElaboratable):
     """
     A simple debounced button.
 
@@ -25,8 +26,8 @@ class Button(Elaboratable):
     debounce: Debounce
     __registered: Signal
 
-    def __init__(self, *, in_sim: bool = False):
-        self.debounce = Debounce(in_sim=in_sim)
+    def __init__(self, *, config: Config):
+        self.debounce = Debounce(config=config)
         self.__registered = Signal()
 
         self.i = Signal()
@@ -65,11 +66,11 @@ class ButtonWithHold(Button):
 
     o_held: Signal
 
-    def __init__(self, *, hold_time: Optional[float] = None, in_sim: bool = False):
-        super().__init__(in_sim=in_sim)
+    def __init__(self, *, hold_time: Optional[float] = None, config: Config):
+        super().__init__(config=config)
 
         self.hold_time = hold_time or (
-            self.SIM_HOLD_TIME if in_sim else self.DEFAULT_HOLD_TIME
+            self.SIM_HOLD_TIME if config.target.simulation else self.DEFAULT_HOLD_TIME
         )
 
         self.o_held = Signal()

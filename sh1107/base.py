@@ -7,7 +7,6 @@ from typing import Any, Final, Self, TypeAlias
 
 from amaranth import Elaboratable
 
-from .common import Hz
 from .target import Target
 
 __all__ = [
@@ -51,6 +50,8 @@ class ConfigElaboratable(Elaboratable):
 
 
 def build_top(args: Namespace, target: Target, **kwargs: Any) -> Elaboratable:
+    from .common import Hz
+
     mod, klass_name = args.top.rsplit(".", 1)
     klass = getattr(importlib.import_module(mod), klass_name)
 

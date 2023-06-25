@@ -3,6 +3,8 @@ from argparse import ArgumentParser, Namespace
 from pathlib import Path
 from unittest import TestLoader, TextTestRunner
 
+__all__ = ["add_main_arguments"]
+
 
 def add_main_arguments(parser: ArgumentParser):
     parser.set_defaults(func=main)

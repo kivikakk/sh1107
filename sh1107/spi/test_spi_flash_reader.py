@@ -10,6 +10,8 @@ from ..base import Config
 from .spi_flash_reader import SPIFlashReader
 
 
+# TODO(Ch): try using this + initted Memory in vsh instead of the whitebox, just
+# to see how hard/easy it is.
 class MockSPIFlashPeripheral(Elaboratable):
     data: Value
 

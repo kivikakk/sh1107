@@ -26,7 +26,3 @@ class TestTimer(sim.TestCase):
         yield
         yield Settle()
         assert not (yield d.o)
-
-
-if __name__ == "__main__":
-    unittest.main()

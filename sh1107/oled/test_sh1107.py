@@ -453,7 +453,3 @@ class TestSH1107Command(unittest.TestCase):
                 case "U":
                     self.assertFalse(parser.valid_finish, msg)
                     self.assertTrue(parser.unrecoverable, msg)
-
-
-if __name__ == "__main__":
-    unittest.main()

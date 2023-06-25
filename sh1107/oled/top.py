@@ -173,7 +173,9 @@ class Top(ConfigElaboratable):
                     except ResourceError:
                         break
                     else:
-                        m.submodules[f"button_{i}"] = button = Button()
+                        m.submodules[f"button_{i}"] = button = Button(
+                            config=self.config
+                        )
                         m.d.comb += button.i.eq(switch)
                         button_up_signals.append(button.o_up)
 
@@ -194,7 +196,7 @@ class Top(ConfigElaboratable):
                 ]
 
                 main_switch = cast(Signal, platform.request("button", 0).i)
-                m.submodules.button_0 = button_0 = ButtonWithHold()
+                m.submodules.button_0 = button_0 = ButtonWithHold(config=self.config)
                 m.d.comb += button_0.i.eq(main_switch)
                 button_up_signals.append(button_0.o_up)
 
@@ -208,7 +210,9 @@ class Top(ConfigElaboratable):
                     except ResourceError:
                         break
                     else:
-                        m.submodules[f"button_{i}"] = button = Button()
+                        m.submodules[f"button_{i}"] = button = Button(
+                            config=self.config
+                        )
                         m.d.comb += button.i.eq(switch)
                         button_up_signals.append(button.o_up)
 

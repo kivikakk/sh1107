@@ -6,6 +6,8 @@ from .base import build_top
 from .oled import OLED
 from .target import Target
 
+__all__ = ["add_main_arguments"]
+
 
 def add_main_arguments(parser: ArgumentParser):
     parser.set_defaults(func=main)

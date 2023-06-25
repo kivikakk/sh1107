@@ -70,7 +70,3 @@ class TestButton(sim.TestCase):
         yield from self._button_up(b)
         assert (yield b.o_up & b.o_held)
         yield from self._button_up_post(b)
-
-
-if __name__ == "__main__":
-    unittest.main()
