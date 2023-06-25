@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Final, TypeAlias
+from typing import Final, Self, TypeAlias
 
 from amaranth import Elaboratable
 
@@ -24,6 +24,11 @@ class Config:
     def __init__(self, *, target: Target, blackboxes: Blackboxes):
         self.target = target
         self.blackboxes = blackboxes
+
+    @classmethod
+    @property
+    def test(cls) -> Self:
+        return Config(target=Target["test"], blackboxes=set())
 
 
 class ConfigElaboratable(Elaboratable):

@@ -26,7 +26,7 @@ from target import Target
 
 def _args_target(args: Namespace | str) -> Target:
     name = args.target if isinstance(args, Namespace) else args
-    return Target.registry[name]()
+    return Target[name]
 
 
 def _build_top(args: Namespace, target: Target, **kwargs: Any) -> Elaboratable:
@@ -267,7 +267,7 @@ def main():
     )
     build_parser.add_argument(
         "target",
-        choices=Target.registry.keys(),
+        choices=Target.platform_targets,
         help="which board to build for",
     )
     build_parser.add_argument(
@@ -299,7 +299,7 @@ def main():
         "-p",
         "--program",
         dest="target",
-        choices=Target.registry.keys(),
+        choices=Target.platform_targets,
         help="program the ROM onto the specified board",
     )
 

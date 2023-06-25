@@ -6,6 +6,7 @@ from amaranth.hdl.ast import ValueCastable
 from amaranth.lib.fifo import SyncFIFO
 
 import sim
+from base import Config
 from .spi_flash_reader import SPIFlashReader
 
 
@@ -103,7 +104,7 @@ class TestSPIFlashReaderTop(Elaboratable):
         self.o_fifo = SyncFIFO(width=8, depth=self.len)
         self.o_busy = Signal()
 
-        self.spifr = SPIFlashReader()
+        self.spifr = SPIFlashReader(config=Config.test)
         self.peripheral = MockSPIFlashPeripheral(data=self.data)
 
     def elaborate(self, platform: Optional[Platform]) -> Module:
