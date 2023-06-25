@@ -47,24 +47,25 @@ The current test deployment targets are:
 
 ## Requirements
 
-By "recent enough" I mean a recent release or the version in your package
-manager is probably fine, and neither applies, just try the latest commit.
+If no version is specified, the most recent release or the version in your
+package manager is probably fine, and if neither concept applies, just try the
+latest commit.
 
 To run at all:
 
 * [Python 3] (3.7+ likely works; I work on 3.12 beta)
 * [Amaranth] ([`d218273`] or later)
-* [Board definitions for Amaranth][amaranth-boards] (recent enough)
-* [Yosys] (recent enough; see below for formal)
+* [Board definitions for Amaranth][amaranth-boards]
+* [Yosys]
 
 To run vsh:
 
 * [Zig] (~[`50339f5`] or later)
-* [SDL2] (recent enough)
+* [SDL2]
 
 To build and deploy:
 
-* [nextpnr] (recent enough) configured with appropriate flows:
+* [nextpnr] configured with appropriate flows:
   * [Project IceStorm] for iCEBreaker
   * [Project Trellis] for OrangeCrab
     * [`dfu-util`] to upload the bitstream and ROM
@@ -72,7 +73,7 @@ To build and deploy:
 To run formal tests:
 
 * [Yosys] ([`d3ee4eb`] or later)
-* [SymbiYosys] (recent enough)
+* [SymbiYosys]
 * [Z3] (4.12+ is known to work; 4.8 is known not to)
 
 [Python 3]: https://www.python.org
