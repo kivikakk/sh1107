@@ -9,9 +9,9 @@ from amaranth import Elaboratable, Signal
 from amaranth._toolchain.yosys import YosysBinary, find_yosys
 from amaranth.back import rtlil
 
-from .base import build_top, path
-from .oled import OLED, rom
-from .target import Target
+from ..base import build_top, path
+from ..oled import OLED, rom
+from ..target import Target
 
 __all__ = ["add_main_arguments"]
 
