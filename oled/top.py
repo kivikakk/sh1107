@@ -1,14 +1,14 @@
 from typing import Optional, cast
 
-from amaranth import Cat, Elaboratable, Memory, Module, Record, Signal
+from amaranth import Cat, Memory, Module, Record, Signal
 from amaranth.build import Platform
 from amaranth.build.res import ResourceError
 from amaranth.hdl.mem import ReadPort
 from amaranth_boards.icebreaker import ICEBreakerPlatform
 from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
 
+from base import Blackbox, Config, ConfigElaboratable
 from common import Button, ButtonWithHold, Hz
-from options import Blackbox, Blackboxes
 from .oled import OLED
 
 __all__ = ["Top"]
@@ -95,11 +95,10 @@ SEQUENCES.append(
 )
 
 
-class Top(Elaboratable):
+class Top(ConfigElaboratable):
     oled: OLED
     sequences: list[list[int]]
     speed: Hz
-    blackboxes: Blackboxes
 
     switches: list[Signal]
 
@@ -109,14 +108,14 @@ class Top(Elaboratable):
     def __init__(
         self,
         *,
+        config: Config,
         sequences: list[list[int]] = SEQUENCES,
         speed: Hz = Hz(400_000),
-        blackboxes: Blackboxes = set(),
     ):
-        self.oled = OLED(speed=speed, blackboxes=blackboxes)
+        super().__init__(config)
+        self.oled = OLED(config=config, speed=speed)
         self.sequences = sequences
         self.speed = speed
-        self.blackboxes = blackboxes
 
         self.switches = [Signal(name=f"switch_{i}") for i, _ in enumerate(sequences)]
 
@@ -131,7 +130,7 @@ class Top(Elaboratable):
     def ports(self) -> list[Signal]:
         ports = self.switches[:]
 
-        if Blackbox.I2C not in self.blackboxes:
+        if Blackbox.I2C not in self.config.blackboxes:
             ports += [
                 self.oled.i2c.scl_o,
                 self.oled.i2c.scl_oe,

@@ -9,7 +9,7 @@ var display: Display = undefined;
 pub var write_vcd: bool = false;
 
 export const spi_flash_content = @embedFile("rom.bin");
-export const spi_flash_base: u32 = 0x800000;
+export const spi_flash_base: u32 = 0xABCDEF;
 export const spi_flash_length: u32 = spi_flash_content.len;
 
 pub fn main() !void {

@@ -1,16 +1,16 @@
 import math
 from typing import Final, Optional
 
-from amaranth import C, ClockSignal, Elaboratable, Instance, Memory, Module, Mux, Signal
+from amaranth import C, ClockSignal, Instance, Memory, Module, Mux, Signal
 from amaranth.build import Platform
 from amaranth.lib.enum import IntEnum
 from amaranth.lib.fifo import SyncFIFO
 from amaranth_boards.icebreaker import ICEBreakerPlatform
 
+from base import Blackbox, Config, ConfigElaboratable
 from common import Hz
 from i2c import I2C, I2CBus
 from oled import rom
-from options import Blackbox, Blackboxes
 from spi import SPIFlashReader, SPIFlashReaderBus
 from .clser import Clser
 from .locator import Locator
@@ -20,7 +20,7 @@ from .scroller import Scroller
 __all__ = ["OLED"]
 
 
-class OLED(Elaboratable):
+class OLED(ConfigElaboratable):
     ADDR: Final[int] = 0x3C
 
     # 1MHz is a bit unacceptable.  It seems to mostly work, except that
@@ -63,8 +63,6 @@ class OLED(Elaboratable):
         BUSY = 1
         FAILURE = 2
 
-    blackboxes: Blackboxes
-
     i2c_bus: I2CBus
     own_i2c_bus: I2CBus
     i2c: I2C | Instance
@@ -97,14 +95,19 @@ class OLED(Elaboratable):
     chpr_data: Signal
     chpr_run: Signal
 
-    def __init__(self, *, speed: Hz, blackboxes: Blackboxes):
-        assert speed.value in self.VALID_SPEEDS
+    def __init__(
+        self,
+        *,
+        config: Config,
+        speed: Hz,
+    ):
+        super().__init__(config)
 
-        self.blackboxes = blackboxes
+        assert speed.value in self.VALID_SPEEDS
 
         self.i2c_bus = I2CBus()
         self.own_i2c_bus = I2CBus()
-        if Blackbox.I2C not in blackboxes:
+        if Blackbox.I2C not in self.config.blackboxes:
             self.i2c = I2C(speed=speed)
         else:
             self.i_i2c_bb_in_ack = Signal()
@@ -128,8 +131,8 @@ class OLED(Elaboratable):
             )
 
         self.spifr_bus = SPIFlashReaderBus()
-        if Blackbox.SPIFR not in blackboxes:
-            self.spifr = SPIFlashReader(blackboxes=blackboxes)
+        if Blackbox.SPIFR not in self.config.blackboxes:
+            self.spifr = SPIFlashReader(config=self.config)
         else:
             self.spifr = Instance(
                 "spifr",
@@ -213,10 +216,10 @@ class OLED(Elaboratable):
                     rom_wr.en.eq(self.rom_wr_en),
                 ]
 
-        if Blackbox.I2C not in self.blackboxes:
+        if Blackbox.I2C not in self.config.blackboxes:
             m.d.comb += self.i2c.bus.connect(self.i2c_bus)
 
-        if Blackbox.SPIFR not in self.blackboxes:
+        if Blackbox.SPIFR not in self.config.blackboxes:
             m.d.comb += self.spifr.bus.connect(self.spifr_bus)
 
         m.submodules.i2c = self.i2c
@@ -258,7 +261,7 @@ class OLED(Elaboratable):
             with m.State("INIT: BEGIN"):
                 m.d.sync += [
                     self.own_rom_bus.addr.eq(0),
-                    self.spifr_bus.addr.eq(rom.ROM_OFFSET),  # XXX TODO
+                    self.spifr_bus.addr.eq(self.config.target.flash_rom_base),
                     self.spifr_bus.len.eq(rom.ROM_LENGTH),
                     self.spifr_bus.stb.eq(1),
                 ]
@@ -764,7 +767,7 @@ class OLED(Elaboratable):
 
         with m.State("SPI_TEST: START"):
             m.d.sync += [
-                self.spifr_bus.addr.eq(rom.ROM_OFFSET),  # XXX TODO
+                self.spifr_bus.addr.eq(self.config.target.flash_rom_base),
                 self.spifr_bus.len.eq(0x100),
                 self.spifr_bus.stb.eq(1),
             ]

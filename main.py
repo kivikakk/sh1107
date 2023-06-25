@@ -17,14 +17,19 @@ from amaranth._toolchain.yosys import YosysBinary, find_yosys
 from amaranth.back import rtlil
 from amaranth.hdl import Fragment
 
+from base import Blackbox, Blackboxes, Config
 from common import Hz
 from formal import formal as prep_formal
 from oled import OLED, ROM_CONTENT
-from options import Blackbox, Blackboxes
-from target import TARGETS
+from target import Target
 
 
-def _build_top(args: Namespace, **kwargs: Any) -> Elaboratable:
+def _args_target(args: Namespace | str) -> Target:
+    name = args.target if isinstance(args, Namespace) else args
+    return Target.registry[name]()
+
+
+def _build_top(args: Namespace, target: Target, **kwargs: Any) -> Elaboratable:
     mod, klass_name = args.top.rsplit(".", 1)
     klass = getattr(importlib.import_module(mod), klass_name)
 
@@ -32,13 +37,15 @@ def _build_top(args: Namespace, **kwargs: Any) -> Elaboratable:
     if "speed" in sig.parameters and "speed" in args:
         kwargs["speed"] = Hz(args.speed)
 
-    kwargs["blackboxes"] = blackboxes = kwargs.get("blackboxes", Blackboxes())
+    blackboxes = kwargs.pop("blackboxes", Blackboxes())
     if kwargs.get("blackbox_i2c", getattr(args, "blackbox_i2c", False)):
         blackboxes.add(Blackbox.I2C)
     if kwargs.get("blackbox_spifr", getattr(args, "blackbox_spifr", False)):
         blackboxes.add(Blackbox.SPIFR)
     else:
         blackboxes.add(Blackbox.SPIFR_WHITEBOX)
+
+    kwargs["config"] = Config(target=target, blackboxes=blackboxes)
 
     return klass(**kwargs)
 
@@ -95,10 +102,12 @@ def _print_file_between(
 
 
 def build(args: Namespace):
-    elaboratable = _build_top(args)
+    target = _args_target(args)
 
-    TARGETS[args.board].amaranth_platform().build(
-        elaboratable,
+    component = _build_top(args, target)
+
+    target.platform().build(
+        component,
         do_program=args.program,
         debug_verilog=args.verilog,
         yosys_opts="-g",
@@ -119,21 +128,8 @@ def rom(args: Namespace):
     with open(path, "wb") as f:
         f.write(ROM_CONTENT)
 
-    # TODO: move this into targets.
-    match args.program:
-        case "icebreaker":
-            iceprog = os.environ.get("ICEPROG", "iceprog")
-            subprocess.run(
-                [iceprog, "-o", hex(TARGETS["icebreaker"].flash_rom_base), path],
-                check=True,
-            )
-        case "orangecrab":
-            dfu_util = os.environ.get("DFU_UTIL", "dfu-util")
-            subprocess.run([dfu_util, "-a 1", "-D", path], check=True)
-        case None:
-            pass
-        case _:
-            raise ValueError(f"unknown board {args.program}")
+    if args.target:
+        _args_target(args).flash_rom(path)
 
 
 def _cxxrtl_convert_with_header(
@@ -167,7 +163,7 @@ def vsh(args: Namespace):
     os.environ["AMARANTH_USE_YOSYS"] = "builtin"
     yosys = cast(YosysBinary, find_yosys(lambda _: True))
 
-    design = _build_top(args)
+    design = _build_top(args, _args_target("vsh"))
 
     black_boxes = {}
     if args.blackbox_i2c:
@@ -270,8 +266,8 @@ def main():
         default="oled.Top",
     )
     build_parser.add_argument(
-        "board",
-        choices=TARGETS.keys(),
+        "target",
+        choices=Target.registry.keys(),
         help="which board to build for",
     )
     build_parser.add_argument(
@@ -302,7 +298,8 @@ def main():
     rom_parser.add_argument(
         "-p",
         "--program",
-        choices=TARGETS.keys(),
+        dest="target",
+        choices=Target.registry.keys(),
         help="program the ROM onto the specified board",
     )
 

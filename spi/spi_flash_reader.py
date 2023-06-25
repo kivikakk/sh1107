@@ -1,14 +1,14 @@
 import math
 from typing import Optional, cast
 
-from amaranth import C, Cat, ClockSignal, Elaboratable, Instance, Module, Record, Signal
+from amaranth import C, Cat, ClockSignal, Instance, Module, Record, Signal
 from amaranth.build import Attrs, Pins, PinsN, Platform, Resource, Subsignal
 from amaranth.hdl.rec import DIR_FANIN, DIR_FANOUT
 from amaranth_boards.icebreaker import ICEBreakerPlatform
 from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
 
 import sim
-from options import Blackbox, Blackboxes
+from base import Blackbox, Config, ConfigElaboratable
 
 __all__ = ["SPIFlashReaderBus", "SPIFlashReader"]
 
@@ -34,7 +34,7 @@ class SPIFlashReaderBus(Record):
         )
 
 
-class SPIFlashReader(Elaboratable):
+class SPIFlashReader(ConfigElaboratable):
     spi_copi: Signal
     spi_cipo: Signal
     spi_cs: Signal
@@ -45,9 +45,9 @@ class SPIFlashReader(Elaboratable):
     def __init__(
         self,
         *,
-        blackboxes: Blackboxes = set(),
+        config: Config,
     ):
-        self.blackboxes = blackboxes
+        super().__init__(config)
 
         self.spi_copi = Signal()
         self.spi_cipo = Signal()
@@ -100,7 +100,7 @@ class SPIFlashReader(Elaboratable):
                 )
 
             case _:
-                if Blackbox.SPIFR_WHITEBOX in self.blackboxes:
+                if Blackbox.SPIFR_WHITEBOX in self.config.blackboxes:
                     m.submodules.spifr_whitebox = Instance(
                         "spifr_whitebox",
                         i_clk=ClockSignal(),
