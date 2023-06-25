@@ -32,6 +32,6 @@ for opts in "-c" "-cfi"; do
 done
 
 echo "--- Formal verification"
-"$PYTHON" -m sh1107 formal
+YOSYS="${YOSYS:-$(which yosys)}" "$PYTHON" -m sh1107 formal
 
 echo "+++ All passed."
