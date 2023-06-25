@@ -1,17 +1,19 @@
 # sh1107
 
-[![Build
-status](https://badge.buildkite.com/50b21967ee2e88d80db0bd35a97173a66f322b5d2141d21060.svg?branch=main)](https://buildkite.com/hrzn/sh1107)
+[![Build status]](https://buildkite.com/hrzn/sh1107)
 
-Hiy! I'm just learning to write gateware. This repository is a testbed for
-exploring [Amaranth](https://github.com/amaranth-lang/amaranth) while doing so.
-It contains a read/write I²C controller, plus a basic driver for SH1107-type
-OLEDs over I²C, such as the [Pimoroni 1.12" 128x128 monochrome
-OLED](https://shop.pimoroni.com/products/1-12-oled-breakout). The driver
-supports simple commands akin to old BASIC: `CLS`, `PRINT`, `LOCATE`. The
-classic IBM 8x8 font is used to this end.
+This repository is a testbed for exploring [Amaranth] while learning digital
+design. It consists of a basic driver for SH1107-type OLEDs over I²C such as the
+[Pimoroni 1.12" 128x128 monochrome OLED][Pimoroni OLED], a read/write I²C
+controller, plus a simple SPI flash reader. The driver supports commands akin to
+old BASIC: `CLS`, `PRINT`, `LOCATE`. The classic IBM 8x8 font is used to this
+end.
 
-There's an entry-point in the root which exposes the various things it can do:
+[Build status]: https://badge.buildkite.com/50b21967ee2e88d80db0bd35a97173a66f322b5d2141d21060.svg?branch=main
+[Amaranth]: https://github.com/amaranth-lang/amaranth
+[Pimoroni OLED]: https://shop.pimoroni.com/products/1-12-oled-breakout
+
+Execute the package to see what it can do:
 
 ```console
 $ py -m sh1107 -h
@@ -31,14 +33,63 @@ options:
 
 The current test deployment targets are:
 
-* iCEBreaker ([Crowd
-  Supply](https://www.crowdsupply.com/1bitsquared/icebreaker-fpga),
-  [1BitSquared](https://1bitsquared.com/products/icebreaker)).
+* iCEBreaker ([Crowd Supply][iCEBreaker on Crowd Supply],
+  [1BitSquared][iCEBreaker on 1BitSquared]).
   * Connect PMOD1 A1 to SDA, A2 to SCL.
-* OrangeCrab ([1BitSquared](https://1bitsquared.com/products/orangecrab)).
+* OrangeCrab ([1BitSquared][OrangeCrab on 1BitSquared]).
   * Connect the pins named SDA and SCL.
   * The code currently expects you have rev 0.2 with an 85F like I do. It's
     trivial to add support for rev 0.1 and/or the 25F.
+
+[iCEBreaker on Crowd Supply]: https://www.crowdsupply.com/1bitsquared/icebreaker-fpga
+[iCEBreaker on 1BitSquared]: https://1bitsquared.com/products/icebreaker
+[OrangeCrab on 1BitSquared]: https://1bitsquared.com/products/orangecrab
+
+## Requirements
+
+By "recent enough" I mean a recent release or the version in your package
+manager is probably fine, and neither applies, just try the latest commit.
+
+To run at all:
+
+* [Python 3] (3.7+ likely works; I work on 3.12 beta)
+* [Amaranth] ([`d218273`] or later)
+* [Board definitions for Amaranth][amaranth-boards] (recent enough)
+* [Yosys] (recent enough; see below for formal)
+
+To run vsh:
+
+* [Zig] (~[`50339f5`] or later)
+* [SDL2] (recent enough)
+
+To build and deploy:
+
+* [nextpnr] (recent enough) configured with appropriate flows:
+  * [Project IceStorm] for iCEBreaker
+  * [Project Trellis] for OrangeCrab
+    * [`dfu-util`] to upload the bitstream and ROM
+
+To run formal tests:
+
+* [Yosys] ([`d3ee4eb`] or later)
+* [SymbiYosys] (recent enough)
+* [Z3] (4.12+ is known to work; 4.8 is known not to)
+
+[Python 3]: https://www.python.org
+[`d218273`]: https://github.com/amaranth-lang/amaranth/commit/d218273b9b2c6e65b7d92eb0f280306ea9c07ea3
+[amaranth-boards]: https://github.com/amaranth-lang/amaranth-boards
+[Yosys]: https://github.com/yosyshq/yosys
+[`d3ee4eb`]: https://github.com/YosysHQ/yosys/commit/d3ee4eba5b8d68c891f0beb831f19068e08765ed
+[SymbiYosys]: https://github.com/YosysHQ/sby
+[Z3]: https://github.com/Z3Prover/z3
+[nextpnr]: https://github.com/YosysHQ/nextpnr
+[Project IceStorm]: https://github.com/YosysHQ/icestorm
+[Project Trellis]: https://github.com/YosysHQ/prjtrellis
+[`dfu-util`]: https://dfu-util.sourceforge.net/
+[Zig]: https://ziglang.org/
+[SDL2]: https://libsdl.org/
+[`50339f5`]: https://github.com/ziglang/zig/commit/50339f595aa6ec96760b1cd9f8d0e0bfc3f167fc
+
 
 ## TODOs
 
@@ -58,9 +109,10 @@ iCEBreaker" src="doc/helloworld.jpg" height="300">](doc/helloworld.jpg)
 
 Initially this was implemented in Python and ran cooperatively with Amaranth's
 own simulator, like the unit tests, but it was pretty slow. It's now written in
-[Zig](https://ziglang.org), and interacts with the simulated hardware running on
-its own thread by compiling it to C++ through Yosys's [CXXRTL
-backend](https://github.com/YosysHQ/yosys/tree/master/backends/cxxrtl).
+[Zig], and interacts with the simulated hardware running on its own thread by
+compiling it to C++ through Yosys's [CXXRTL backend][CXXRTL].
+
+[CXXRTL]: https://github.com/YosysHQ/yosys/tree/master/backends/cxxrtl
 
 ```console
 $ py -m sh1107 vsh -h
@@ -108,7 +160,7 @@ By default, the SPI flash reader component is stubbed out with a
 [interface](vsh/spifr_blackbox.il), returning data bytes directly to the OLED
 driver from the ROM embedded in the build.
 
-This blackbox can be replaced with a [whitebox](vsh/spifr_whitebox.cc), which
-emulates at one level lower, emulating the [SPI
+This blackbox can be replaced with a [whitebox](vsh/spifr_whitebox.cc) (`vsh
+-f`), which emulates at one level lower, emulating the [SPI
 interface](vsh/spifr_whitebox.il) itself, returning data bitwise to the [flash
 reader](sh1107/spi/spi_flash_reader.py).
