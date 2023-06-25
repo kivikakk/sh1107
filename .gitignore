@@ -3,3 +3,4 @@
 **/zig-out/
 rom.bin
 vsh.vcd
+/venv

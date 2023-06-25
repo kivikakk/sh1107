@@ -53,7 +53,7 @@ pub fn Object(comptime T: type) type {
 
         pub fn next(self: Self, value: T) void {
             if (T == bool) {
-                self.object.*.next[0] = @as(u32, @boolToInt(value));
+                self.object.*.next[0] = @as(u32, @intFromBool(value));
             } else {
                 self.object.*.next[0] = @as(u32, value);
             }

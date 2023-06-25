@@ -24,6 +24,13 @@ pub fn Sample(comptime T: type) type {
             return self;
         }
 
+        pub fn debug(self: *Self) *Self {
+            if (self.prev != self.curr) {
+                std.debug.print("{}\n", .{self});
+            }
+            return self;
+        }
+
         pub inline fn stable(self: Self) bool {
             return self.curr == self.prev;
         }

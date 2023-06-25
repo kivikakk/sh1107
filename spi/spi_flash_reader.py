@@ -1,42 +1,60 @@
 import math
 from typing import Optional, cast
 
-from amaranth import C, Cat, ClockSignal, Elaboratable, Module, Signal
-from amaranth.build import Platform
+from amaranth import C, Cat, ClockSignal, Instance, Module, Record, Signal
+from amaranth.build import Attrs, Pins, PinsN, Platform, Resource, Subsignal
+from amaranth.hdl.rec import DIR_FANIN, DIR_FANOUT
 from amaranth_boards.icebreaker import ICEBreakerPlatform
+from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
 
 import sim
+from base import Blackbox, Config, ConfigElaboratable
 
-__all__ = ["SPIFlashReader"]
+__all__ = ["SPIFlashReaderBus", "SPIFlashReader"]
 
 
-class SPIFlashReader(Elaboratable):
+class SPIFlashReaderBus(Record):
+    addr: Signal
+    len: Signal
+    stb: Signal
+    busy: Signal
+    data: Signal
+    valid: Signal
+
+    def __init__(self):
+        super().__init__(
+            [
+                ("addr", 24, DIR_FANIN),
+                ("len", 16, DIR_FANIN),
+                ("stb", 1, DIR_FANIN),
+                ("busy", 1, DIR_FANOUT),
+                ("data", 8, DIR_FANOUT),
+                ("valid", 1, DIR_FANOUT),
+            ]
+        )
+
+
+class SPIFlashReader(ConfigElaboratable):
     spi_copi: Signal
     spi_cipo: Signal
     spi_cs: Signal
     spi_clk: Signal
 
-    i_addr: Signal
-    i_len: Signal
-    i_stb: Signal
-    o_busy: Signal
+    bus: SPIFlashReaderBus
 
-    o_data: Signal
-    o_valid: Signal
+    def __init__(
+        self,
+        *,
+        config: Config,
+    ):
+        super().__init__(config)
 
-    def __init__(self):
         self.spi_copi = Signal()
         self.spi_cipo = Signal()
         self.spi_cs = Signal()
         self.spi_clk = Signal()
 
-        self.i_addr = Signal(24)
-        self.i_len = Signal(16)
-        self.i_stb = Signal()
-        self.o_busy = Signal()
-
-        self.o_data = Signal(8)
-        self.o_valid = Signal()
+        self.bus = SPIFlashReaderBus()
 
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
@@ -50,8 +68,46 @@ class SPIFlashReader(Elaboratable):
                 self.spi_cipo = spi.cipo.i
                 self.spi_cs = spi.cs.o
                 self.spi_clk = spi.clk.o
+
+            case OrangeCrabR0_2_85FPlatform():
+                # XXX(Ch): At least until I know what the hell I'm doing here
+                # *and* have tested it.
+                platform.add_resources(
+                    [
+                        Resource(
+                            "custom_spi_flash",
+                            0,
+                            Subsignal("cs", PinsN("U17", dir="o")),
+                            # Subsignal("clk", Pins("", dir="i")),    # driven through USRMCLK
+                            Subsignal("cipo", Pins("T18", dir="i")),
+                            Subsignal("copi", Pins("U18", dir="o")),
+                            Subsignal("wp", PinsN("R18", dir="o")),
+                            Subsignal("hold", PinsN("N18", dir="o")),
+                            Attrs(IO_TYPE="LVCMOS33"),
+                        ),
+                    ]
+                )
+
+                spi = platform.request("custom_spi_flash")
+                self.spi_copi = spi.copi.o
+                self.spi_cipo = spi.cipo.i
+                self.spi_cs = spi.cs.o
+
+                m.submodules.usrmclk = Instance(
+                    "USRMCLK",
+                    i_USRMCLKI=self.spi_clk,
+                    i_USRMCLKTS=0,
+                )
+
             case _:
-                pass
+                if Blackbox.SPIFR_WHITEBOX in self.config.blackboxes:
+                    m.submodules.spifr_whitebox = Instance(
+                        "spifr_whitebox",
+                        i_clk=ClockSignal(),
+                        i_copi=self.spi_copi,
+                        o_cipo=self.spi_cipo,
+                        i_cs=self.spi_cs,
+                    )
 
         freq = (
             cast(int, platform.default_clk_frequency)
@@ -66,21 +122,21 @@ class SPIFlashReader(Elaboratable):
         snd_bitcount = Signal(range(max(32, TRES1_TDP_CYCLES)))
 
         rcv_bitcount = Signal(range(8))
-        rcv_bytecount = Signal.like(self.i_len)
+        rcv_bytecount = Signal.like(self.bus.len)
 
         m.d.comb += [
             self.spi_copi.eq(sr[-1]),
             self.spi_clk.eq(self.spi_cs & ~clk),
-            self.o_data.eq(sr[:8]),
+            self.bus.data.eq(sr[:8]),
         ]
 
-        m.d.sync += self.o_valid.eq(0)
+        m.d.sync += self.bus.valid.eq(0)
 
         with m.FSM() as fsm:
-            m.d.comb += self.o_busy.eq(~fsm.ongoing("IDLE"))
+            m.d.comb += self.bus.busy.eq(~fsm.ongoing("IDLE"))
 
             with m.State("IDLE"):
-                with m.If(self.i_stb):
+                with m.If(self.bus.stb):
                     m.d.sync += [
                         self.spi_cs.eq(1),
                         sr.eq(0xAB000000),
@@ -106,10 +162,10 @@ class SPIFlashReader(Elaboratable):
                 with m.Else():
                     m.d.sync += [
                         self.spi_cs.eq(1),
-                        sr.eq(Cat(self.i_addr, C(0x03, 8))),
+                        sr.eq(Cat(self.bus.addr, C(0x03, 8))),
                         snd_bitcount.eq(31),
                         rcv_bitcount.eq(7),
-                        rcv_bytecount.eq(self.i_len),
+                        rcv_bytecount.eq(self.bus.len - 1),
                     ]
                     m.next = "SEND CMD"
 
@@ -130,7 +186,7 @@ class SPIFlashReader(Elaboratable):
                     m.d.sync += [
                         rcv_bytecount.eq(rcv_bytecount - 1),
                         rcv_bitcount.eq(7),
-                        self.o_valid.eq(1),
+                        self.bus.valid.eq(1),
                     ]
                     with m.If(rcv_bytecount == 0):
                         m.d.sync += [

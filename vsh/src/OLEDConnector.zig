@@ -6,12 +6,15 @@ const I2CBBConnector = @import("./I2CBBConnector.zig");
 const FPGAThread = @import("./FPGAThread.zig");
 const Cmd = @import("./Cmd.zig");
 
+const OLEDConnector = @This();
+
 const InnerI2CConnector = union(enum) {
     I2CConnector: I2CConnector,
     I2CBBConnector: I2CBBConnector,
 };
 
 i2c_connector: InnerI2CConnector,
+
 state: union(enum) {
     Unaddressed,
     AddressedWrite: Cmd.Parser,
@@ -32,7 +35,11 @@ pub const RW = enum(u1) {
     R = 1,
 };
 
-pub fn tick(self: *@This(), fpga_thread: *FPGAThread) void {
+pub fn tick(self: *OLEDConnector, fpga_thread: *FPGAThread) void {
+    self.tick_i2c(fpga_thread);
+}
+
+fn tick_i2c(self: *OLEDConnector, fpga_thread: *FPGAThread) void {
     switch (self.i2c_connector) {
         inline else => |*i2c_connector| {
             switch (i2c_connector.tick()) {
@@ -91,10 +98,16 @@ pub fn tick(self: *@This(), fpga_thread: *FPGAThread) void {
     }
 }
 
-pub fn init(cxxrtl: Cxxrtl, addr: u7) @This() {
+pub fn init(cxxrtl: Cxxrtl, addr: u7) OLEDConnector {
+    var i2c_connector: InnerI2CConnector = undefined;
+
     if (cxxrtl.find(bool, "scl__o") != null) {
-        return .{ .i2c_connector = .{ .I2CConnector = I2CConnector.init(cxxrtl, addr) } };
+        i2c_connector = .{ .I2CConnector = I2CConnector.init(cxxrtl, addr) };
     } else {
-        return .{ .i2c_connector = .{ .I2CBBConnector = I2CBBConnector.init(cxxrtl, addr) } };
+        i2c_connector = .{ .I2CBBConnector = I2CBBConnector.init(cxxrtl, addr) };
     }
+
+    return .{
+        .i2c_connector = i2c_connector,
+    };
 }

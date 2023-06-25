@@ -11,7 +11,6 @@ from .sh1107 import Cmd, DataBytes
 
 __all__ = [
     "ROMBus",
-    "ROM_OFFSET",
     "ROM_LENGTH",
     "ROM_CONTENT",
     "SEQ_COUNT",
@@ -21,9 +20,6 @@ __all__ = [
     "OFFSET_SCROLL",
     "OFFSET_CHAR",
 ]
-
-# XXX(Ch): this will be platform-specific.
-ROM_OFFSET = 0x800000
 
 
 # XXX(Ch): All of this is ugly and The Worst, but it'll be replaced once the

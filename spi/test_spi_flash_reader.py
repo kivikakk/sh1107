@@ -6,10 +6,11 @@ from amaranth.hdl.ast import ValueCastable
 from amaranth.lib.fifo import SyncFIFO
 
 import sim
+from base import Config
 from .spi_flash_reader import SPIFlashReader
 
 
-class TestSPIFlashPeripheral(Elaboratable):
+class MockSPIFlashPeripheral(Elaboratable):
     data: Value
 
     spi_copi: Signal
@@ -93,7 +94,7 @@ class TestSPIFlashReaderTop(Elaboratable):
     o_busy: Signal
 
     spifr: SPIFlashReader
-    peripheral: TestSPIFlashPeripheral
+    peripheral: MockSPIFlashPeripheral
 
     def __init__(self, *, data: ValueCastable):
         self.data = Value.cast(data)
@@ -103,8 +104,8 @@ class TestSPIFlashReaderTop(Elaboratable):
         self.o_fifo = SyncFIFO(width=8, depth=self.len)
         self.o_busy = Signal()
 
-        self.spifr = SPIFlashReader()
-        self.peripheral = TestSPIFlashPeripheral(data=self.data)
+        self.spifr = SPIFlashReader(config=Config.test)
+        self.peripheral = MockSPIFlashPeripheral(data=self.data)
 
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
@@ -121,7 +122,7 @@ class TestSPIFlashReaderTop(Elaboratable):
         ]
 
         m.d.sync += [
-            self.spifr.i_stb.eq(0),
+            self.spifr.bus.stb.eq(0),
             self.o_fifo.w_en.eq(0),
         ]
 
@@ -131,9 +132,9 @@ class TestSPIFlashReaderTop(Elaboratable):
             with m.State("IDLE"):
                 with m.If(self.i_stb):
                     m.d.sync += [
-                        self.spifr.i_addr.eq(0x00CAFE),
-                        self.spifr.i_len.eq(self.len),
-                        self.spifr.i_stb.eq(1),
+                        self.spifr.bus.addr.eq(0x00CAFE),
+                        self.spifr.bus.len.eq(self.len),
+                        self.spifr.bus.stb.eq(1),
                     ]
                     m.next = "STROBED SPIFR"
 
@@ -141,12 +142,12 @@ class TestSPIFlashReaderTop(Elaboratable):
                 m.next = "WAITING SPIFR"
 
             with m.State("WAITING SPIFR"):
-                with m.If(self.spifr.o_valid):
+                with m.If(self.spifr.bus.valid):
                     m.d.sync += [
-                        self.o_fifo.w_data.eq(self.spifr.o_data),
+                        self.o_fifo.w_data.eq(self.spifr.bus.data),
                         self.o_fifo.w_en.eq(1),
                     ]
-                with m.Elif(~self.spifr.o_busy):
+                with m.Elif(~self.spifr.bus.busy):
                     m.next = "IDLE"
 
         return m

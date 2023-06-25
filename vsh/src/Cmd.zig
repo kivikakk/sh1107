@@ -176,7 +176,7 @@ pub const Command = union(enum) {
             if (bytes.len == 2) {
                 return .{ .SetDisplayClockFrequency = .{
                     .ratio = @as(u5, @truncate(u4, bytes[1])) + 1,
-                    .frequency = @intToEnum(SH1107.DclkFreq, @truncate(u4, bytes[1] >> 4)),
+                    .frequency = @enumFromInt(SH1107.DclkFreq, @truncate(u4, bytes[1] >> 4)),
                 } };
             }
             return error.Unrecoverable;
