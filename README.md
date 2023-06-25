@@ -65,7 +65,7 @@ backend](https://github.com/YosysHQ/yosys/tree/master/backends/cxxrtl).
 ```console
 $ ./main.py vsh -h
 usage: main vsh [-h] [-i] [-f] [-c] [-s {100000,400000,2000000}] [-t TOP]
-                [-v] [-O]
+                [-v] [-O {none,rtl,zig,both}]
 
 options:
   -h, --help            show this help message and exit
@@ -79,7 +79,8 @@ options:
   -t TOP, --top TOP     which top-level module to simulate (default:
                         oled.Top)
   -v, --vcd             output a VCD file
-  -O, --opt             build with -Doptimize=ReleaseFast
+  -O {none,rtl,zig,both}, --optimize {none,rtl,zig,both}
+                        build RTL or Zig with optimizations (default: both)
 ```
 
 ### I²C
@@ -93,7 +94,8 @@ is fast.
 At the most fine-grained level (`vsh -i`), it responds to the gateware by doing
 edge detection at I²C level, [spying](vsh/src/I2CConnector.zig) on the I²C
 lines. This method is faster than the pure Python version I started with, but
-still slow enough to take several seconds to clear the screen.
+still slow enough to take several seconds to clear the screen when not compiled
+with optimizations.
 
 ### SPI flash
 

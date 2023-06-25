@@ -8,6 +8,7 @@ import subprocess
 import sys
 import warnings
 from argparse import ArgumentParser, Namespace
+from enum import Enum
 from pathlib import Path
 from typing import Any, Optional, cast
 from unittest import TestLoader, TextTestRunner
@@ -22,6 +23,24 @@ from common import Hz
 from formal import formal as prep_formal
 from oled import OLED, ROM_CONTENT
 from target import Target
+
+
+class Optimize(Enum):
+    none = 'none'
+    rtl = 'rtl'
+    zig = 'zig'
+    both = 'both'
+
+    def __str__(self):
+        return self.value
+
+    @property
+    def opt_rtl(self) -> bool:
+        return self in (self.rtl, self.both)
+
+    @property
+    def opt_zig(self) -> bool:
+        return self in (self.zig, self.both)
 
 
 def _args_target(args: Namespace | str) -> Target:
@@ -197,6 +216,7 @@ def vsh(args: Namespace):
             [
                 "zig",
                 "c++",
+                *(["-O3"] if args.optimize.opt_rtl else []),
                 "-DCXXRTL_INCLUDE_CAPI_IMPL",
                 "-DCXXRTL_INCLUDE_VCD_CAPI_IMPL",
                 "-I" + str(_path(".")),
@@ -216,7 +236,7 @@ def vsh(args: Namespace):
     if not args.compile:
         cmd += ["run"]
     cmd += [
-        *(["-Doptimize=ReleaseFast"] if args.opt else []),
+        *(["-Doptimize=ReleaseFast"] if args.optimize.opt_zig else []),
         f"-Dyosys_data_dir={yosys.data_dir()}",
         f"-Dcxxrtl_lib_paths={','.join(str(o_path) for o_path in cc_o_paths.values())}",
     ]
@@ -349,9 +369,11 @@ def main():
     )
     vsh_parser.add_argument(
         "-O",
-        "--opt",
-        action="store_true",
-        help="build with -Doptimize=ReleaseFast",
+        "--optimize",
+        type=Optimize,
+        choices=Optimize,
+        help="build RTL or Zig with optimizations (default: both)",
+        default=Optimize.both,
     )
 
     args = parser.parse_args()
