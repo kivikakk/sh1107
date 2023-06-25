@@ -15,23 +15,23 @@ echo "+++ Unit tests"
 (
 	trap 'buildkite-agent artifact upload "build/*.vcd"' ERR
 	
-	env CI=1 "$PYTHON" . test
+	env CI=1 "$PYTHON" -m sh1107 test
 )
 
 
 for board in "${BOARDS[@]}"; do
 	for speed in "${SPEEDS[@]}"; do
 		echo "--- Building $board @ $speed"
-		"$PYTHON" . build "$board" -s "$speed"
+		"$PYTHON" -m sh1107 build "$board" -s "$speed"
 	done
 done
 
 for opts in "-c" "-cfi"; do
 	echo "--- Building Virtual SH1107 ($opts)"
-	"$PYTHON" . vsh "$opts"
+	"$PYTHON" -m sh1107 vsh "$opts"
 done
 
 echo "--- Formal verification"
-"$PYTHON" . formal
+"$PYTHON" -m sh1107 formal
 
 echo "+++ All passed."
