@@ -111,4 +111,4 @@ driver from the ROM embedded in the build.
 This blackbox can be replaced with a [whitebox](vsh/spifr_whitebox.cc), which
 emulates at one level lower, emulating the [SPI
 interface](vsh/spifr_whitebox.il) itself, returning data bitwise to the [flash
-reader](spi/spi_flash_reader.py).
+reader](sh1107/spi/spi_flash_reader.py).

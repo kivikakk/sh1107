@@ -74,11 +74,6 @@
 			"LOCALFOLDER",
 		],
 		"python.formatting.provider": "black",
-		// linting
-		"python.linting.flake8Enabled": true,
-		"python.linting.flake8Args": [
-			"--ignore=E501,E203,W503,F821",
-		],
 		// c++
 		"clangd.fallbackFlags": [
 			"-I${workspaceFolder}",

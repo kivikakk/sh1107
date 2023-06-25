@@ -1,6 +1,5 @@
 import struct
 from argparse import ArgumentParser, Namespace
-from pathlib import Path
 from typing import Self
 
 from amaranth import Record, Signal
