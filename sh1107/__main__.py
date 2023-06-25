@@ -1,50 +1,43 @@
-#!/usr/bin/env python
-
 import warnings
 from argparse import ArgumentParser
 
 from . import build, formal, oled, test, vsh
 
+warnings.simplefilter("default")
 
-def main():
-    parser = ArgumentParser(prog="sh1107")
-    subparsers = parser.add_subparsers(required=True)
+parser = ArgumentParser(prog="sh1107")
+subparsers = parser.add_subparsers(required=True)
 
-    test.add_main_arguments(
-        subparsers.add_parser(
-            "test",
-            help="run the unit tests and sim tests",
-        )
+test.add_main_arguments(
+    subparsers.add_parser(
+        "test",
+        help="run the unit tests and sim tests",
     )
-    formal.add_main_arguments(
-        subparsers.add_parser(
-            "formal",
-            help="formally verify the design",
-        )
+)
+formal.add_main_arguments(
+    subparsers.add_parser(
+        "formal",
+        help="formally verify the design",
     )
-    build.add_main_arguments(
-        subparsers.add_parser(
-            "build",
-            help="build the design, and optionally program it",
-        )
+)
+build.add_main_arguments(
+    subparsers.add_parser(
+        "build",
+        help="build the design, and optionally program it",
     )
-    oled.rom.add_main_arguments(
-        subparsers.add_parser(
-            "rom",
-            help="build the ROM image, and optionally program it",
-        )
+)
+oled.rom.add_main_arguments(
+    subparsers.add_parser(
+        "rom",
+        help="build the ROM image, and optionally program it",
     )
-    vsh.add_main_arguments(
-        subparsers.add_parser(
-            "vsh",
-            help="run the Virtual SH1107",
-        )
+)
+vsh.add_main_arguments(
+    subparsers.add_parser(
+        "vsh",
+        help="run the Virtual SH1107",
     )
+)
 
-    args = parser.parse_args()
-    args.func(args)
-
-
-if __name__ == "__main__":
-    warnings.simplefilter("default")
-    main()
+args = parser.parse_args()
+args.func(args)
