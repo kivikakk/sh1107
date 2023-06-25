@@ -26,9 +26,10 @@ for board in "${BOARDS[@]}"; do
 	done
 done
 
-echo "--- Building Virtual SH1107"
-"$PYTHON" main.py vsh -ci
-"$PYTHON" main.py vsh -c
+for opts in "-c" "-cfi"; do
+	echo "--- Building Virtual SH1107 ($opts)"
+	"$PYTHON" main.py vsh "$opts"
+done
 
 echo "--- Formal verification"
 "$PYTHON" main.py formal
