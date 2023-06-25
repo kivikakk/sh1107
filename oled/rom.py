@@ -1,4 +1,6 @@
 import struct
+from argparse import ArgumentParser, Namespace
+from pathlib import Path
 from typing import Self
 
 from amaranth import Record, Signal
@@ -6,10 +8,12 @@ from amaranth.hdl.ast import ShapeCastable, Statement
 from amaranth.hdl.mem import ReadPort
 from amaranth.hdl.rec import DIR_FANIN, DIR_FANOUT
 
+from target import Target
 from .chars import CHARS
 from .sh1107 import Cmd, DataBytes
 
 __all__ = [
+    "add_main_arguments",
     "ROMBus",
     "ROM_LENGTH",
     "ROM_CONTENT",
@@ -20,6 +24,26 @@ __all__ = [
     "OFFSET_SCROLL",
     "OFFSET_CHAR",
 ]
+
+
+def add_main_arguments(parser: ArgumentParser):
+    parser.set_defaults(func=rom_main)
+    parser.add_argument(
+        "-p",
+        "--program",
+        dest="target",
+        choices=Target.platform_targets,
+        help="program the ROM onto the specified board",
+    )
+
+
+def rom_main(args: Namespace):
+    path = Path(__file__).parent.parent / "rom.bin"
+    with open(path, "wb") as f:
+        f.write(ROM_CONTENT)
+
+    if args.target:
+        Target[args.target].flash_rom(path)
 
 
 # XXX(Ch): All of this is ugly and The Worst, but it'll be replaced once the

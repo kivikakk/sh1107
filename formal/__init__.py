@@ -1,11 +1,37 @@
+import subprocess
+from argparse import ArgumentParser, Namespace
 from typing import Optional, Tuple
 
-from amaranth import ClockSignal, Module, ResetSignal, Signal, Value
+from amaranth import ClockSignal, Fragment, Module, ResetSignal, Signal, Value
 from amaranth.asserts import Assert, Assume, Cover, Initial
+from amaranth.back import rtlil
 from amaranth.hdl.ast import ValueCastable
 
+from base import path
 from common import Hz
 from i2c import RW, I2CFormal
+
+
+def add_main_arguments(parser: ArgumentParser):
+    parser.set_defaults(func=formal_main)
+    parser.add_argument(
+        "tasks",
+        help="tasks to run; defaults to all",
+        nargs="*",
+    )
+
+
+def formal_main(args: Namespace):
+    design, ports = prep_formal()
+    fragment = Fragment.get(design, None)
+    output = rtlil.convert(fragment, name="formal_top", ports=ports)
+    with open(path("build/sh1107.il"), "w") as f:
+        f.write(output)
+
+    sby_file = path("formal/sh1107.sby")
+    subprocess.run(
+        ["sby", "--prefix", "build/sh1107", "-f", sby_file, *args.tasks], check=True
+    )
 
 
 def past(
@@ -29,7 +55,7 @@ def past(
     return curr
 
 
-def formal() -> Tuple[Module, list[Signal | Value]]:
+def prep_formal() -> Tuple[Module, list[Signal | Value]]:
     m = Module()
     m.submodules.dut = dut = I2CFormal(speed=Hz(2_000_000))
 

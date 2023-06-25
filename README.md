@@ -14,8 +14,8 @@ classic IBM 8x8 font is used to this end.
 There's an entry-point in the root which exposes the various things it can do:
 
 ```console
-$ ./main.py -h
-usage: main [-h] {test,formal,build,rom,vsh} ...
+$ py . -h
+usage: sh1107 [-h] {test,formal,build,rom,vsh} ...
 
 positional arguments:
   {test,formal,build,rom,vsh}
@@ -63,9 +63,9 @@ its own thread by compiling it to C++ through Yosys's [CXXRTL
 backend](https://github.com/YosysHQ/yosys/tree/master/backends/cxxrtl).
 
 ```console
-$ ./main.py vsh -h
-usage: main vsh [-h] [-i] [-f] [-c] [-s {100000,400000,2000000}] [-t TOP]
-                [-v] [-O {none,rtl,zig,both}]
+$ py . vsh -h
+usage: sh1107 vsh [-h] [-i] [-f] [-c] [-s {100000,400000,2000000}] [-t TOP]
+                  [-v] [-O {none,rtl,zig,both}]
 
 options:
   -h, --help            show this help message and exit
