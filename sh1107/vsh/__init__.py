@@ -1,4 +1,5 @@
 import os
+import platform
 import subprocess
 from argparse import ArgumentParser, Namespace
 from enum import Enum
@@ -86,11 +87,16 @@ def add_main_arguments(parser: ArgumentParser):
 
 
 def main(args: Namespace):
-    # NOTE: builtin-yosys works better on Windows since osscad's yosys-config a)
-    # doesn't execute cleanly as-is (bash script), and b) its answers are wrong
-    # anyway (!!!).
-    os.environ["AMARANTH_USE_YOSYS"] = "builtin"
-    yosys = cast(YosysBinary, find_yosys(lambda _: True))
+    if (
+        os.environ.get("VIRTUAL_ENV") == "OSS Cad Suite"
+        and platform.system() == "Windows"
+    ):
+        # NOTE: osscad's yosys-config (used by _SystemYosys.data_dir) on Windows
+        # (a) doesn't execute as-is (bash script, can't popen directly from
+        # native Windows Python), and (b) its answers are wrong anyway (!!!).
+        os.environ["AMARANTH_USE_YOSYS"] = "builtin"
+
+    yosys = cast(YosysBinary, find_yosys(lambda ver: ver >= (0, 10)))
 
     design = build_top(args, Target["vsh"])
 
@@ -105,23 +111,24 @@ def main(args: Namespace):
         with open(path("vsh/spifr_whitebox.il"), "r") as f:
             black_boxes["spifr_whitebox"] = f.read()
 
-    cxxrtl_ccpath = path("build/sh1107.cc")
+    cxxrtl_cc_path = path("build/sh1107.cc")
     _cxxrtl_convert_with_header(
-        cxxrtl_ccpath,
+        yosys,
+        cxxrtl_cc_path,
         design,
         black_boxes=black_boxes,
         ports=getattr(design, "ports", []),
     )
 
-    cc_opaths = {cxxrtl_ccpath: cxxrtl_ccpath.with_suffix(".o")}
+    cc_o_paths = {cxxrtl_cc_path: cxxrtl_cc_path.with_suffix(".o")}
     if args.blackbox_i2c:
-        cc_opaths[path("vsh/i2c_blackbox.cc")] = path("build/i2c_blackbox.o")
+        cc_o_paths[path("vsh/i2c_blackbox.cc")] = path("build/i2c_blackbox.o")
     if args.blackbox_spifr:
-        cc_opaths[path("vsh/spifr_blackbox.cc")] = path("build/spifr_blackbox.o")
+        cc_o_paths[path("vsh/spifr_blackbox.cc")] = path("build/spifr_blackbox.o")
     else:
-        cc_opaths[path("vsh/spifr_whitebox.cc")] = path("build/spifr_whitebox.o")
+        cc_o_paths[path("vsh/spifr_whitebox.cc")] = path("build/spifr_whitebox.o")
 
-    for ccpath, opath in cc_opaths.items():
+    for cc_path, o_path in cc_o_paths.items():
         subprocess.run(
             [
                 "zig",
@@ -132,9 +139,9 @@ def main(args: Namespace):
                 "-I" + str(path(".")),
                 "-I" + str(cast(Path, yosys.data_dir()) / "include"),
                 "-c",
-                ccpath,
+                cc_path,
                 "-o",
-                opath,
+                o_path,
             ],
             check=True,
         )
@@ -148,7 +155,7 @@ def main(args: Namespace):
     cmd += [
         *(["-Doptimize=ReleaseFast"] if args._Optimize.opt_zig else []),
         f"-Dyosys_data_dir={yosys.data_dir()}",
-        f"-Dcxxrtl_lib_paths={','.join(str(opath) for opath in cc_opaths.values())}",
+        f"-Dcxxrtl_lib_paths={','.join(str(o_path) for o_path in cc_o_paths.values())}",
     ]
     if not args.compile:
         cmd += ["--"]
@@ -159,6 +166,7 @@ def main(args: Namespace):
 
 
 def _cxxrtl_convert_with_header(
+    yosys: YosysBinary,
     cc_out: Path,
     design: Elaboratable,
     *,
@@ -173,7 +181,6 @@ def _cxxrtl_convert_with_header(
                 "cc_out must be relative to cwd for builtin-yosys to write to it"
             )
     rtlil_text = rtlil.convert(design, ports=ports)
-    yosys = find_yosys(lambda ver: ver >= (0, 10))
     script = []
     for box_source in black_boxes.values():
         script.append(f"read_rtlil <<rtlil\n{box_source}\nrtlil")
