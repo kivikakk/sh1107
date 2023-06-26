@@ -56,7 +56,6 @@ To run at all:
 * [Python 3] (3.7+ likely works; I work on 3.12 beta)
 * [Amaranth] ([`d218273`] or later)
 * [Board definitions for Amaranth][amaranth-boards]
-* [Yosys]
 
 To run vsh:
 
