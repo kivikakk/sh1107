@@ -1,12 +1,16 @@
 import warnings
 from argparse import ArgumentParser
+from os import makedirs
 
 from . import build, formal, rom, test, vsh
+from .base import path
 
 warnings.simplefilter("default")
+makedirs(path("build"), exist_ok=True)
 
 parser = ArgumentParser(prog="sh1107")
 subparsers = parser.add_subparsers(required=True)
+
 
 test.add_main_arguments(
     subparsers.add_parser(

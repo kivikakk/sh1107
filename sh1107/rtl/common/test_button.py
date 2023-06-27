@@ -1,7 +1,7 @@
 from amaranth.sim import Delay, Settle
 
 from ... import sim
-from . import Button, ButtonWithHold
+from .button import Button, ButtonWithHold
 
 
 class TestButton(sim.TestCase):

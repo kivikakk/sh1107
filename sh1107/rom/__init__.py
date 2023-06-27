@@ -3,8 +3,8 @@ from argparse import ArgumentParser, Namespace
 
 from ..base import path
 from ..proto import Cmd, DataBytes
-from ..rom.chars import CHARS
 from ..target import Target
+from .chars import CHARS
 
 __all__ = [
     "add_main_arguments",

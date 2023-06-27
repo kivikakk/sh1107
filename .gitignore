@@ -1,6 +1,7 @@
 **/__pycache__/
 **/zig-cache/
 **/zig-out/
+/build/
+/venv/
 rom.bin
 vsh.vcd
-/venv
