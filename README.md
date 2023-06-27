@@ -51,6 +51,9 @@ If no version is specified, the most recent release or the version in your
 package manager is probably fine, and if neither concept applies, just try the
 latest commit.
 
+For a detailed guide on installing specific versions of some of these tools,
+please see [Installing an HDL toolchain from source][notes-0001].
+
 To run at all:
 
 * [Python 3] (3.7+ likely works; I work on 3.12 beta)
@@ -75,6 +78,7 @@ To run formal tests:
 * [SymbiYosys]
 * [Z3] (4.12+ is known to work; 4.8 is known not to)
 
+[notes-0001]: https://notes.hrzn.ee/posts/0001-hdl-toolchain-source/
 [Python 3]: https://www.python.org
 [`d218273`]: https://github.com/amaranth-lang/amaranth/commit/d218273b9b2c6e65b7d92eb0f280306ea9c07ea3
 [amaranth-boards]: https://github.com/amaranth-lang/amaranth-boards
