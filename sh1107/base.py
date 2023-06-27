@@ -16,7 +16,6 @@ __all__ = [
     "ConfigElaboratable",
     "build_top",
     "path",
-    "subcommand_main",
 ]
 
 
@@ -51,7 +50,7 @@ class ConfigElaboratable(Elaboratable):
 
 
 def build_top(args: Namespace, target: Target, **kwargs: Any) -> Elaboratable:
-    from .common import Hz
+    from .rtl.common import Hz
 
     mod, klass_name = args.top.rsplit(".", 1)
     klass = getattr(importlib.import_module(mod), klass_name)
@@ -76,24 +75,3 @@ def build_top(args: Namespace, target: Target, **kwargs: Any) -> Elaboratable:
 def path(rest: str) -> Path:
     base = Path(__file__).parent.parent.absolute()
     return base / rest
-
-
-def subcommand_main():
-    """
-    Get the __package__ of the calling __main__; use its "add_main_arguments" to
-    populate the argument parser.
-    """
-    import warnings
-    from argparse import ArgumentParser
-
-    warnings.simplefilter("default")
-
-    calling_frame = inspect.stack()[1].frame
-    calling_module = inspect.getmodule(calling_frame)
-    assert calling_module
-    package = calling_module.__package__
-
-    parser = ArgumentParser(prog=package)
-    importlib.import_module(package).add_main_arguments(parser)
-    args = parser.parse_args()
-    args.func(args)

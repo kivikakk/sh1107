@@ -8,8 +8,8 @@ from amaranth.back import rtlil
 from amaranth.hdl.ast import ValueCastable
 
 from ..base import path
-from ..common import Hz
-from ..i2c import RW, I2CFormal
+from ..rtl.common import Hz
+from ..rtl.i2c import RW, I2CFormal
 
 
 def add_main_arguments(parser: ArgumentParser):

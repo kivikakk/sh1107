@@ -154,7 +154,7 @@ def args(*args: Any, **kwargs: Any):
 
 
 def i2c_speeds(sim_test: Callable[..., Procedure]) -> Callable[..., Procedure]:
-    from .common import Hz
+    from .rtl.common import Hz
 
     if not hasattr(sim_test, "_sim_args"):
         sim_test._sim_args = []  # pyright: ignore[reportFunctionMemberAccess]

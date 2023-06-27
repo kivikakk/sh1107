@@ -3,7 +3,7 @@ from argparse import ArgumentParser, Namespace
 from typing import Optional
 
 from .base import build_top
-from .oled import OLED
+from .rtl.oled import OLED
 from .target import Target
 
 __all__ = ["add_main_arguments"]
@@ -14,8 +14,8 @@ def add_main_arguments(parser: ArgumentParser):
     parser.add_argument(
         "-t",
         "--top",
-        help="which top-level module to build (default: sh1107.oled.Top)",
-        default="sh1107.oled.Top",
+        help="which top-level module to build (default: sh1107.rtl.Top)",
+        default="sh1107.rtl.Top",
     )
     parser.add_argument(
         "target",
