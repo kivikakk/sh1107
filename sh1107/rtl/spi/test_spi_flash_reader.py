@@ -7,7 +7,7 @@ from amaranth.lib.fifo import SyncFIFO
 
 from ... import sim
 from ...base import Config
-from .spi_flash_reader import SPIFlashReader
+from . import SPIFlashReader
 
 
 # TODO(Ch): try using this + initted Memory in vsh instead of the whitebox, just
