@@ -31,7 +31,7 @@ class ROMWriter(Elaboratable):
         self.o_busy = Signal()
 
         self.i2c_bus = I2CBus()
-        self.rom_bus = rom_bus.clone()
+        self.rom_bus = rom_bus.clone(name="romwriter")
 
         self.offset = Signal(range(rom.ROM_LENGTH))
         self.remain = Signal(range(rom.ROM_LENGTH))

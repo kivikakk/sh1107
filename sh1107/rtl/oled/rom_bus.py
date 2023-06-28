@@ -14,22 +14,32 @@ class ROMBus(Record):
     addr: Signal
     data: Signal
 
-    def __init__(self, addr: ShapeCastable, width: ShapeCastable):
+    def __init__(
+        self,
+        addr: ShapeCastable,
+        data: ShapeCastable,
+        *,
+        name: str,
+    ):
         super().__init__(
             [
                 ("addr", addr, DIR_FANIN),
-                ("data", width, DIR_FANOUT),
+                ("data", data, DIR_FANOUT),
             ],
-            name="ROMBus",
+            name=f"ROMBus_{name}",
         )
 
     @classmethod
-    def for_read_port(cls, rom_rd: ReadPort):
-        return cls(rom_rd.addr.shape(), rom_rd.data.shape())
+    def for_read_port(cls, rom_rd: ReadPort, *, name: str):
+        return cls(rom_rd.addr.shape(), rom_rd.data.shape(), name=name)
 
-    def clone(self) -> Self:
+    def clone(self, *, name: str) -> Self:
         # "like" gives back a Record, not an instance.
-        return ROMBus(self.addr.shape(), self.data.shape())
+        return ROMBus(
+            self.addr.shape(),
+            self.data.shape(),
+            name=name,
+        )
 
     def connect_read_port(self, rom_rd: ReadPort) -> list[Statement]:
         return [

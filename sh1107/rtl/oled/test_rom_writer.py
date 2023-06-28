@@ -29,9 +29,9 @@ class TestROMWriterTop(Elaboratable):
             width=8,
             depth=rom.ROM_LENGTH,
             init=rom.ROM_CONTENT,
-        ).read_port(transparent=False)
+        ).read_port()
         self.rom_writer = ROMWriter(
-            rom_bus=ROMBus.for_read_port(self.rom_rd),
+            rom_bus=ROMBus.for_read_port(self.rom_rd, name="mem"),
             addr=TestROMWriterTop.ADDR,
         )
 
