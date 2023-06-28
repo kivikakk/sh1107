@@ -359,7 +359,7 @@ class OLED(ConfigElaboratable):
         m.d.sync += effective_addr.eq(self.rom_bus.addr)
 
         m.d.comb += [
-            addr.eq(self.rom_bus.addr // 2),  # XXX Testing $divfloor.
+            addr.eq(self.rom_bus.addr >> 1),
             self.rom_bus.data.eq(rd_data.word_select(effective_addr[0], 8)),
             wr_en.eq(
                 self.rom_wr_en.replicate(2)

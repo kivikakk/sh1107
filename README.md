@@ -97,9 +97,8 @@ To run formal tests:
 
 ## TODOs
 
-- OrangeCrab: try on-board DDR3 instead of EBR.
-- pack 16-bit data for 16-bit wide memories.
 - try QSPI.
+- OrangeCrab: try on-board DDR3 instead of EBR.
 
 ## vsh
 
