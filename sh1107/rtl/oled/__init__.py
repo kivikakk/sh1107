@@ -1,7 +1,7 @@
 import math
 from typing import Final, Optional
 
-from amaranth import C, ClockSignal, Instance, Memory, Module, Mux, Signal
+from amaranth import C, ClockSignal, Instance, Memory, Module, Mux, Signal, signed
 from amaranth.build import Platform
 from amaranth.lib.enum import IntEnum
 from amaranth.lib.fifo import SyncFIFO
@@ -56,7 +56,7 @@ class OLED(ConfigElaboratable):
         CURSOR_ON = 0x07
         CURSOR_OFF = 0x08
         ID = 0x09
-        PRINT_BYTE = 0x0A
+        DIVFLOOR = 0x0A
         SPI_TEST = 0x0B
 
     class Result(IntEnum, shape=2):
@@ -367,8 +367,8 @@ class OLED(ConfigElaboratable):
                     with m.Case(OLED.Command.ID):
                         m.next = "ID: START"
 
-                    with m.Case(OLED.Command.PRINT_BYTE):
-                        m.next = "PRINT_BYTE: START"
+                    with m.Case(OLED.Command.DIVFLOOR):
+                        m.next = "DIVFLOOR: START"
 
                     with m.Case(OLED.Command.SPI_TEST):
                         m.next = "SPI_TEST: START"
@@ -376,7 +376,7 @@ class OLED(ConfigElaboratable):
             self.locate_states(m)
             self.print_states(m)
             self.id_states(m)
-            self.print_byte_states(m)
+            self.divfloor_states(m)
             self.spi_test_states(m)
 
             with m.State("CLSER: STROBED"):
@@ -596,7 +596,7 @@ class OLED(ConfigElaboratable):
 
     def id_states(self, m: Module):
         # XXX(Ch): hack just to test read capability The hex printing is
-        # duplicated in the print_byte states.
+        # duplicated in the DIVFLOOR states.
 
         id_recvd = Signal(8)
 
@@ -719,28 +719,56 @@ class OLED(ConfigElaboratable):
                 m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
                 m.next = "IDLE"
 
-    def print_byte_states(self, m: Module):
+    def divfloor_states(self, m: Module):
+        op1 = Signal(signed(8))
+        op2 = Signal(signed(8))
+        result = Signal(signed(8))
+
         second_half = Signal(4)
 
-        with m.State("PRINT_BYTE: START"):
+        with m.State("DIVFLOOR: START"):
             with m.If(self.i_fifo.r_rdy):
-                first_half = self.i_fifo.r_data[4:8]
                 m.d.sync += [
-                    second_half.eq(self.i_fifo.r_data[:4]),
+                    op1.eq(self.i_fifo.r_data),
                     self.i_fifo.r_en.eq(1),
-                    self.chpr_data.eq(
-                        Mux(
-                            first_half > 9,
-                            ord("A") + first_half - 10,
-                            ord("0") + first_half,
-                        )
-                    ),
-                    self.chpr_run.eq(1),
                 ]
-                m.next = "PRINT_BYTE: STROBED R_EN, CHPR RUNNING"
+                m.next = "DIVFLOOR: STROBED R_EN, WAIT OP2"
 
-        with m.State("PRINT_BYTE: STROBED R_EN, CHPR RUNNING"):
+        with m.State("DIVFLOOR: STROBED R_EN, WAIT OP2"):
             m.d.sync += self.i_fifo.r_en.eq(0)
+            m.next = "DIVFLOOR: WAIT OP2"
+
+        with m.State("DIVFLOOR: WAIT OP2"):
+            with m.If(self.i_fifo.r_rdy):
+                m.d.sync += [
+                    op2.eq(self.i_fifo.r_data),
+                    self.i_fifo.r_en.eq(1),
+                ]
+                m.next = "DIVFLOOR: STROBED R_EN"
+
+        with m.State("DIVFLOOR: STROBED R_EN"):
+            m.d.sync += [
+                self.i_fifo.r_en.eq(0),
+                result.eq(op1 // op2),
+            ]
+            m.next = "DIVFLOOR: BEGIN"
+
+        with m.State("DIVFLOOR: BEGIN"):
+            first_half = result[4:]
+            m.d.sync += [
+                second_half.eq(result[:4]),
+                self.chpr_data.eq(
+                    Mux(
+                        first_half > 9,
+                        ord("A") + first_half - 10,
+                        ord("0") + first_half,
+                    )
+                ),
+                self.chpr_run.eq(1),
+            ]
+            m.next = "DIVFLOOR: CHPR RUNNING"
+
+        with m.State("DIVFLOOR: CHPR RUNNING"):
             with m.If(~self.chpr_run):
                 m.d.sync += [
                     self.chpr_data.eq(
@@ -752,9 +780,9 @@ class OLED(ConfigElaboratable):
                     ),
                     self.chpr_run.eq(1),
                 ]
-                m.next = "PRINT_BYTE: SECOND HALF: CHPR RUNNING"
+                m.next = "DIVFLOOR: SECOND HALF: CHPR RUNNING"
 
-        with m.State("PRINT_BYTE: SECOND HALF: CHPR RUNNING"):
+        with m.State("DIVFLOOR: SECOND HALF: CHPR RUNNING"):
             with m.If(~self.chpr_run):
                 m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
                 m.next = "IDLE"
