@@ -359,9 +359,12 @@ class OLED(ConfigElaboratable):
         m.d.sync += effective_addr.eq(self.rom_bus.addr)
 
         m.d.comb += [
-            addr.eq(self.rom_bus.addr // 2), # XXX Testing $divfloor.
+            addr.eq(self.rom_bus.addr // 2),  # XXX Testing $divfloor.
             self.rom_bus.data.eq(rd_data.word_select(effective_addr[0], 8)),
-            wr_en.eq(self.rom_wr_en.replicate(2) & Mux(effective_addr[0], C(0b10, 2), C(0b01, 2))),
+            wr_en.eq(
+                self.rom_wr_en.replicate(2)
+                & Mux(effective_addr[0], C(0b10, 2), C(0b01, 2))
+            ),
         ]
 
         match platform:
@@ -425,7 +428,6 @@ class OLED(ConfigElaboratable):
         m.submodules.i_fifo = self.i_fifo
 
         with m.If(self.rom_writer.o_busy):
-            print(self.rom_bus.connect(self.rom_writer.rom_bus))
             m.d.comb += [
                 self.i2c_bus.connect(self.rom_writer.i2c_bus),
                 self.rom_bus.connect(self.rom_writer.rom_bus),
@@ -440,14 +442,12 @@ class OLED(ConfigElaboratable):
                 self.rom_bus.connect(self.scroller.rom_bus),
             ]
         with m.Else():
-            print(self.rom_bus.connect(self.own_rom_bus))
             m.d.comb += [
                 self.i2c_bus.connect(self.own_i2c_bus),
                 self.rom_bus.connect(self.own_rom_bus),
             ]
 
         m.d.comb += self.locator.i_adjust.eq(self.scroller.o_adjusted)
-
 
     def locate_states(self, m: Module):
         with m.State("LOCATE: ROW: WAIT"):
