@@ -91,7 +91,7 @@ class Locator(Elaboratable):
                         ]
                         m.next = "START: PAGE: STROBED W_EN"
                     with m.Elif(self.i_row != 0):
-                        self.startRow(m)
+                        self.start_row(m)
                         m.next = "START: COL LOWER: STROBED W_EN"
                     with m.Else():
                         m.d.sync += self.o_busy.eq(0)
@@ -111,7 +111,7 @@ class Locator(Elaboratable):
                         & self.i2c_bus.o_ack
                         & self.i2c_bus.o_in_fifo_w_rdy
                     ):
-                        self.startRow(m)
+                        self.start_row(m)
                         m.next = "START: COL LOWER: STROBED W_EN"
                     with m.Elif(~self.i2c_bus.o_busy):
                         m.d.sync += self.o_busy.eq(0)
@@ -160,7 +160,7 @@ class Locator(Elaboratable):
 
         return m
 
-    def startRow(self, m: Module):
+    def start_row(self, m: Module):
         # For (adjusted) rows 0, 2, 4, 6, .., the column addresses are 0x00, 0x10, 0x20, ...
         # For (adjusted) rows 1, 3, 5, 7, .., the column addresses are 0x08, 0x18, 0x28, ...
         byte = Cmd.SetLowerColumnAddress(0x00).to_byte() + Mux(
