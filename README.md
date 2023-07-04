@@ -56,7 +56,7 @@ please see [Installing an HDL toolchain from source][notes-0001].
 
 To run at all:
 
-* [Python 3] (3.7+ likely works; I work on 3.12 beta)
+* [Python 3] (3.8+ works; I work on 3.12 beta)
 * [Amaranth] ([`d218273`] or later)
 * [Board definitions for Amaranth][amaranth-boards]
 
