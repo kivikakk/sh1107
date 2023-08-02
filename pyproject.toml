@@ -1,0 +1,21 @@
+
+[project]
+name = "sh1107"
+version = "0.0"
+description = ""
+authors = [
+    {name = "Charlotte", email = "charlotte@hrzn.ee"},
+]
+dependencies = [
+    "amaranth >= 0.4.0dev0, < 0.6",
+]
+requires-python = ">=3.8"
+license = {text = "BSD-2-Clause"}
+
+[project.optional-dependencies]
+build = [
+    "amaranth-boards",
+]
+
+[tool.setuptools]
+packages = ["sh1107"]
