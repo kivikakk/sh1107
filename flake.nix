@@ -50,6 +50,8 @@
           pkgs.iconv
         ];
 
+        dontAddExtraLibs = true;
+
         preBuild = ''
           export ZIG_GLOBAL_CACHE_DIR="$TMPDIR/zig"
         '';
