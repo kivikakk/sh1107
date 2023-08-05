@@ -87,11 +87,11 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1690967424,
-        "narHash": "sha256-J0osA17dOfWe/VbmQc6STNciw3cI7tRrijtZOITdlWs=",
+        "lastModified": 1691214883,
+        "narHash": "sha256-3EWCa5DOvSO39s3KcY6dHZE8ZaJBsRMX5ychLNEarrM=",
         "owner": "charlottia",
         "repo": "hdx",
-        "rev": "7c8e632c9fbed0e6a11c91caf2bad09164277f92",
+        "rev": "e1c50d1fbd5aab5501849e661cfc4086039062fe",
         "type": "github"
       },
       "original": {
