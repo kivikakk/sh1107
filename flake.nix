@@ -46,7 +46,11 @@
 
         buildInputs = with pkgs; [
           zig.master
+          pkgs.SDL2
+          pkgs.iconv
         ];
+
+        dontAddExtraLibs = true;
 
         doCheck = true;
 

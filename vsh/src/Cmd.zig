@@ -49,13 +49,13 @@ pub const Command = union(enum) {
         std.debug.assert(bytes.len >= 1);
         if (bytes[0] >= 0x00 and bytes[0] <= 0x0F) {
             if (bytes.len == 1) {
-                return .{ .SetLowerColumnAddress = @truncate(u4, bytes[0]) };
+                return .{ .SetLowerColumnAddress = @as(u4, @truncate(bytes[0])) };
             }
             return error.Unrecoverable;
         }
         if (bytes[0] >= 0x10 and bytes[0] <= 0x17) {
             if (bytes.len == 1) {
-                return .{ .SetHigherColumnAddress = @truncate(u3, bytes[0]) };
+                return .{ .SetHigherColumnAddress = @as(u3, @truncate(bytes[0])) };
             }
             return error.Unrecoverable;
         }
@@ -97,7 +97,7 @@ pub const Command = union(enum) {
                 return null;
             }
             if (bytes.len == 2) {
-                return .{ .SetMultiplexRatio = @as(u8, @truncate(u7, bytes[1])) + 1 };
+                return .{ .SetMultiplexRatio = @as(u8, @as(u7, @truncate(bytes[1]))) + 1 };
             }
             return error.Unrecoverable;
         }
@@ -130,7 +130,7 @@ pub const Command = union(enum) {
                 return null;
             }
             if (bytes.len == 2) {
-                return .{ .SetDisplayOffset = @truncate(u7, bytes[1]) };
+                return .{ .SetDisplayOffset = @as(u7, @truncate(bytes[1])) };
             }
             return error.Unrecoverable;
         }
@@ -157,7 +157,7 @@ pub const Command = union(enum) {
         }
         if (bytes[0] >= 0xB0 and bytes[0] <= 0xBF) {
             if (bytes.len == 1) {
-                return .{ .SetPageAddress = @truncate(u4, bytes[0]) };
+                return .{ .SetPageAddress = @as(u4, @truncate(bytes[0])) };
             }
             return error.Unrecoverable;
         }
@@ -175,8 +175,8 @@ pub const Command = union(enum) {
             }
             if (bytes.len == 2) {
                 return .{ .SetDisplayClockFrequency = .{
-                    .ratio = @as(u5, @truncate(u4, bytes[1])) + 1,
-                    .frequency = @enumFromInt(SH1107.DclkFreq, @truncate(u4, bytes[1] >> 4)),
+                    .ratio = @as(u5, @as(u4, @truncate(bytes[1]))) + 1,
+                    .frequency = @as(SH1107.DclkFreq, @enumFromInt(@as(u4, @truncate(bytes[1] >> 4)))),
                 } };
             }
             return error.Unrecoverable;
@@ -187,8 +187,8 @@ pub const Command = union(enum) {
             }
             if (bytes.len == 2) {
                 return .{ .SetPreDischargePeriod = .{
-                    .precharge = @truncate(u4, bytes[1]),
-                    .discharge = @truncate(u4, bytes[1] >> 4),
+                    .precharge = @as(u4, @truncate(bytes[1])),
+                    .discharge = @as(u4, @truncate(bytes[1] >> 4)),
                 } };
             }
             return error.Unrecoverable;
@@ -207,7 +207,7 @@ pub const Command = union(enum) {
                 return null;
             }
             if (bytes.len == 2) {
-                return .{ .SetDisplayStartLine = @truncate(u7, bytes[1]) };
+                return .{ .SetDisplayStartLine = @as(u7, @truncate(bytes[1])) };
             }
             return error.Unrecoverable;
         }

@@ -48,8 +48,8 @@ pub fn tick(self: *@This()) Tick {
             // .Pass, but then imagine the first data byte looks like it
             // addressses us.
             if (!self.addressed) {
-                const addr: u7 = @truncate(u7, byte >> 1);
-                const rw = @enumFromInt(RW, @truncate(u1, byte));
+                const addr: u7 = @as(u7, @truncate(byte >> 1));
+                const rw = @as(RW, @enumFromInt(@as(u1, @truncate(byte))));
                 if (addr == self.addr and rw == .W) {
                     self.sda_i.next(false);
                     self.addressed = true;

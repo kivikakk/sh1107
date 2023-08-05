@@ -49,7 +49,7 @@ pub fn main() !void {
     });
 }
 
-fn gkInit() !void {
+fn gkInit() anyerror!void { // XXX
     display = try Display.init();
 }
 
