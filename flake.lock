@@ -1,5 +1,54 @@
 {
   "nodes": {
+    "abc": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1687943424,
+        "narHash": "sha256-Qkk61Lh84ervtehWskSB9GKh+JPB7mI1IuG32OSZMdg=",
+        "owner": "YosysHQ",
+        "repo": "abc",
+        "rev": "bb64142b07794ee685494564471e67365a093710",
+        "type": "github"
+      },
+      "original": {
+        "owner": "YosysHQ",
+        "repo": "abc",
+        "rev": "bb64142b07794ee685494564471e67365a093710",
+        "type": "github"
+      }
+    },
+    "amaranth": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1691691127,
+        "narHash": "sha256-Gqq4iReeJsBA8+P2oQ0bFDjzk/4Xpo7ThrH3wQksK54=",
+        "owner": "amaranth-lang",
+        "repo": "amaranth",
+        "rev": "f976754e15e625d5b88beb7798e64f8b7ca20f48",
+        "type": "github"
+      },
+      "original": {
+        "owner": "amaranth-lang",
+        "repo": "amaranth",
+        "type": "github"
+      }
+    },
+    "amaranth-boards": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1691507939,
+        "narHash": "sha256-2cr2LkDA47KkAAp0DTSYjd8jDEeXoWDWJn6k0+JxhaY=",
+        "owner": "amaranth-lang",
+        "repo": "amaranth-boards",
+        "rev": "dc82d934b93409f639d5c7fbac4c62afb7978260",
+        "type": "github"
+      },
+      "original": {
+        "owner": "amaranth-lang",
+        "repo": "amaranth-boards",
+        "type": "github"
+      }
+    },
     "flake-compat": {
       "flake": false,
       "locked": {
@@ -17,6 +66,22 @@
       }
     },
     "flake-compat_2": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1673956053,
+        "narHash": "sha256-4gtG9iQuiKITOjNQQeQIpoIB6b16fm+504Ch3sNKLd8=",
+        "owner": "edolstra",
+        "repo": "flake-compat",
+        "rev": "35bb57c0c8d8b62bbfd284272c928ceb64ddbde9",
+        "type": "github"
+      },
+      "original": {
+        "owner": "edolstra",
+        "repo": "flake-compat",
+        "type": "github"
+      }
+    },
+    "flake-compat_3": {
       "flake": false,
       "locked": {
         "lastModified": 1673956053,
@@ -83,20 +148,66 @@
     },
     "hdx": {
       "inputs": {
+        "abc": "abc",
+        "amaranth": "amaranth",
+        "amaranth-boards": "amaranth-boards",
+        "flake-compat": "flake-compat_2",
         "flake-utils": "flake-utils_2",
-        "nixpkgs": "nixpkgs"
+        "icestorm": "icestorm",
+        "nextpnr": "nextpnr",
+        "nixpkgs": "nixpkgs",
+        "symbiyosys": "symbiyosys",
+        "trellis": "trellis",
+        "yices": "yices",
+        "yosys": "yosys",
+        "z3": "z3"
       },
       "locked": {
-        "lastModified": 1691214883,
-        "narHash": "sha256-3EWCa5DOvSO39s3KcY6dHZE8ZaJBsRMX5ychLNEarrM=",
+        "lastModified": 1691806035,
+        "narHash": "sha256-YUl6/huI82cM4vrUVhORpNmrfcWKXVarT91CdpIpYuM=",
         "owner": "charlottia",
         "repo": "hdx",
-        "rev": "e1c50d1fbd5aab5501849e661cfc4086039062fe",
+        "rev": "70f220182c3021ce55dd489b4b4cba521579009c",
         "type": "github"
       },
       "original": {
         "owner": "charlottia",
         "repo": "hdx",
+        "rev": "70f220182c3021ce55dd489b4b4cba521579009c",
+        "type": "github"
+      }
+    },
+    "icestorm": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1676734673,
+        "narHash": "sha256-dEBmxO2+Rf/UVyxDlDdJGFAeI4cu1wTCbneo5I4gFG0=",
+        "owner": "YosysHQ",
+        "repo": "icestorm",
+        "rev": "d20a5e9001f46262bf0cef220f1a6943946e421d",
+        "type": "github"
+      },
+      "original": {
+        "owner": "YosysHQ",
+        "repo": "icestorm",
+        "rev": "d20a5e9001f46262bf0cef220f1a6943946e421d",
+        "type": "github"
+      }
+    },
+    "nextpnr": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1687251498,
+        "narHash": "sha256-pLRuKMvpxgLHt43tI0tEmYXoMExqYTXqy+Q2HBezfkM=",
+        "owner": "YosysHQ",
+        "repo": "nextpnr",
+        "rev": "54b2045726fc3fe77857c05c81a5ab77e98ba851",
+        "type": "github"
+      },
+      "original": {
+        "owner": "YosysHQ",
+        "repo": "nextpnr",
+        "rev": "54b2045726fc3fe77857c05c81a5ab77e98ba851",
         "type": "github"
       }
     },
@@ -142,6 +253,23 @@
         "zig": "zig"
       }
     },
+    "symbiyosys": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1689691600,
+        "narHash": "sha256-O0BWOojXVmzYW2APWM9La5FunFjkfhkxhT9XjngqYqI=",
+        "owner": "YosysHQ",
+        "repo": "sby",
+        "rev": "cf0a761a3a0ba2e38258ff72f93505c85834dd16",
+        "type": "github"
+      },
+      "original": {
+        "owner": "YosysHQ",
+        "repo": "sby",
+        "rev": "cf0a761a3a0ba2e38258ff72f93505c85834dd16",
+        "type": "github"
+      }
+    },
     "systems": {
       "locked": {
         "lastModified": 1681028828,
@@ -172,18 +300,86 @@
         "type": "github"
       }
     },
+    "trellis": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1688397630,
+        "narHash": "sha256-COC5iPJHkpfB6rZUAz1P6EvpdqfbSLsc59dhAm1nXMA=",
+        "rev": "e830a28077e1a789d32e75841312120ae624c8d6",
+        "revCount": 1213,
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/YosysHQ/prjtrellis"
+      },
+      "original": {
+        "rev": "e830a28077e1a789d32e75841312120ae624c8d6",
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/YosysHQ/prjtrellis"
+      }
+    },
+    "yices": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1689210408,
+        "narHash": "sha256-NM20zgIT2BkLVEGHZyovV90cM8XcXLwKeCFThkCP+9w=",
+        "owner": "SRI-CSL",
+        "repo": "yices2",
+        "rev": "5a3e3f0fabf7d588c5adf1f791b26a590eac547f",
+        "type": "github"
+      },
+      "original": {
+        "owner": "SRI-CSL",
+        "repo": "yices2",
+        "rev": "5a3e3f0fabf7d588c5adf1f791b26a590eac547f",
+        "type": "github"
+      }
+    },
+    "yosys": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1691801191,
+        "narHash": "sha256-yJ656QKxcsxH7nSdsJau/z0Cx5314i34QNnHPC6yEHc=",
+        "owner": "YosysHQ",
+        "repo": "yosys",
+        "rev": "860e3e40563e6d5096ba0b7b1e81d25a70deb58c",
+        "type": "github"
+      },
+      "original": {
+        "owner": "YosysHQ",
+        "repo": "yosys",
+        "type": "github"
+      }
+    },
+    "z3": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1683921544,
+        "narHash": "sha256-DTgpKEG/LtCGZDnicYvbxG//JMLv25VHn/NaF307JYA=",
+        "owner": "Z3Prover",
+        "repo": "z3",
+        "rev": "e417f7d78509b2d0c9ebc911fee7632e6ef546b6",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Z3Prover",
+        "ref": "z3-4.12.2",
+        "repo": "z3",
+        "type": "github"
+      }
+    },
     "zig": {
       "inputs": {
-        "flake-compat": "flake-compat_2",
+        "flake-compat": "flake-compat_3",
         "flake-utils": "flake-utils_3",
         "nixpkgs": "nixpkgs_2"
       },
       "locked": {
-        "lastModified": 1691195023,
-        "narHash": "sha256-Ud0wU0LospRfKgpfggFSmKVH0Vywww1WozsvQNEUhjo=",
+        "lastModified": 1691799556,
+        "narHash": "sha256-bGW5lrIRSTq7YIwKpXVLVEBbNm8cmOM68dpNcpnUdhY=",
         "owner": "mitchellh",
         "repo": "zig-overlay",
-        "rev": "5b4dec84f870c21f8110f18640f8d4da87e99210",
+        "rev": "f5804d6cc4cfac52235404722f4abbbb4190035c",
         "type": "github"
       },
       "original": {

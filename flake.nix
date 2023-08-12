@@ -28,7 +28,7 @@
     flake-utils.lib.eachDefaultSystem (system: let
       pkgs = import nixpkgs {inherit overlays system;};
       hdx = pkgs.hdx.default;
-      python = hdx.hdx-config.python;
+      inherit (hdx) python;
     in rec {
       formatter = pkgs.alejandra;
 
