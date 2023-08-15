@@ -47,7 +47,7 @@ class SPIFlashReader(ConfigElaboratable):
         *,
         config: Config,
     ):
-        super().__init__(config)
+        super().__init__(config=config)
 
         self.spi_copi = Signal()
         self.spi_cipo = Signal()

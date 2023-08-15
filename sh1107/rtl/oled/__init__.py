@@ -102,7 +102,7 @@ class OLED(ConfigElaboratable):
         config: Config,
         speed: Hz,
     ):
-        super().__init__(config)
+        super().__init__(config=config)
 
         assert speed.value in self.VALID_SPEEDS
 

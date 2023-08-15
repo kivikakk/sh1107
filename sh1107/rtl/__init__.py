@@ -112,7 +112,7 @@ class Top(ConfigElaboratable):
         sequences: list[list[int]] = SEQUENCES,
         speed: Hz = Hz(400_000),
     ):
-        super().__init__(config)
+        super().__init__(config=config)
         self.oled = OLED(config=config, speed=speed)
         self.sequences = sequences
         self.speed = speed

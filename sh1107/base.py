@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Final, Self, TypeAlias
 
 from amaranth import Elaboratable
+from amaranth.lib.wiring import Component
 
 from .target import Target
 
@@ -14,6 +15,7 @@ __all__ = [
     "Blackboxes",
     "Config",
     "ConfigElaboratable",
+    "ConfigComponent",
     "build_top",
     "path",
 ]
@@ -45,7 +47,16 @@ class Config:
 class ConfigElaboratable(Elaboratable):
     config: Final[Config]
 
-    def __init__(self, config: Config):
+    def __init__(self, *, config: Config):
+        super().__init__()
+        self.config = config
+
+
+class ConfigComponent(Component):
+    config: Final[Config]
+
+    def __init__(self, *, config: Config):
+        super().__init__()
         self.config = config
 
 
