@@ -5,7 +5,7 @@ from amaranth import C, Cat, ClockSignal, Instance, Memory, Module, Mux, Signal
 from amaranth.build import Platform
 from amaranth.lib.enum import IntEnum
 from amaranth.lib.fifo import SyncFIFO
-from amaranth.lib.wiring import Component, In, Out, connect, transpose
+from amaranth.lib.wiring import In, connect, transpose
 from amaranth_boards.icebreaker import ICEBreakerPlatform
 
 from ... import rom

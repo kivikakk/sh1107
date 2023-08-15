@@ -1,9 +1,8 @@
 import math
 from typing import Optional, cast
 
-from amaranth import C, Cat, ClockSignal, Instance, Module, Record, Signal
+from amaranth import C, Cat, ClockSignal, Instance, Module, Signal
 from amaranth.build import Attrs, Pins, PinsN, Platform, Resource, Subsignal
-from amaranth.hdl.rec import DIR_FANIN, DIR_FANOUT
 from amaranth.lib.wiring import In, Out, Signature
 from amaranth_boards.icebreaker import ICEBreakerPlatform
 from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform

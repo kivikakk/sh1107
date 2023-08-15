@@ -30,10 +30,10 @@
       pkgs = import nixpkgs {inherit overlays system;};
       hdx = pkgs.hdx.default;
       inherit (hdx) python;
-      zig = if pkgs.stdenv.isDarwin then
-        pkgs.zig-overlay.master
-      else
-        pkgs.zig;
+      zig =
+        if pkgs.stdenv.isDarwin
+        then pkgs.zig-overlay.master
+        else pkgs.zig;
     in rec {
       formatter = pkgs.alejandra;
 
@@ -48,6 +48,7 @@
             python.pkgs.setuptools
             python.pkgs.black
             python.pkgs.isort
+            pkgs.nodePackages.pyright
             hdx
             zig
             pkgs.dfu-util

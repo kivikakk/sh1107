@@ -2,6 +2,7 @@ from typing import Final, Optional
 
 from amaranth import Elaboratable, Module
 from amaranth.build import Platform
+from amaranth.lib.wiring import connect
 from amaranth.sim import Settle
 
 from ... import sim
@@ -30,7 +31,7 @@ class TestLocatorTop(Elaboratable):
         m.submodules.i2c = self.i2c
         m.submodules.locator = self.locator
 
-        m.d.comb += self.i2c.bus.connect(self.locator.i2c_bus)
+        connect(m, self.i2c.bus, self.locator.i2c_bus)
 
         return m
 

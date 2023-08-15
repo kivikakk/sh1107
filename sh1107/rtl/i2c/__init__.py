@@ -1,11 +1,9 @@
 from typing import Final, Optional, Self, cast
 
-from amaranth import Elaboratable, Module, Record, Signal
+from amaranth import Module, Signal
 from amaranth.build import Attrs, Platform
-from amaranth.hdl.rec import DIR_FANIN, DIR_FANOUT
 from amaranth.lib import data, enum
 from amaranth.lib.fifo import SyncFIFO
-from amaranth.lib.io import Pin
 from amaranth.lib.wiring import Component, In, Out, Signature
 from amaranth_boards.icebreaker import ICEBreakerPlatform
 from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform

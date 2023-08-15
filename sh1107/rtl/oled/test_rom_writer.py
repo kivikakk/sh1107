@@ -3,6 +3,7 @@ from typing import Final, Optional
 from amaranth import Elaboratable, Memory, Module
 from amaranth.build import Platform
 from amaranth.hdl.mem import ReadPort
+from amaranth.lib.wiring import connect
 from amaranth.sim import Delay
 
 from ... import rom, sim
@@ -30,10 +31,7 @@ class TestROMWriterTop(Elaboratable):
             depth=rom.ROM_LENGTH,
             init=rom.ROM_CONTENT,
         ).read_port()
-        self.rom_writer = ROMWriter(
-            rom_bus=ROMBus.for_read_port(self.rom_rd, name="mem"),
-            addr=TestROMWriterTop.ADDR,
-        )
+        self.rom_writer = ROMWriter(addr=TestROMWriterTop.ADDR)
 
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
@@ -42,10 +40,8 @@ class TestROMWriterTop(Elaboratable):
         m.submodules.rom_rd = self.rom_rd
         m.submodules.rom_writer = self.rom_writer
 
-        m.d.comb += [
-            self.i2c.bus.connect(self.rom_writer.i2c_bus),
-            self.rom_writer.rom_bus.connect_read_port(self.rom_rd),
-        ]
+        connect(m, self.i2c.bus, self.rom_writer.i2c_bus)
+        ROMBus.connect_read_port(m, self.rom_rd, self.rom_writer.rom_bus)
 
         return m
 
