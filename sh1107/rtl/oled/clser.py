@@ -2,7 +2,7 @@ from typing import Optional
 
 from amaranth import Module, Signal
 from amaranth.build import Platform
-from amaranth.lib.wiring import Component, In
+from amaranth.lib.wiring import Component, In, Out
 
 from ...proto import Cmd, ControlByte
 from ..i2c import RW, I2CBus, Transfer
@@ -13,9 +13,9 @@ __all__ = ["Clser"]
 class Clser(Component):
     addr: int
 
-    i_stb: Signal
+    i_stb: In(1)
 
-    o_busy: Signal
+    o_busy: Out(1)
 
     i2c_bus: In(I2CBus)
 

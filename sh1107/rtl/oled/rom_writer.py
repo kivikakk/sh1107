@@ -2,7 +2,7 @@ from typing import Optional, cast
 
 from amaranth import Cat, Module, Signal
 from amaranth.build import Platform
-from amaranth.lib.wiring import Component, In
+from amaranth.lib.wiring import Component, In, Out
 
 from ... import rom
 from ..i2c import RW, I2CBus, Transfer
@@ -14,25 +14,19 @@ __all__ = ["ROMWriter"]
 class ROMWriter(Component):
     addr: int
 
-    i_index: Signal
-    i_stb: Signal
-    o_busy: Signal
+    i_index: In(range(rom.SEQ_COUNT))
+    i_stb: In(1)
+    o_busy: Out(1)
 
     i2c_bus: In(I2CBus)
-    rom_bus: ROMBus
+    rom_bus: In(ROMBus(rom.ROM_ABITS, 8))
 
     offset: Signal
     remain: Signal
 
-    def __init__(self, *, rom_bus: ROMBus, addr: int):
+    def __init__(self, *, addr: int):
         super().__init__()
         self.addr = addr
-
-        self.i_index = Signal(range(rom.SEQ_COUNT))
-        self.i_stb = Signal()
-        self.o_busy = Signal()
-
-        self.rom_bus = rom_bus.clone(name="romwriter")
 
         self.offset = Signal(range(rom.ROM_LENGTH))
         self.remain = Signal(range(rom.ROM_LENGTH))

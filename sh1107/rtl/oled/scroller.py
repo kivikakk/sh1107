@@ -2,7 +2,7 @@ from typing import Optional, cast
 
 from amaranth import Cat, Module, Mux, Signal
 from amaranth.build import Platform
-from amaranth.lib.wiring import Component, In
+from amaranth.lib.wiring import Component, In, Out
 
 from ... import rom
 from ..i2c import RW, I2CBus, Transfer
@@ -14,28 +14,21 @@ __all__ = ["Scroller"]
 class Scroller(Component):
     addr: int
 
-    i_stb: Signal
-    i_rst: Signal
-    o_busy: Signal
-    o_adjusted: Signal
+    i_stb: In(1)
+    i_rst: In(1)
+    o_busy: Out(1)
+    o_adjusted: Out(range(16))
 
     i2c_bus: In(I2CBus)
-    rom_bus: ROMBus
+    rom_bus: In(ROMBus(rom.ROM_ABITS, 8))
 
     offset: Signal
     remain: Signal
     written: Signal
 
-    def __init__(self, *, rom_bus: ROMBus, addr: int):
+    def __init__(self, *, addr: int):
         super().__init__()
         self.addr = addr
-
-        self.i_stb = Signal()
-        self.i_rst = Signal()
-        self.o_busy = Signal()
-        self.o_adjusted = Signal(range(16))
-
-        self.rom_bus = rom_bus.clone(name="scroller")
 
         self.offset = Signal(range(rom.ROM_LENGTH))
         self.remain = Signal(range(rom.ROM_LENGTH))

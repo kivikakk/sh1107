@@ -1,3 +1,4 @@
+import math
 import struct
 from argparse import ArgumentParser, Namespace
 
@@ -9,6 +10,7 @@ from .chars import CHARS
 __all__ = [
     "add_main_arguments",
     "ROM_LENGTH",
+    "ROM_ABITS",
     "ROM_CONTENT",
     "SEQ_COUNT",
     "OFFSET_INIT",
@@ -128,6 +130,7 @@ for parts in seqs:
 ROM_CONTENT = index + bytes(rom)
 
 ROM_LENGTH = len(ROM_CONTENT)
+ROM_ABITS = math.ceil(math.log2(ROM_LENGTH))
 
 # ROM structure:
 # "Commands" are 1 or more sequences of bytes to send as individual I2C transmissions.

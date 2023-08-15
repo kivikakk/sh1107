@@ -78,8 +78,8 @@ class OLED(ConfigComponent):
 
     rom_wr_en: Signal
     rom_wr_data: Signal
-    rom_bus: ROMBus
-    own_rom_bus: ROMBus
+    rom_bus: In(ROMBus(rom.ROM_ABITS, 8))
+    own_rom_bus: In(ROMBus(rom.ROM_ABITS, 8))
     rom_mem: Instance | Memory
 
     rom_writer: ROMWriter
@@ -146,14 +146,10 @@ class OLED(ConfigComponent):
 
         self.rom_wr_en = Signal()
         self.rom_wr_data = Signal(8)
-        abits = math.ceil(math.log2(rom.ROM_LENGTH))
-        self.rom_bus = ROMBus(abits, 8, name="mem")
-        self.own_rom_bus = self.rom_bus.clone(name="oled")
-
-        self.rom_writer = ROMWriter(rom_bus=self.rom_bus, addr=OLED.ADDR)
+        self.rom_writer = ROMWriter(addr=OLED.ADDR)
         self.locator = Locator(addr=OLED.ADDR)
         self.clser = Clser(addr=OLED.ADDR)
-        self.scroller = Scroller(rom_bus=self.rom_bus, addr=OLED.ADDR)
+        self.scroller = Scroller(addr=OLED.ADDR)
 
         self.i_fifo = SyncFIFO(width=8, depth=1)
         self.o_result = Signal(OLED.Result, reset=OLED.Result.BUSY)
@@ -427,23 +423,17 @@ class OLED(ConfigComponent):
 
         with m.If(self.rom_writer.o_busy):
             connect(m, transpose(self.i2c_bus), self.rom_writer.i2c_bus)
-            m.d.comb += [
-                self.rom_bus.connect(self.rom_writer.rom_bus),
-            ]
+            connect(m, transpose(self.rom_bus), self.rom_writer.rom_bus)
         with m.Elif(self.locator.o_busy):
             connect(m, transpose(self.i2c_bus), self.locator.i2c_bus)
         with m.Elif(self.clser.o_busy):
             connect(m, transpose(self.i2c_bus), self.clser.i2c_bus)
         with m.Elif(self.scroller.o_busy):
             connect(m, transpose(self.i2c_bus), self.scroller.i2c_bus)
-            m.d.comb += [
-                self.rom_bus.connect(self.scroller.rom_bus),
-            ]
+            connect(m, transpose(self.rom_bus), self.scroller.rom_bus)
         with m.Else():
             connect(m, transpose(self.i2c_bus), self.own_i2c_bus)
-            m.d.comb += [
-                self.rom_bus.connect(self.own_rom_bus),
-            ]
+            connect(m, transpose(self.rom_bus), self.own_rom_bus)
 
         m.d.comb += self.locator.i_adjust.eq(self.scroller.o_adjusted)
 
