@@ -46,6 +46,8 @@
         nativeBuildInputs =
           [
             python.pkgs.setuptools
+            python.pkgs.black
+            python.pkgs.isort
             hdx
             zig
             pkgs.dfu-util
