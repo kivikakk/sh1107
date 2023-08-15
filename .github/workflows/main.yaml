@@ -11,4 +11,4 @@ jobs:
       - name: Run the Magic Nix Cache
         uses: DeterminateSystems/magic-nix-cache-action@v2
       - name: Build everything
-        run: nix build . -L
+        run: nix build '.?submodules=1' -L
