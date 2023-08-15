@@ -53,7 +53,7 @@ latest commit.
 
 For a detailed guide on installing specific versions of some of these tools,
 please see [Installing an HDL toolchain from source][notes-0001].  On Nix,
-[hdx] packages everything — `nix develop` and `nix-shell` will use it.
+[hdx] packages everything — `nix develop`/`nix-shell` will use it.
 
 To run at all:
 
@@ -79,7 +79,7 @@ To run formal tests:
 * [SymbiYosys]
 * [Z3] (4.12+ is known to work; 4.8 is known not to)
 
-[notes-0001]: https://notes.hrzn.ee/posts/0001-hdl-toolchain-source/
+[notes-0001]: https://lottia.net/notes/0001-hdl-toolchain-source.html
 [hdx]: https://github.com/charlottia/hdx
 [Python 3]: https://www.python.org
 [`d218273`]: https://github.com/amaranth-lang/amaranth/commit/d218273b9b2c6e65b7d92eb0f280306ea9c07ea3
