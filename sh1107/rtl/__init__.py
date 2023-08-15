@@ -4,10 +4,11 @@ from amaranth import Cat, Memory, Module, Record, Signal
 from amaranth.build import Platform
 from amaranth.build.res import ResourceError
 from amaranth.hdl.mem import ReadPort
+from amaranth.lib.wiring import Signature, In
 from amaranth_boards.icebreaker import ICEBreakerPlatform
 from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
 
-from ..base import Blackbox, Config, ConfigElaboratable
+from ..base import Blackbox, Config, ConfigComponent
 from .common import Button, ButtonWithHold, Hz
 from .oled import OLED
 
@@ -95,12 +96,10 @@ SEQUENCES.append(
 )
 
 
-class Top(ConfigElaboratable):
+class Top(ConfigComponent):
     oled: OLED
     sequences: list[list[int]]
     speed: Hz
-
-    switches: list[Signal]
 
     rom_len: int
     rom_rd: ReadPort
@@ -112,12 +111,12 @@ class Top(ConfigElaboratable):
         sequences: list[list[int]] = SEQUENCES,
         speed: Hz = Hz(400_000),
     ):
-        super().__init__(config=config)
-        self.oled = OLED(config=config, speed=speed)
         self.sequences = sequences
-        self.speed = speed
+        super().__init__(config=config)
+        self.switches = [getattr(self, f"switch_{i}") for i in range(len(sequences))]
 
-        self.switches = [Signal(name=f"switch_{i}") for i, _ in enumerate(sequences)]
+        self.oled = OLED(config=config, speed=speed)
+        self.speed = speed
 
         self.rom_len = sum(len(seq) for seq in sequences)
         self.rom_rd = Memory(
@@ -125,6 +124,14 @@ class Top(ConfigElaboratable):
             depth=self.rom_len,
             init=[i for seq in sequences for i in seq],
         ).read_port()
+
+    @property
+    def signature(self):
+        return Signature({
+            # Note that these remain disconnected/unused when building for an
+            # actual target.
+            f"switch_{i}": In(1) for i in range(len(self.sequences))
+        })
 
     @property
     def ports(self) -> list[Signal]:
