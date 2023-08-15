@@ -7,7 +7,7 @@
       url = github:edolstra/flake-compat;
       flake = false;
     };
-    hdx.url = github:charlottia/hdx;
+    hdx.url = github:charlottia/hdx?ref=v0.1;
     zig.url = github:mitchellh/zig-overlay;
   };
 
@@ -21,7 +21,7 @@
     overlays = [
       (final: prev: {
         hdx = inputs.hdx.packages.${prev.system};
-        zig = inputs.zig.packages.${prev.system};
+        zig-overlay = inputs.zig.packages.${prev.system};
       })
     ];
   in
@@ -29,6 +29,10 @@
       pkgs = import nixpkgs {inherit overlays system;};
       hdx = pkgs.hdx.default;
       inherit (hdx) python;
+      zig = if pkgs.stdenv.isDarwin then
+        pkgs.zig-overlay.master
+      else
+        pkgs.zig;
     in rec {
       formatter = pkgs.alejandra;
 
@@ -42,7 +46,7 @@
           [
             python.pkgs.setuptools
             hdx
-            pkgs.zig.master
+            zig
             pkgs.dfu-util
           ]
           ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
@@ -51,7 +55,7 @@
 
         buildInputs = with pkgs;
           [
-            zig.master
+            zig
             pkgs.SDL2
             pkgs.iconv
           ]

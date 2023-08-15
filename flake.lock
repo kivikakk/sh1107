@@ -20,11 +20,11 @@
     "amaranth": {
       "flake": false,
       "locked": {
-        "lastModified": 1691691127,
-        "narHash": "sha256-Gqq4iReeJsBA8+P2oQ0bFDjzk/4Xpo7ThrH3wQksK54=",
-        "owner": "amaranth-lang",
+        "lastModified": 1692060736,
+        "narHash": "sha256-hd44D6Ds6Fwj1BT8GZv16HzGuL9Ujtm2OTmMUlIyluI=",
+        "owner": "whitequark",
         "repo": "amaranth",
-        "rev": "f976754e15e625d5b88beb7798e64f8b7ca20f48",
+        "rev": "9a86327695444b3881f98e79fcef866261e2633d",
         "type": "github"
       },
       "original": {
@@ -163,17 +163,17 @@
         "z3": "z3"
       },
       "locked": {
-        "lastModified": 1691806035,
-        "narHash": "sha256-YUl6/huI82cM4vrUVhORpNmrfcWKXVarT91CdpIpYuM=",
+        "lastModified": 1691970242,
+        "narHash": "sha256-ZhVm3w7vu098GBSdjom1WCr3dtJbyz+OCttzq3UuC0k=",
         "owner": "charlottia",
         "repo": "hdx",
-        "rev": "70f220182c3021ce55dd489b4b4cba521579009c",
+        "rev": "0a2743db55937d93b133b05b8a8ab2deb2f343a3",
         "type": "github"
       },
       "original": {
         "owner": "charlottia",
+        "ref": "v0.1",
         "repo": "hdx",
-        "rev": "70f220182c3021ce55dd489b4b4cba521579009c",
         "type": "github"
       }
     },
@@ -213,11 +213,11 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1690327932,
-        "narHash": "sha256-Fv7PYZxN4eo0K6zXhHG/vOc+e2iuqQ5ywDrh0yeRjP0=",
+        "lastModified": 1691709280,
+        "narHash": "sha256-zmfH2OlZEXwv572d0g8f6M5Ac6RiO8TxymOpY3uuqrM=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "a9b47d85504bdd199e90846622c76aa0bfeabfac",
+        "rev": "cf73a86c35a84de0e2f3ba494327cf6fb51c0dfd",
         "type": "github"
       },
       "original": {
@@ -375,11 +375,11 @@
         "nixpkgs": "nixpkgs_2"
       },
       "locked": {
-        "lastModified": 1691799556,
-        "narHash": "sha256-bGW5lrIRSTq7YIwKpXVLVEBbNm8cmOM68dpNcpnUdhY=",
+        "lastModified": 1692014887,
+        "narHash": "sha256-NkHmwJgi7IS8d2ZgWirl5jWFKyHt9khNoc+/Fd+wDUA=",
         "owner": "mitchellh",
         "repo": "zig-overlay",
-        "rev": "f5804d6cc4cfac52235404722f4abbbb4190035c",
+        "rev": "16209df45cad3b1217234c40a37fdde26af46373",
         "type": "github"
       },
       "original": {
