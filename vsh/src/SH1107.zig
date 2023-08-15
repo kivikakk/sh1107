@@ -184,7 +184,7 @@ pub fn data(self: *@This(), b: u8) Write {
 
             var i: u4 = 8;
             while (i > 0) : (i -= 1) {
-                value = (value << 1) | ((b >> @truncate(u3, i - 1)) & 0x1);
+                value = (value << 1) | ((b >> @as(u3, @truncate(i - 1))) & 0x1);
             }
         },
         .Flipped => {
@@ -192,7 +192,7 @@ pub fn data(self: *@This(), b: u8) Write {
 
             var i: u4 = 0;
             while (i < 8) : (i += 1) {
-                value = (value << 1) | ((b >> @truncate(u3, i)) & 0x1);
+                value = (value << 1) | ((b >> @as(u3, @truncate(i))) & 0x1);
             }
         },
     }

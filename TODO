@@ -1,1 +1,2 @@
 * vsh on Nix on macOS doesn't work due to https://github.com/ziglang/zig/issues/14569.
+* build/ isn't the place to build during a nix build process!

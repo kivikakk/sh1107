@@ -66,7 +66,7 @@ pub fn tick(self: *I2CBBConnector) Tick {
                 }
             } else {
                 switch (rw) {
-                    .W => return .{ .Byte = @truncate(u8, self.latched_fifo_in_data) },
+                    .W => return .{ .Byte = @as(u8, @truncate(self.latched_fifo_in_data)) },
                     .R => {
                         self.bb_in_out_fifo_data.next(self.next_read_value);
                         self.bb_in_out_fifo_stb.next(true);
@@ -97,8 +97,8 @@ pub fn tick(self: *I2CBBConnector) Tick {
 }
 
 fn handleAddress(self: *I2CBBConnector, fifo: u9) ?RW {
-    const addr: u7 = @truncate(u7, fifo >> 1);
-    const rw = @enumFromInt(RW, @truncate(u1, fifo));
+    const addr: u7 = @as(u7, @truncate(fifo >> 1));
+    const rw = @as(RW, @enumFromInt(@as(u1, @truncate(fifo))));
     if (addr == self.addr) {
         self.addressed = rw;
         self.bb_in_ack.next(true);

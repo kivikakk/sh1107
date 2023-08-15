@@ -47,7 +47,7 @@ pub fn Object(comptime T: type) type {
             if (T == bool) {
                 return self.object.*.curr[0] == 1;
             } else {
-                return @intCast(T, self.object.*.curr[0]);
+                return @as(T, @intCast(self.object.*.curr[0]));
             }
         }
 

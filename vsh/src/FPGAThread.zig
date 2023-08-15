@@ -70,7 +70,7 @@ pub fn process_data(self: *FPGAThread, data: u8) void {
     defer self.idata_mutex.unlock();
     defer self.idata_stale.store(true, .Release);
     for (0..8) |i| {
-        const px = ((pxw.value >> @truncate(u3, i)) & 1) == 1;
+        const px = ((pxw.value >> @as(u3, @truncate(i))) & 1) == 1;
         const x = pxw.column;
         const y = pxw.row + i;
 
@@ -158,7 +158,7 @@ const State = struct {
             clk.next(true);
 
             for (self.switch_connectors, 1..) |*swicon, i| {
-                if (self.fpga_thread.press_signal.compareAndSwap(@intCast(u8, i), 0, .Monotonic, .Monotonic) == null) {
+                if (self.fpga_thread.press_signal.compareAndSwap(@as(u8, @intCast(i)), 0, .Monotonic, .Monotonic) == null) {
                     swicon.press();
                 }
                 swicon.tick();

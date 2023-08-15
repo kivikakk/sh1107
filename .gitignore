@@ -1,3 +1,4 @@
+**/__pypackages__/
 **/__pycache__/
 **/zig-cache/
 **/zig-out/
@@ -5,3 +6,6 @@
 /venv/
 rom.bin
 vsh.vcd
+.pdm-python
+result
+result-*
