@@ -4,43 +4,37 @@ from typing import Optional, cast
 from amaranth import C, Cat, ClockSignal, Instance, Module, Record, Signal
 from amaranth.build import Attrs, Pins, PinsN, Platform, Resource, Subsignal
 from amaranth.hdl.rec import DIR_FANIN, DIR_FANOUT
+from amaranth.lib.wiring import Signature, In, Out
 from amaranth_boards.icebreaker import ICEBreakerPlatform
 from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
 
 from ... import sim
-from ...base import Blackbox, Config, ConfigElaboratable
+from ...base import Blackbox, Config, ConfigComponent
 
-__all__ = ["SPIFlashReaderBus", "SPIFlashReader"]
-
-
-class SPIFlashReaderBus(Record):
-    addr: Signal
-    len: Signal
-    stb: Signal
-    busy: Signal
-    data: Signal
-    valid: Signal
-
-    def __init__(self):
-        super().__init__(
-            [
-                ("addr", 24, DIR_FANIN),
-                ("len", 16, DIR_FANIN),
-                ("stb", 1, DIR_FANIN),
-                ("busy", 1, DIR_FANOUT),
-                ("data", 8, DIR_FANOUT),
-                ("valid", 1, DIR_FANOUT),
-            ]
-        )
+__all__ = ["SPIBus", "SPIFlashReaderBus", "SPIFlashReader"]
 
 
-class SPIFlashReader(ConfigElaboratable):
-    spi_copi: Signal
-    spi_cipo: Signal
-    spi_cs: Signal
-    spi_clk: Signal
+SPIBus = Signature({
+    "copi": Out(1),
+    "cipo": In(1),
+    "cs": Out(1),
+    "clk": Out(1),
+})
 
-    bus: SPIFlashReaderBus
+
+SPIFlashReaderBus = Signature({
+    "addr": In(24),
+    "len": In(16),
+    "stb": In(1),
+    "busy": Out(1),
+    "data": Out(8),
+    "valid": Out(1),
+})
+
+
+class SPIFlashReader(ConfigComponent):
+    spi: Out(SPIBus)
+    bus: Out(SPIFlashReaderBus)
 
     def __init__(
         self,
@@ -48,13 +42,6 @@ class SPIFlashReader(ConfigElaboratable):
         config: Config,
     ):
         super().__init__(config=config)
-
-        self.spi_copi = Signal()
-        self.spi_cipo = Signal()
-        self.spi_cs = Signal()
-        self.spi_clk = Signal()
-
-        self.bus = SPIFlashReaderBus()
 
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
@@ -64,10 +51,12 @@ class SPIFlashReader(ConfigElaboratable):
         match platform:
             case ICEBreakerPlatform():
                 spi = platform.request("spi_flash_1x")
-                self.spi_copi = spi.copi.o
-                self.spi_cipo = spi.cipo.i
-                self.spi_cs = spi.cs.o
-                self.spi_clk = spi.clk.o
+                m.d.comb += [
+                    spi.copi.o.eq(self.spi.copi),
+                    self.spi.cipo.eq(spi.cipo.i),
+                    spi.cs.o.eq(self.spi.cs),
+                    spi.clk.o.eq(self.spi.clk),
+                ]
 
             case OrangeCrabR0_2_85FPlatform():
                 # XXX(Ch): At least until I know what the hell I'm doing here
@@ -89,13 +78,15 @@ class SPIFlashReader(ConfigElaboratable):
                 )
 
                 spi = platform.request("custom_spi_flash")
-                self.spi_copi = spi.copi.o
-                self.spi_cipo = spi.cipo.i
-                self.spi_cs = spi.cs.o
+                m.d.comb += [
+                    spi.copi.o.eq(self.spi.copi),
+                    self.spi.cipo.eq(spi.cipo.i),
+                    spi.cs.o.eq(self.spi.cs),
+                ]
 
                 m.submodules.usrmclk = Instance(
                     "USRMCLK",
-                    i_USRMCLKI=self.spi_clk,
+                    i_USRMCLKI=self.spi.clk,
                     i_USRMCLKTS=0,
                 )
 
@@ -104,9 +95,9 @@ class SPIFlashReader(ConfigElaboratable):
                     m.submodules.spifr_whitebox = Instance(
                         "spifr_whitebox",
                         i_clk=ClockSignal(),
-                        i_copi=self.spi_copi,
-                        o_cipo=self.spi_cipo,
-                        i_cs=self.spi_cs,
+                        i_copi=self.spi.copi,
+                        o_cipo=self.spi.cipo,
+                        i_cs=self.spi.cs,
                     )
 
         freq = (
@@ -125,8 +116,8 @@ class SPIFlashReader(ConfigElaboratable):
         rcv_bytecount = Signal.like(self.bus.len)
 
         m.d.comb += [
-            self.spi_copi.eq(sr[-1]),
-            self.spi_clk.eq(self.spi_cs & ~clk),
+            self.spi.copi.eq(sr[-1]),
+            self.spi.clk.eq(self.spi.cs & ~clk),
             self.bus.data.eq(sr[:8]),
         ]
 
@@ -138,7 +129,7 @@ class SPIFlashReader(ConfigElaboratable):
             with m.State("IDLE"):
                 with m.If(self.bus.stb):
                     m.d.sync += [
-                        self.spi_cs.eq(1),
+                        self.spi.cs.eq(1),
                         sr.eq(0xAB000000),
                         snd_bitcount.eq(31),
                     ]
@@ -151,7 +142,7 @@ class SPIFlashReader(ConfigElaboratable):
                 ]
                 with m.If(snd_bitcount == 0):
                     m.d.sync += [
-                        self.spi_cs.eq(0),
+                        self.spi.cs.eq(0),
                         snd_bitcount.eq(TRES1_TDP_CYCLES - 1),
                     ]
                     m.next = "WAIT TRES1"
@@ -161,7 +152,7 @@ class SPIFlashReader(ConfigElaboratable):
                     m.d.sync += snd_bitcount.eq(snd_bitcount - 1)
                 with m.Else():
                     m.d.sync += [
-                        self.spi_cs.eq(1),
+                        self.spi.cs.eq(1),
                         sr.eq(Cat(self.bus.addr, C(0x03, 8))),
                         snd_bitcount.eq(31),
                         rcv_bitcount.eq(7),
@@ -180,7 +171,7 @@ class SPIFlashReader(ConfigElaboratable):
             with m.State("RECEIVING"):
                 m.d.sync += [
                     rcv_bitcount.eq(rcv_bitcount - 1),
-                    sr.eq(Cat(self.spi_cipo, sr[:-1])),
+                    sr.eq(Cat(self.spi.cipo, sr[:-1])),
                 ]
                 with m.If(rcv_bitcount == 0):
                     m.d.sync += [
@@ -190,7 +181,7 @@ class SPIFlashReader(ConfigElaboratable):
                     ]
                     with m.If(rcv_bytecount == 0):
                         m.d.sync += [
-                            self.spi_cs.eq(0),
+                            self.spi.cs.eq(0),
                             snd_bitcount.eq(TRES1_TDP_CYCLES - 1),
                         ]
                         m.next = "POWER DOWN"

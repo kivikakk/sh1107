@@ -79,7 +79,7 @@ def add_main_arguments(parser: ArgumentParser):
     )
     parser.add_argument(
         "-O",
-        "--_Optimize",
+        "--optimize",
         type=_Optimize,
         choices=_Optimize,
         help="build RTL or Zig with optimizations (default: both)",
@@ -134,7 +134,7 @@ def main(args: Namespace):
             [
                 "zig",
                 "c++",
-                *(["-O3"] if args._Optimize.opt_rtl else []),
+                *(["-O3"] if args.optimize.opt_rtl else []),
                 "-DCXXRTL_INCLUDE_CAPI_IMPL",
                 "-DCXXRTL_INCLUDE_VCD_CAPI_IMPL",
                 "-I" + str(path(".")),
@@ -154,7 +154,7 @@ def main(args: Namespace):
     if not args.compile:
         cmd += ["run"]
     cmd += [
-        *(["-Doptimize=ReleaseFast"] if args._Optimize.opt_zig else []),
+        *(["-Doptimize=ReleaseFast"] if args.optimize.opt_zig else []),
         f"-Dyosys_data_dir={yosys.data_dir()}",
         f"-Dcxxrtl_lib_paths={','.join(str(o_path) for o_path in cc_o_paths.values())}",
     ]

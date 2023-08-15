@@ -5,10 +5,11 @@ from amaranth import C, Cat, ClockSignal, Instance, Memory, Module, Mux, Signal
 from amaranth.build import Platform
 from amaranth.lib.enum import IntEnum
 from amaranth.lib.fifo import SyncFIFO
+from amaranth.lib.wiring import Component, In, connect
 from amaranth_boards.icebreaker import ICEBreakerPlatform
 
 from ... import rom
-from ...base import Blackbox, Config, ConfigElaboratable
+from ...base import Blackbox, Config, ConfigComponent
 from ..common import Hz
 from ..i2c import I2C, I2CBus
 from ..spi import SPIFlashReader, SPIFlashReaderBus
@@ -21,7 +22,7 @@ from .scroller import Scroller
 __all__ = ["OLED"]
 
 
-class OLED(ConfigElaboratable):
+class OLED(ConfigComponent):
     ADDR: Final[int] = 0x3C
 
     # 1MHz is a bit unacceptable.  It seems to mostly work, except that
@@ -72,7 +73,7 @@ class OLED(ConfigElaboratable):
     i_i2c_bb_in_out_fifo_data: Signal
     i_i2c_bb_in_out_fifo_stb: Signal
 
-    spifr_bus: SPIFlashReaderBus
+    spifr_bus: In(SPIFlashReaderBus)
     spifr: SPIFlashReader | Instance
 
     rom_wr_en: Signal
@@ -131,7 +132,6 @@ class OLED(ConfigElaboratable):
                 o_out_fifo_r_data=self.i2c_bus.o_out_fifo_r_data,
             )
 
-        self.spifr_bus = SPIFlashReaderBus()
         if Blackbox.SPIFR not in self.config.blackboxes:
             self.spifr = SPIFlashReader(config=self.config)
         else:
@@ -416,7 +416,7 @@ class OLED(ConfigElaboratable):
             m.d.comb += self.i2c.bus.connect(self.i2c_bus)
 
         if Blackbox.SPIFR not in self.config.blackboxes:
-            m.d.comb += self.spifr.bus.connect(self.spifr_bus)
+            connect(m, self.spifr.bus, self.spifr_bus)
 
         m.submodules.i2c = self.i2c
         m.submodules.spifr = self.spifr

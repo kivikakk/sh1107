@@ -1,34 +1,28 @@
 from typing import Optional
 
-from amaranth import C, Cat, Elaboratable, Module, Signal, Value
+from amaranth import C, Cat, Module, Signal, Value
 from amaranth.build import Platform
 from amaranth.hdl.ast import ValueCastable
 from amaranth.lib.fifo import SyncFIFO
+from amaranth.lib.wiring import In, Out, Component
 
 from ... import sim
 from ...base import Config
-from . import SPIFlashReader
+from . import SPIBus, SPIFlashReader
 
 
 # TODO(Ch): try using this + initted Memory in vsh instead of the whitebox, just
 # to see how hard/easy it is.
-class MockSPIFlashPeripheral(Elaboratable):
+class MockSPIFlashPeripheral(Component):
     data: Value
-
-    spi_copi: Signal
-    spi_cipo: Signal
-    spi_cs: Signal
-    spi_clk: Signal
+    spi: In(SPIBus)
 
     def __init__(self, *, data: Value):
+        super().__init__()
+
         self.data = data
         assert len(self.data) <= 32
         assert len(self.data) % 8 == 0
-
-        self.spi_copi = Signal()
-        self.spi_cipo = Signal()
-        self.spi_cs = Signal()
-        self.spi_clk = Signal()
 
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
@@ -39,12 +33,12 @@ class MockSPIFlashPeripheral(Elaboratable):
 
         # XXX(Ch): when we all run at the same speed, we can't detect the rising
         # edge.
-        clk_rising = self.spi_clk == 1
+        clk_rising = self.spi.clk == 1
 
         srnext = Signal.like(sr)
-        m.d.comb += srnext.eq(Cat(self.spi_copi, sr[:-1]))
+        m.d.comb += srnext.eq(Cat(self.spi.copi, sr[:-1]))
 
-        with m.If(self.spi_cs & clk_rising):
+        with m.If(self.spi.cs & clk_rising):
             m.d.sync += [
                 sr.eq(srnext),
                 edges.eq(edges + 1),
@@ -52,11 +46,11 @@ class MockSPIFlashPeripheral(Elaboratable):
         with m.Else():
             m.d.sync += edges.eq(0)
 
-        m.d.comb += self.spi_cipo.eq(0)
+        m.d.comb += self.spi.cipo.eq(0)
 
         with m.FSM():
             with m.State("IDLE"):
-                with m.If(self.spi_cs):
+                with m.If(self.spi.cs):
                     m.next = "SELECTED, POWERED DOWN"
 
             with m.State("SELECTED, POWERED DOWN"):
@@ -64,11 +58,11 @@ class MockSPIFlashPeripheral(Elaboratable):
                     m.next = "SELECTED, POWERING UP, NEEDS DESELECT"
 
             with m.State("SELECTED, POWERING UP, NEEDS DESELECT"):
-                with m.If(~self.spi_cs):
+                with m.If(~self.spi.cs):
                     m.next = "DESELECTED, POWERED UP"
 
             with m.State("DESELECTED, POWERED UP"):
-                with m.If(self.spi_cs):
+                with m.If(self.spi.cs):
                     m.next = "SELECTED, POWERED UP"
 
             with m.State("SELECTED, POWERED UP"):
@@ -80,20 +74,20 @@ class MockSPIFlashPeripheral(Elaboratable):
                     m.next = "READING"
 
             with m.State("READING"):
-                m.d.comb += self.spi_cipo.eq(sr[-1])
-                with m.If(~self.spi_cs):
+                m.d.comb += self.spi.cipo.eq(sr[-1])
+                with m.If(~self.spi.cs):
                     m.next = "IDLE"
 
         return m
 
 
-class TestSPIFlashReaderTop(Elaboratable):
+class TestSPIFlashReaderTop(Component):
     data: Value
     len: int
 
-    i_stb: Signal
+    i_stb: In(1)
     o_fifo: SyncFIFO
-    o_busy: Signal
+    o_busy: Out(1)
 
     spifr: SPIFlashReader
     peripheral: MockSPIFlashPeripheral
@@ -117,10 +111,10 @@ class TestSPIFlashReaderTop(Elaboratable):
         m.submodules.peripheral = self.peripheral
 
         m.d.comb += [
-            self.peripheral.spi_copi.eq(self.spifr.spi_copi),
-            self.spifr.spi_cipo.eq(self.peripheral.spi_cipo),
-            self.peripheral.spi_cs.eq(self.spifr.spi_cs),
-            self.peripheral.spi_clk.eq(self.spifr.spi_clk),
+            self.peripheral.spi.copi.eq(self.spifr.spi.copi),
+            self.spifr.spi.cipo.eq(self.peripheral.spi.cipo),
+            self.peripheral.spi.cs.eq(self.spifr.spi.cs),
+            self.peripheral.spi.clk.eq(self.spifr.spi.clk),
         ]
 
         m.d.sync += [
