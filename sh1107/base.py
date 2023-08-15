@@ -14,7 +14,6 @@ __all__ = [
     "Blackbox",
     "Blackboxes",
     "Config",
-    "ConfigElaboratable",
     "ConfigComponent",
     "build_top",
     "path",
@@ -42,14 +41,6 @@ class Config:
     @property
     def test(cls) -> Self:
         return Config(target=Target["test"], blackboxes=set())
-
-
-class ConfigElaboratable(Elaboratable):
-    config: Final[Config]
-
-    def __init__(self, *, config: Config):
-        super().__init__()
-        self.config = config
 
 
 class ConfigComponent(Component):

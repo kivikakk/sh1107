@@ -4,7 +4,7 @@ from amaranth import Cat, Memory, Module, Record, Signal
 from amaranth.build import Platform
 from amaranth.build.res import ResourceError
 from amaranth.hdl.mem import ReadPort
-from amaranth.lib.wiring import Signature, In
+from amaranth.lib.wiring import In, Signature
 from amaranth_boards.icebreaker import ICEBreakerPlatform
 from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
 
@@ -127,11 +127,14 @@ class Top(ConfigComponent):
 
     @property
     def signature(self):
-        return Signature({
-            # Note that these remain disconnected/unused when building for an
-            # actual target.
-            f"switch_{i}": In(1) for i in range(len(self.sequences))
-        })
+        return Signature(
+            {
+                # Note that these remain disconnected/unused when building for an
+                # actual target.
+                f"switch_{i}": In(1)
+                for i in range(len(self.sequences))
+            }
+        )
 
     @property
     def ports(self) -> list[Signal]:
@@ -139,11 +142,11 @@ class Top(ConfigComponent):
 
         if Blackbox.I2C not in self.config.blackboxes:
             ports += [
-                self.oled.i2c.scl_o,
-                self.oled.i2c.scl_oe,
-                self.oled.i2c.sda_o,
-                self.oled.i2c.sda_oe,
-                self.oled.i2c.sda_i,
+                self.oled.i2c.hard_bus.scl_o,
+                self.oled.i2c.hard_bus.scl_oe,
+                self.oled.i2c.hard_bus.sda_o,
+                self.oled.i2c.hard_bus.sda_oe,
+                self.oled.i2c.hard_bus.sda_i,
             ]
         else:
             ports += [

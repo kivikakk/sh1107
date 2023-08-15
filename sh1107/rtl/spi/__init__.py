@@ -4,7 +4,7 @@ from typing import Optional, cast
 from amaranth import C, Cat, ClockSignal, Instance, Module, Record, Signal
 from amaranth.build import Attrs, Pins, PinsN, Platform, Resource, Subsignal
 from amaranth.hdl.rec import DIR_FANIN, DIR_FANOUT
-from amaranth.lib.wiring import Signature, In, Out
+from amaranth.lib.wiring import In, Out, Signature
 from amaranth_boards.icebreaker import ICEBreakerPlatform
 from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
 
@@ -14,22 +14,26 @@ from ...base import Blackbox, Config, ConfigComponent
 __all__ = ["SPIBus", "SPIFlashReaderBus", "SPIFlashReader"]
 
 
-SPIBus = Signature({
-    "copi": Out(1),
-    "cipo": In(1),
-    "cs": Out(1),
-    "clk": Out(1),
-})
+SPIBus = Signature(
+    {
+        "copi": Out(1),
+        "cipo": In(1),
+        "cs": Out(1),
+        "clk": Out(1),
+    }
+)
 
 
-SPIFlashReaderBus = Signature({
-    "addr": In(24),
-    "len": In(16),
-    "stb": In(1),
-    "busy": Out(1),
-    "data": Out(8),
-    "valid": Out(1),
-})
+SPIFlashReaderBus = Signature(
+    {
+        "addr": In(24),
+        "len": In(16),
+        "stb": In(1),
+        "busy": Out(1),
+        "data": Out(8),
+        "valid": Out(1),
+    }
+)
 
 
 class SPIFlashReader(ConfigComponent):

@@ -17,11 +17,11 @@ sda_oe: Sample(bool),
 sda_i: Cxxrtl.Object(bool),
 
 pub fn init(cxxrtl: Cxxrtl, addr: u7) @This() {
-    const scl_o = Sample(bool).init(cxxrtl, "scl__o", false);
-    const scl_oe = Sample(bool).init(cxxrtl, "scl__oe", false);
-    const sda_o = Sample(bool).init(cxxrtl, "sda__o", false);
-    const sda_oe = Sample(bool).init(cxxrtl, "sda__oe", false);
-    const sda_i = cxxrtl.get(bool, "sda__i");
+    const scl_o = Sample(bool).init(cxxrtl, "hard_bus__scl_o", false);
+    const scl_oe = Sample(bool).init(cxxrtl, "hard_bus__scl_oe", false);
+    const sda_o = Sample(bool).init(cxxrtl, "hard_bus__sda_o", false);
+    const sda_oe = Sample(bool).init(cxxrtl, "hard_bus__sda_oe", false);
+    const sda_i = cxxrtl.get(bool, "hard_bus__sda_i");
 
     return .{
         .addr = addr,

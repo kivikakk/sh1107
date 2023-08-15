@@ -4,7 +4,7 @@ from amaranth import C, Cat, Module, Signal, Value
 from amaranth.build import Platform
 from amaranth.hdl.ast import ValueCastable
 from amaranth.lib.fifo import SyncFIFO
-from amaranth.lib.wiring import In, Out, Component
+from amaranth.lib.wiring import Component, In, Out
 
 from ... import sim
 from ...base import Config
