@@ -2,15 +2,16 @@ from typing import Final, Optional
 
 from amaranth import Module, Signal
 from amaranth.build import Platform
+from amaranth.lib.wiring import In, Out
 
-from ...base import Config, ConfigElaboratable
+from ...base import Config, ConfigComponent
 from .debounce import Debounce
 from .timer import Timer
 
 __all__ = ["Button", "ButtonWithHold"]
 
 
-class Button(ConfigElaboratable):
+class Button(ConfigComponent):
     """
     A simple debounced button.
 
@@ -18,34 +19,29 @@ class Button(ConfigElaboratable):
     o_up strobes when the button is registered as released.
     """
 
-    i: Signal
+    i: In(1)
 
-    o_down: Signal
-    o_up: Signal
+    o_down: Out(1)
+    o_up: Out(1)
 
     debounce: Debounce
-    __registered: Signal
 
     def __init__(self, *, config: Config):
+        super().__init__(config=config)
         self.debounce = Debounce(config=config)
-        self.__registered = Signal()
-
-        self.i = Signal()
-
-        self.o_down = Signal()
-        self.o_up = Signal()
 
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
 
         m.submodules.debounce = self.debounce
 
+        registered = Signal()
         m.d.comb += self.debounce.i.eq(self.i)
-        m.d.sync += self.__registered.eq(self.debounce.o)
+        m.d.sync += registered.eq(self.debounce.o)
 
         m.d.comb += [
-            self.o_down.eq(~self.__registered & self.debounce.o),
-            self.o_up.eq(self.__registered & ~self.debounce.o),
+            self.o_down.eq(~registered & self.debounce.o),
+            self.o_up.eq(registered & ~self.debounce.o),
         ]
 
         return m
@@ -64,7 +60,7 @@ class ButtonWithHold(Button):
 
     hold_time: float
 
-    o_held: Signal
+    o_held: Out(1)
 
     def __init__(self, *, hold_time: Optional[float] = None, config: Config):
         super().__init__(config=config)

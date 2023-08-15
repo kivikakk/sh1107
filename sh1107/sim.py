@@ -11,7 +11,7 @@ from amaranth.hdl.ast import Operator, Statement
 from amaranth.lib.fifo import SyncFIFO
 from amaranth.sim import Delay, Settle, Simulator
 
-from .base import Config, ConfigElaboratable, path
+from .base import Config, ConfigElaboratable, ConfigComponent, path
 
 __all__ = [
     "clock",
@@ -96,7 +96,7 @@ class TestCase(unittest.TestCase):
             else:
                 target = name
 
-            if issubclass(dutc, ConfigElaboratable):
+            if issubclass(dutc, (ConfigElaboratable, ConfigComponent)):
                 sim_args[1]["config"] = Config.test
 
             for args, kwargs in sim_always_args:

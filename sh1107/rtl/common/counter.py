@@ -2,20 +2,21 @@ from typing import Optional, cast
 
 from amaranth import Elaboratable, Module, Signal
 from amaranth.build import Platform
+from amaranth.lib.wiring import Component, In, Out
 
 from ... import sim
 
 __all__ = ["Counter"]
 
 
-class Counter(Elaboratable):
+class Counter(Component):
     time: Optional[float]
     hz: Optional[int]
 
-    en: Signal
+    en: In(1)
 
-    o_half: Signal
-    o_full: Signal
+    o_half: Out(1)
+    o_full: Out(1)
 
     def __init__(
         self,
@@ -23,14 +24,10 @@ class Counter(Elaboratable):
         time: Optional[float] = None,
         hz: Optional[int] = None,
     ):
+        super().__init__()
         assert time or hz
         self.time = time
         self.hz = hz
-
-        self.en = Signal()
-
-        self.o_half = Signal()
-        self.o_full = Signal()
 
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
