@@ -1,7 +1,8 @@
 from typing import Optional
 
-from amaranth import Elaboratable, Module, Mux, Signal
+from amaranth import Module, Mux, Signal
 from amaranth.build import Platform
+from amaranth.lib.wiring import Component, In
 
 from ...proto import Cmd, ControlByte
 from ..i2c import RW, I2CBus, Transfer
@@ -9,7 +10,7 @@ from ..i2c import RW, I2CBus, Transfer
 __all__ = ["Locator"]
 
 
-class Locator(Elaboratable):
+class Locator(Component):
     addr: int
 
     i_adjust: Signal
@@ -19,10 +20,11 @@ class Locator(Elaboratable):
 
     o_busy: Signal
 
-    i2c_bus: I2CBus
+    i2c_bus: In(I2CBus)
     adjusted_row: Signal
 
     def __init__(self, *, addr: int):
+        super().__init__()
         self.addr = addr
 
         self.i_adjust = Signal(range(16))
@@ -32,7 +34,6 @@ class Locator(Elaboratable):
 
         self.o_busy = Signal()
 
-        self.i2c_bus = I2CBus()
         self.adjusted_row = Signal(range(16))
 
     def elaborate(self, platform: Optional[Platform]) -> Module:

@@ -5,7 +5,7 @@ from amaranth import C, Cat, ClockSignal, Instance, Memory, Module, Mux, Signal
 from amaranth.build import Platform
 from amaranth.lib.enum import IntEnum
 from amaranth.lib.fifo import SyncFIFO
-from amaranth.lib.wiring import Component, In, connect
+from amaranth.lib.wiring import Component, In, Out, connect, transpose
 from amaranth_boards.icebreaker import ICEBreakerPlatform
 
 from ... import rom
@@ -65,8 +65,8 @@ class OLED(ConfigComponent):
         BUSY = 1
         FAILURE = 2
 
-    i2c_bus: I2CBus
-    own_i2c_bus: I2CBus
+    i2c_bus: In(I2CBus)
+    own_i2c_bus: In(I2CBus)
     i2c: I2C | Instance
     # For blackbox simulation only; not defined otherwise.
     i_i2c_bb_in_ack: Signal
@@ -107,8 +107,6 @@ class OLED(ConfigComponent):
 
         assert speed.value in self.VALID_SPEEDS
 
-        self.i2c_bus = I2CBus()
-        self.own_i2c_bus = I2CBus()
         if Blackbox.I2C not in self.config.blackboxes:
             self.i2c = I2C(speed=speed)
         else:
@@ -413,7 +411,7 @@ class OLED(ConfigComponent):
 
     def elaborate_submodules(self, m: Module):
         if Blackbox.I2C not in self.config.blackboxes:
-            m.d.comb += self.i2c.bus.connect(self.i2c_bus)
+            connect(m, self.i2c_bus, self.i2c.bus)
 
         if Blackbox.SPIFR not in self.config.blackboxes:
             connect(m, self.spifr.bus, self.spifr_bus)
@@ -428,22 +426,22 @@ class OLED(ConfigComponent):
         m.submodules.i_fifo = self.i_fifo
 
         with m.If(self.rom_writer.o_busy):
+            connect(m, transpose(self.i2c_bus), self.rom_writer.i2c_bus)
             m.d.comb += [
-                self.i2c_bus.connect(self.rom_writer.i2c_bus),
                 self.rom_bus.connect(self.rom_writer.rom_bus),
             ]
         with m.Elif(self.locator.o_busy):
-            m.d.comb += self.i2c_bus.connect(self.locator.i2c_bus)
+            connect(m, transpose(self.i2c_bus), self.locator.i2c_bus)
         with m.Elif(self.clser.o_busy):
-            m.d.comb += self.i2c_bus.connect(self.clser.i2c_bus)
+            connect(m, transpose(self.i2c_bus), self.clser.i2c_bus)
         with m.Elif(self.scroller.o_busy):
+            connect(m, transpose(self.i2c_bus), self.scroller.i2c_bus)
             m.d.comb += [
-                self.i2c_bus.connect(self.scroller.i2c_bus),
                 self.rom_bus.connect(self.scroller.rom_bus),
             ]
         with m.Else():
+            connect(m, transpose(self.i2c_bus), self.own_i2c_bus)
             m.d.comb += [
-                self.i2c_bus.connect(self.own_i2c_bus),
                 self.rom_bus.connect(self.own_rom_bus),
             ]
 

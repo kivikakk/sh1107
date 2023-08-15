@@ -1,7 +1,8 @@
 from typing import Optional
 
-from amaranth import Elaboratable, Module, Signal
+from amaranth import Module, Signal
 from amaranth.build import Platform
+from amaranth.lib.wiring import Component, In
 
 from ...proto import Cmd, ControlByte
 from ..i2c import RW, I2CBus, Transfer
@@ -9,26 +10,25 @@ from ..i2c import RW, I2CBus, Transfer
 __all__ = ["Clser"]
 
 
-class Clser(Elaboratable):
+class Clser(Component):
     addr: int
 
     i_stb: Signal
 
     o_busy: Signal
 
-    i2c_bus: I2CBus
+    i2c_bus: In(I2CBus)
 
     current_page: Signal
     current_column: Signal
 
     def __init__(self, *, addr: int):
+        super().__init__()
         self.addr = addr
 
         self.i_stb = Signal()
 
         self.o_busy = Signal()
-
-        self.i2c_bus = I2CBus()
 
         self.current_page = Signal(range(0x10))
         self.current_column = Signal(range(0x81))

@@ -59,35 +59,20 @@ class Transfer(data.Struct):
     kind: Kind
 
 
-class I2CBus(Record):
-    i_in_fifo_w_data: Signal
-    i_in_fifo_w_en: Signal
-    i_out_fifo_r_en: Signal
-    i_stb: Signal
-    o_ack: Signal
-    o_busy: Signal
-    o_in_fifo_w_rdy: Signal
-    o_in_fifo_r_rdy: Signal
-    o_out_fifo_r_rdy: Signal
-    o_out_fifo_r_data: Signal
-
-    def __init__(self):
-        super().__init__(
-            [
-                ("i_in_fifo_w_data", 9, DIR_FANIN),
-                ("i_in_fifo_w_en", 1, DIR_FANIN),
-                ("i_out_fifo_r_en", 1, DIR_FANIN),
-                ("i_stb", 1, DIR_FANIN),
-                ("o_ack", 1, DIR_FANOUT),
-                ("o_busy", 1, DIR_FANOUT),
-                ("o_in_fifo_w_rdy", 1, DIR_FANOUT),
-                ("o_in_fifo_r_rdy", 1, DIR_FANOUT),
-                ("o_out_fifo_r_rdy", 1, DIR_FANOUT),
-                ("o_out_fifo_r_data", 8, DIR_FANOUT),
-            ],
-            name="I2CBus",
-        )
-        self.fields["o_ack"].reset = 1
+I2CBus = Signature(
+    {
+        "i_in_fifo_w_data": In(9),
+        "i_in_fifo_w_en": In(1),
+        "i_out_fifo_r_en": In(1),
+        "i_stb": In(1),
+        "o_ack": Out(1, reset=1),
+        "o_busy": Out(1),
+        "o_in_fifo_w_rdy": Out(1),
+        "o_in_fifo_r_rdy": Out(1),
+        "o_out_fifo_r_rdy": Out(1),
+        "o_out_fifo_r_data": Out(8),
+    }
+)
 
 
 I2CHardBus = Signature(
@@ -132,9 +117,9 @@ class I2C(Component):
 
     _out_fifo: SyncFIFO
 
-    bus: I2CBus
     c: Counter
 
+    bus: Out(I2CBus)
     hard_bus: Out(I2CHardBus)
 
     rw: Signal
@@ -157,7 +142,6 @@ class I2C(Component):
 
         self._out_fifo = SyncFIFO(width=8, depth=1)
 
-        self.bus = I2CBus()
         self.c = Counter(hz=speed.value * 2)
 
         self.rw = Signal(RW)
