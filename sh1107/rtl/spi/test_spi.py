@@ -1,6 +1,6 @@
 from typing import Optional
 
-from amaranth import C, Cat, Module, Signal, Value
+from amaranth import C, Cat, Elaboratable, Module, Signal, Value
 from amaranth.build import Platform
 from amaranth.hdl.ast import ValueCastable
 from amaranth.lib.fifo import SyncFIFO
@@ -24,7 +24,7 @@ class MockSPIFlashPeripheral(Component):
         assert len(self.data) <= 32
         assert len(self.data) % 8 == 0
 
-    def elaborate(self, platform: Optional[Platform]) -> Module:
+    def elaborate(self, platform: Optional[Platform]) -> Elaboratable:
         m = Module()
 
         sr = Signal(32)
@@ -103,7 +103,7 @@ class TestSPIFlashReaderTop(Component):
         self.spifr = SPIFlashReader(config=Config.test)
         self.peripheral = MockSPIFlashPeripheral(data=self.data)
 
-    def elaborate(self, platform: Optional[Platform]) -> Module:
+    def elaborate(self, platform: Optional[Platform]) -> Elaboratable:
         m = Module()
 
         m.submodules.fifo_out = self.fifo_out

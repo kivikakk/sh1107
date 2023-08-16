@@ -1,6 +1,6 @@
 from typing import Optional, cast
 
-from amaranth import Cat, Module, Signal
+from amaranth import Cat, Elaboratable, Module, Signal
 from amaranth.build import Platform
 from amaranth.lib.wiring import Component, In, Out
 
@@ -31,7 +31,7 @@ class ROMWriter(Component):
         self.offset = Signal(range(rom.ROM_LENGTH))
         self.remain = Signal(range(rom.ROM_LENGTH))
 
-    def elaborate(self, platform: Optional[Platform]) -> Module:
+    def elaborate(self, platform: Optional[Platform]) -> Elaboratable:
         m = Module()
 
         transfer = Transfer(self.i2c_bus.in_fifo_w_data)

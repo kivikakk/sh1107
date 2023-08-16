@@ -1,6 +1,6 @@
 from typing import Final, Optional, Self, cast
 
-from amaranth import Module, Signal
+from amaranth import Elaboratable, Module, Signal
 from amaranth.build import Attrs, Platform
 from amaranth.lib import data, enum
 from amaranth.lib.fifo import SyncFIFO
@@ -151,7 +151,7 @@ class I2C(Component):
         self.formal_repeated_start = None
         self.formal_stop = None
 
-    def elaborate(self, platform: Optional[Platform]) -> Module:
+    def elaborate(self, platform: Optional[Platform]) -> Elaboratable:
         m = Module()
 
         m.submodules.in_fifo = self._in_fifo

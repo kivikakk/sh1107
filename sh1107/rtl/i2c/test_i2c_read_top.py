@@ -1,6 +1,6 @@
 from typing import Optional
 
-from amaranth import Module, Signal
+from amaranth import Elaboratable, Module, Signal
 from amaranth.build import Platform
 from amaranth.lib.fifo import SyncFIFO
 from amaranth.lib.wiring import Component, In, Out, Signature
@@ -44,7 +44,7 @@ class TestI2CReadTop(Component):
             }
         )
 
-    def elaborate(self, platform: Optional[Platform]) -> Module:
+    def elaborate(self, platform: Optional[Platform]) -> Elaboratable:
         m = Module()
 
         m.submodules.i2c = self.i2c

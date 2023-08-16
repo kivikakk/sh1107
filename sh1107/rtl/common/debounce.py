@@ -1,6 +1,6 @@
 from typing import Final, Optional
 
-from amaranth import Module
+from amaranth import Elaboratable, Module
 from amaranth.build import Platform
 from amaranth.lib.wiring import In, Out
 
@@ -25,7 +25,7 @@ class Debounce(ConfigComponent):
             self.SIM_HOLD_TIME if config.target.simulation else self.DEFAULT_HOLD_TIME
         )
 
-    def elaborate(self, platform: Optional[Platform]) -> Module:
+    def elaborate(self, platform: Optional[Platform]) -> Elaboratable:
         m = Module()
 
         m.submodules.timer = timer = Timer(time=self.hold_time)

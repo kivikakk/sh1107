@@ -25,7 +25,7 @@ class TestClserTop(Elaboratable):
         self.i2c = I2C(speed=speed)
         self.clser = Clser(addr=TestClserTop.ADDR)
 
-    def elaborate(self, platform: Optional[Platform]) -> Module:
+    def elaborate(self, platform: Optional[Platform]) -> Elaboratable:
         m = Module()
 
         m.submodules.i2c = self.i2c

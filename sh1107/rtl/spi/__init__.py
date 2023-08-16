@@ -1,7 +1,7 @@
 import math
 from typing import Optional, cast
 
-from amaranth import C, Cat, ClockSignal, Instance, Module, Signal
+from amaranth import C, Cat, ClockSignal, Elaboratable, Instance, Module, Signal
 from amaranth.build import Attrs, Pins, PinsN, Platform, Resource, Subsignal
 from amaranth.lib.wiring import In, Out, Signature
 from amaranth_boards.icebreaker import ICEBreakerPlatform
@@ -46,7 +46,7 @@ class SPIFlashReader(ConfigComponent):
     ):
         super().__init__(config=config)
 
-    def elaborate(self, platform: Optional[Platform]) -> Module:
+    def elaborate(self, platform: Optional[Platform]) -> Elaboratable:
         m = Module()
 
         clk = ClockSignal()

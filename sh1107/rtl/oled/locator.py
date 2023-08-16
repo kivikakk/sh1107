@@ -1,6 +1,6 @@
 from typing import Optional
 
-from amaranth import Module, Mux, Signal
+from amaranth import Elaboratable, Module, Mux, Signal
 from amaranth.build import Platform
 from amaranth.lib.wiring import Component, In, Out
 
@@ -29,7 +29,7 @@ class Locator(Component):
 
         self.adjusted_row = Signal(range(16))
 
-    def elaborate(self, platform: Optional[Platform]) -> Module:
+    def elaborate(self, platform: Optional[Platform]) -> Elaboratable:
         m = Module()
 
         m.d.comb += self.adjusted_row.eq(self.row - 1 + self.adjust)

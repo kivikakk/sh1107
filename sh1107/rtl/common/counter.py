@@ -1,6 +1,6 @@
 from typing import Optional, cast
 
-from amaranth import Module, Signal
+from amaranth import Elaboratable, Module, Signal
 from amaranth.build import Platform
 from amaranth.lib.wiring import Component, In, Out
 
@@ -29,7 +29,7 @@ class Counter(Component):
         self.time = time
         self.hz = hz
 
-    def elaborate(self, platform: Optional[Platform]) -> Module:
+    def elaborate(self, platform: Optional[Platform]) -> Elaboratable:
         m = Module()
 
         freq = (

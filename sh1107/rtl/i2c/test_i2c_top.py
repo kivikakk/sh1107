@@ -1,6 +1,6 @@
 from typing import Optional
 
-from amaranth import Module, Value
+from amaranth import Elaboratable, Module, Value
 from amaranth.build import Platform
 from amaranth.lib.wiring import Component, In, Out, Signature
 
@@ -34,7 +34,7 @@ class TestI2CTop(Component):
             }
         )
 
-    def elaborate(self, platform: Optional[Platform]) -> Module:
+    def elaborate(self, platform: Optional[Platform]) -> Elaboratable:
         m = Module()
 
         m.submodules.i2c = self.i2c

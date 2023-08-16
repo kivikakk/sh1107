@@ -33,7 +33,7 @@ class TestScrollerTop(Elaboratable):
         ).read_port()
         self.scroller = Scroller(addr=TestScrollerTop.ADDR)
 
-    def elaborate(self, platform: Optional[Platform]) -> Module:
+    def elaborate(self, platform: Optional[Platform]) -> Elaboratable:
         m = Module()
 
         m.submodules.i2c = self.i2c

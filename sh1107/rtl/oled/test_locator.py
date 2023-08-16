@@ -25,7 +25,7 @@ class TestLocatorTop(Elaboratable):
         self.i2c = I2C(speed=speed)
         self.locator = Locator(addr=TestLocatorTop.ADDR)
 
-    def elaborate(self, platform: Optional[Platform]) -> Module:
+    def elaborate(self, platform: Optional[Platform]) -> Elaboratable:
         m = Module()
 
         m.submodules.i2c = self.i2c

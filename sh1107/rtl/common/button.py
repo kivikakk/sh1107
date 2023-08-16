@@ -1,6 +1,6 @@
 from typing import Final, Optional
 
-from amaranth import Module, Signal
+from amaranth import Elaboratable, Module, Signal
 from amaranth.build import Platform
 from amaranth.lib.wiring import In, Out
 
@@ -30,7 +30,7 @@ class Button(ConfigComponent):
         super().__init__(config=config)
         self.debounce = Debounce(config=config)
 
-    def elaborate(self, platform: Optional[Platform]) -> Module:
+    def elaborate(self, platform: Optional[Platform]) -> Elaboratable:
         m = Module()
 
         m.submodules.debounce = self.debounce
@@ -69,9 +69,10 @@ class ButtonWithHold(Button):
             self.SIM_HOLD_TIME if config.target.simulation else self.DEFAULT_HOLD_TIME
         )
 
-    def elaborate(self, platform: Optional[Platform]) -> Module:
-        m = super().elaborate(platform)
+    def elaborate(self, platform: Optional[Platform]) -> Elaboratable:
+        m = Module()
 
+        m.submodules.button = super().elaborate(platform)
         m.submodules.timer = timer = Timer(time=self.hold_time)
 
         holding = Signal()

@@ -1,6 +1,6 @@
 from typing import Optional
 
-from amaranth import Module, Signal
+from amaranth import Elaboratable, Module, Signal
 from amaranth.build import Platform
 from amaranth.lib.wiring import Component, In, Out
 
@@ -32,7 +32,7 @@ class Clser(Component):
         self.current_page = Signal(range(0x10))
         self.current_column = Signal(range(0x81))
 
-    def elaborate(self, platform: Optional[Platform]) -> Module:
+    def elaborate(self, platform: Optional[Platform]) -> Elaboratable:
         m = Module()
 
         transfer = Transfer(self.i2c_bus.in_fifo_w_data)

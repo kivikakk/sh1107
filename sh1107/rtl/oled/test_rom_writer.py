@@ -33,7 +33,7 @@ class TestROMWriterTop(Elaboratable):
         ).read_port()
         self.rom_writer = ROMWriter(addr=TestROMWriterTop.ADDR)
 
-    def elaborate(self, platform: Optional[Platform]) -> Module:
+    def elaborate(self, platform: Optional[Platform]) -> Elaboratable:
         m = Module()
 
         m.submodules.i2c = self.i2c

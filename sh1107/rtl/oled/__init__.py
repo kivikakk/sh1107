@@ -1,7 +1,17 @@
 import math
 from typing import Final, Optional
 
-from amaranth import C, Cat, ClockSignal, Instance, Memory, Module, Mux, Signal
+from amaranth import (
+    C,
+    Cat,
+    ClockSignal,
+    Elaboratable,
+    Instance,
+    Memory,
+    Module,
+    Mux,
+    Signal,
+)
 from amaranth.build import Platform
 from amaranth.lib.enum import IntEnum
 from amaranth.lib.fifo import SyncFIFO
@@ -160,7 +170,7 @@ class OLED(ConfigComponent):
         self.chpr_data = Signal(8)
         self.chpr_run = Signal()
 
-    def elaborate(self, platform: Optional[Platform]) -> Module:
+    def elaborate(self, platform: Optional[Platform]) -> Elaboratable:
         m = Module()
 
         self.elaborate_memory(m, platform)
