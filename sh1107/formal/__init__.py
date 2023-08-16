@@ -75,8 +75,8 @@ def prep_formal() -> Tuple[Module, list[Signal | Value]]:
 
     m.d.comb += Assume(~sync_rst)
 
-    i_stb = dut.bus.i_stb
-    i_stb_past = past(m, i_stb, stable1=sync_clk_falling)
+    stb = dut.bus.stb
+    stb_past = past(m, stb, stable1=sync_clk_falling)
 
     in_fifo_w_en = in_fifo.w_en
     past(m, in_fifo_w_en, stable1=sync_clk_falling)
@@ -87,43 +87,43 @@ def prep_formal() -> Tuple[Module, list[Signal | Value]]:
     in_fifo_r_en = in_fifo.r_en
     in_fifo_r_en_past = past(m, in_fifo_r_en)
 
-    o_busy = dut.bus.o_busy
-    # o_busy_past = past(m, o_busy)
+    busy = dut.bus.busy
+    # busy_past = past(m, busy)
 
     byte_ix = dut.byte_ix
 
-    scl_o = dut.hard_bus.scl_o
+    scl_o = dut.hw_bus.scl_o
     scl_o_past = past(m, scl_o)
 
-    sda_oe = dut.hard_bus.sda_oe
+    sda_oe = dut.hw_bus.sda_oe
     # sda_oe_past = past(m, sda_oe)
 
-    sda_o = dut.hard_bus.sda_o
+    sda_o = dut.hw_bus.sda_o
     sda_o_past = past(m, sda_o)
 
     # Start with no strobes high.
     with m.If(Initial()):
-        m.d.comb += Assume(~i_stb & ~in_fifo_w_en)
+        m.d.comb += Assume(~stb & ~in_fifo_w_en)
 
     # Don't strobe when already busy. After strobe, we should either pop the
     # FIFO and start activity, or do neither.
-    with m.If(i_stb):
-        m.d.comb += Assume(~o_busy & ~in_fifo_r_en)
-        m.d.sync += Assert(in_fifo_r_en == o_busy)
+    with m.If(stb):
+        m.d.comb += Assume(~busy & ~in_fifo_r_en)
+        m.d.sync += Assert(in_fifo_r_en == busy)
 
-    m.d.comb += Assume(o_busy == dut.c.en)
+    m.d.comb += Assume(busy == dut.c.en)
 
     with m.If(dut.rw == RW.W):
         m.d.comb += Assert(sda_oe | (byte_ix == 7))
 
     # Cover strobing that both does and doesn't result in popping the FIFO.
-    m.d.comb += Cover((i_stb_past & ~i_stb) & (~in_fifo_r_en_past & in_fifo_r_en))
-    m.d.comb += Cover((i_stb_past & ~i_stb) & (~in_fifo_r_en_past & ~in_fifo_r_en))
+    m.d.comb += Cover((stb_past & ~stb) & (~in_fifo_r_en_past & in_fifo_r_en))
+    m.d.comb += Cover((stb_past & ~stb) & (~in_fifo_r_en_past & ~in_fifo_r_en))
 
     # Just make sure we see some activity.
     m.d.comb += Cover(scl_o_past & ~scl_o)
     m.d.comb += Cover(sda_o_past & ~sda_o)
-    m.d.comb += Cover(o_busy)
+    m.d.comb += Cover(busy)
 
     # Get some way into addressing the target.
     m.d.comb += Cover(byte_ix == 1)
@@ -162,7 +162,7 @@ def prep_formal() -> Tuple[Module, list[Signal | Value]]:
     return m, [
         sync_clk,
         sync_rst,
-        dut.bus.i_stb,
-        dut.bus.i_in_fifo_w_en,
-        dut.bus.i_in_fifo_w_data,
+        dut.bus.stb,
+        dut.bus.in_fifo_w_en,
+        dut.bus.in_fifo_w_data,
     ]

@@ -85,9 +85,9 @@ class TestSPIFlashReaderTop(Component):
     data: Value
     len: int
 
-    i_stb: In(1)
+    stb: In(1)
     o_fifo: SyncFIFO
-    o_busy: Out(1)
+    busy: Out(1)
 
     spifr: SPIFlashReader
     peripheral: MockSPIFlashPeripheral
@@ -96,9 +96,9 @@ class TestSPIFlashReaderTop(Component):
         self.data = Value.cast(data)
         self.len = len(self.data) // 8
 
-        self.i_stb = Signal()
+        self.stb = Signal()
         self.o_fifo = SyncFIFO(width=8, depth=self.len)
-        self.o_busy = Signal()
+        self.busy = Signal()
 
         self.spifr = SPIFlashReader(config=Config.test)
         self.peripheral = MockSPIFlashPeripheral(data=self.data)
@@ -123,10 +123,10 @@ class TestSPIFlashReaderTop(Component):
         ]
 
         with m.FSM() as fsm:
-            m.d.comb += self.o_busy.eq(~fsm.ongoing("IDLE"))
+            m.d.comb += self.busy.eq(~fsm.ongoing("IDLE"))
 
             with m.State("IDLE"):
-                with m.If(self.i_stb):
+                with m.If(self.stb):
                     m.d.sync += [
                         self.spifr.bus.addr.eq(0x00CAFE),
                         self.spifr.bus.len.eq(self.len),
@@ -155,12 +155,12 @@ class TestSPIFlashReader(sim.TestCase):
     @sim.args(data=C(0x7EEF08, 24))
     @sim.args(data=C(0xBEEFFEED, 32))
     def test_sim_spifr(self, dut: TestSPIFlashReaderTop) -> sim.Procedure:
-        yield dut.i_stb.eq(1)
+        yield dut.stb.eq(1)
         yield
-        yield dut.i_stb.eq(0)
+        yield dut.stb.eq(0)
         yield
 
-        while (yield dut.o_busy):
+        while (yield dut.busy):
             yield
 
         expected = []

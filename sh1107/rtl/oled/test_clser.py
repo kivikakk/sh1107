@@ -42,9 +42,9 @@ class TestClser(sim.TestCase):
     @sim.args(speed=Hz(2_000_000))
     def test_sim_clser(self, dut: TestClserTop) -> sim.Procedure:
         def trigger() -> sim.Procedure:
-            yield dut.clser.i_stb.eq(1)
+            yield dut.clser.stb.eq(1)
             yield Delay(sim.clock())
-            yield dut.clser.i_stb.eq(0)
+            yield dut.clser.stb.eq(0)
 
         yield from sim_i2c.full_sequence(
             dut.i2c,

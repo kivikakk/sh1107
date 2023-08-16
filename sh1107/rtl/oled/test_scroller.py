@@ -52,10 +52,10 @@ class TestScroller(sim.TestCase):
     @sim.args(speed=Hz(2_000_000))
     def test_sim_scroller(self, dut: TestScrollerTop) -> sim.Procedure:
         def trigger() -> sim.Procedure:
-            assert not (yield dut.scroller.o_busy)
-            yield dut.scroller.i_stb.eq(1)
+            assert not (yield dut.scroller.busy)
+            yield dut.scroller.stb.eq(1)
             yield Delay(sim.clock())
-            yield dut.scroller.i_stb.eq(0)
+            yield dut.scroller.stb.eq(0)
 
         yield from sim_i2c.full_sequence(
             dut.i2c,

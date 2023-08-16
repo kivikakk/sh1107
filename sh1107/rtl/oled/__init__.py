@@ -116,18 +116,18 @@ class OLED(ConfigComponent):
             self.i2c = Instance(
                 "i2c",
                 i_clk=ClockSignal(),
-                i_in_fifo_w_data=self.i2c_bus.i_in_fifo_w_data,
-                i_in_fifo_w_en=self.i2c_bus.i_in_fifo_w_en,
-                i_out_fifo_r_en=self.i2c_bus.i_out_fifo_r_en,
-                i_stb=self.i2c_bus.i_stb,
+                i_in_fifo_w_data=self.i2c_bus.in_fifo_w_data,
+                i_in_fifo_w_en=self.i2c_bus.in_fifo_w_en,
+                i_out_fifo_r_en=self.i2c_bus.out_fifo_r_en,
+                i_stb=self.i2c_bus.stb,
                 i_bb_in_ack=self.i_i2c_bb_in_ack,
                 i_bb_in_out_fifo_data=self.i_i2c_bb_in_out_fifo_data,
                 i_bb_in_out_fifo_stb=self.i_i2c_bb_in_out_fifo_stb,
-                o_ack=self.i2c_bus.o_ack,
-                o_busy=self.i2c_bus.o_busy,
-                o_in_fifo_w_rdy=self.i2c_bus.o_in_fifo_w_rdy,
-                o_out_fifo_r_rdy=self.i2c_bus.o_out_fifo_r_rdy,
-                o_out_fifo_r_data=self.i2c_bus.o_out_fifo_r_data,
+                o_ack=self.i2c_bus.ack,
+                o_busy=self.i2c_bus.busy,
+                o_in_fifo_w_rdy=self.i2c_bus.in_fifo_w_rdy,
+                o_out_fifo_r_rdy=self.i2c_bus.out_fifo_r_rdy,
+                o_out_fifo_r_data=self.i2c_bus.out_fifo_r_data,
             )
 
         if Blackbox.SPIFR not in self.config.blackboxes:
@@ -210,7 +210,7 @@ class OLED(ConfigComponent):
                 m.next = "INIT: WAIT SPIFR"
 
             with m.State("IDLE"):
-                with m.If(self.i_fifo.r_rdy & self.own_i2c_bus.o_in_fifo_w_rdy):
+                with m.If(self.i_fifo.r_rdy & self.own_i2c_bus.in_fifo_w_rdy):
                     m.d.sync += [
                         command.eq(self.i_fifo.r_data),
                         self.i_fifo.r_en.eq(1),
@@ -228,7 +228,7 @@ class OLED(ConfigComponent):
                     with m.Case(OLED.Command.INIT):
                         m.d.sync += [
                             self.rom_writer.i_index.eq(rom.OFFSET_INIT),
-                            self.rom_writer.i_stb.eq(1),
+                            self.rom_writer.stb.eq(1),
                             self.row.eq(1),
                             self.col.eq(1),
                             self.scroller.i_rst.eq(1),
@@ -238,20 +238,20 @@ class OLED(ConfigComponent):
                     with m.Case(OLED.Command.DISPLAY_ON):
                         m.d.sync += [
                             self.rom_writer.i_index.eq(rom.OFFSET_DISPLAY_ON),
-                            self.rom_writer.i_stb.eq(1),
+                            self.rom_writer.stb.eq(1),
                         ]
                         m.next = "ROM WRITE SINGLE: STROBED ROM WRITER"
 
                     with m.Case(OLED.Command.DISPLAY_OFF):
                         m.d.sync += [
                             self.rom_writer.i_index.eq(rom.OFFSET_DISPLAY_OFF),
-                            self.rom_writer.i_stb.eq(1),
+                            self.rom_writer.stb.eq(1),
                         ]
                         m.next = "ROM WRITE SINGLE: STROBED ROM WRITER"
 
                     with m.Case(OLED.Command.CLS):
                         m.d.sync += [
-                            self.clser.i_stb.eq(1),
+                            self.clser.stb.eq(1),
                             self.row.eq(1),
                             self.col.eq(1),
                         ]
@@ -293,40 +293,40 @@ class OLED(ConfigComponent):
             self.spi_test_states(m)
 
             with m.State("CLSER: STROBED"):
-                m.d.sync += self.clser.i_stb.eq(0)
+                m.d.sync += self.clser.stb.eq(0)
                 m.next = "CLSER: UNSTROBED"
 
             with m.State("CLSER: UNSTROBED"):
-                with m.If(~self.clser.o_busy):
+                with m.If(~self.clser.busy):
                     m.d.sync += [
                         self.locator.i_row.eq(self.row),
                         self.locator.i_col.eq(self.col),
-                        self.locator.i_stb.eq(1),
+                        self.locator.stb.eq(1),
                     ]
                     m.next = "CLSER: STROBED LOCATOR"
 
             with m.State("CLSER: STROBED LOCATOR"):
-                m.d.sync += self.locator.i_stb.eq(0)
+                m.d.sync += self.locator.stb.eq(0)
                 m.next = "CLSER: UNSTROBED LOCATOR"
 
             with m.State("CLSER: UNSTROBED LOCATOR"):
-                with m.If(~self.locator.o_busy):
+                with m.If(~self.locator.busy):
                     m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
                     m.next = "IDLE"
 
             with m.State("INIT: STROBED ROM WRITER"):
                 m.d.sync += [
-                    self.rom_writer.i_stb.eq(0),
+                    self.rom_writer.stb.eq(0),
                     self.scroller.i_rst.eq(0),
                 ]
                 m.next = "ROM WRITE SINGLE: UNSTROBED ROM WRITER"
 
             with m.State("ROM WRITE SINGLE: STROBED ROM WRITER"):
-                m.d.sync += self.rom_writer.i_stb.eq(0)
+                m.d.sync += self.rom_writer.stb.eq(0)
                 m.next = "ROM WRITE SINGLE: UNSTROBED ROM WRITER"
 
             with m.State("ROM WRITE SINGLE: UNSTROBED ROM WRITER"):
-                with m.If(~self.rom_writer.o_busy):
+                with m.If(~self.rom_writer.busy):
                     m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
                     m.next = "IDLE"
 
@@ -421,14 +421,14 @@ class OLED(ConfigComponent):
 
         m.submodules.i_fifo = self.i_fifo
 
-        with m.If(self.rom_writer.o_busy):
+        with m.If(self.rom_writer.busy):
             connect(m, transpose(self.i2c_bus), self.rom_writer.i2c_bus)
             connect(m, transpose(self.rom_bus), self.rom_writer.rom_bus)
-        with m.Elif(self.locator.o_busy):
+        with m.Elif(self.locator.busy):
             connect(m, transpose(self.i2c_bus), self.locator.i2c_bus)
-        with m.Elif(self.clser.o_busy):
+        with m.Elif(self.clser.busy):
             connect(m, transpose(self.i2c_bus), self.clser.i2c_bus)
-        with m.Elif(self.scroller.o_busy):
+        with m.Elif(self.scroller.busy):
             connect(m, transpose(self.i2c_bus), self.scroller.i2c_bus)
             connect(m, transpose(self.rom_bus), self.scroller.rom_bus)
         with m.Else():
@@ -465,19 +465,19 @@ class OLED(ConfigComponent):
                     m.d.sync += self.locator.i_col.eq(0)
                 m.d.sync += [
                     self.i_fifo.r_en.eq(1),
-                    self.locator.i_stb.eq(1),
+                    self.locator.stb.eq(1),
                 ]
                 m.next = "LOCATE: COL: STROBED R_EN"
 
         with m.State("LOCATE: COL: STROBED R_EN"):
             m.d.sync += [
                 self.i_fifo.r_en.eq(0),
-                self.locator.i_stb.eq(0),
+                self.locator.stb.eq(0),
             ]
             m.next = "LOCATE: UNSTROBED LOCATOR"
 
         with m.State("LOCATE: UNSTROBED LOCATOR"):
-            with m.If(~self.locator.o_busy):
+            with m.If(~self.locator.busy):
                 m.d.sync += self.o_result.eq(OLED.Result.SUCCESS)
                 m.next = "IDLE"
 
@@ -529,7 +529,7 @@ class OLED(ConfigComponent):
                             self.col.eq(1),
                             self.locator.i_col.eq(1),
                             self.locator.i_row.eq(0),
-                            self.locator.i_stb.eq(1),
+                            self.locator.stb.eq(1),
                         ]
                         m.next = "CHPR: STROBED LOCATOR"
                     with m.Elif(self.chpr_data == 10):
@@ -537,7 +537,7 @@ class OLED(ConfigComponent):
                         with m.If(self.row == 16):
                             m.d.sync += [
                                 self.col.eq(1),
-                                self.scroller.i_stb.eq(1),
+                                self.scroller.stb.eq(1),
                             ]
                             m.next = "CHPR: STROBED SCROLLER"
                         with m.Else():
@@ -546,7 +546,7 @@ class OLED(ConfigComponent):
                                 self.row.eq(self.row + 1),
                                 self.locator.i_row.eq(self.row + 1),
                                 self.locator.i_col.eq(1),
-                                self.locator.i_stb.eq(1),
+                                self.locator.stb.eq(1),
                             ]
                             m.next = "CHPR: STROBED LOCATOR"
                     with m.Else():
@@ -554,12 +554,12 @@ class OLED(ConfigComponent):
                             self.rom_writer.i_index.eq(
                                 rom.OFFSET_CHAR + self.chpr_data
                             ),
-                            self.rom_writer.i_stb.eq(1),
+                            self.rom_writer.stb.eq(1),
                         ]
                         m.next = "CHPR: STROBED ROM WRITER"
 
             with m.State("CHPR: STROBED ROM WRITER"):
-                m.d.sync += self.rom_writer.i_stb.eq(0)
+                m.d.sync += self.rom_writer.stb.eq(0)
                 with m.If(self.col == 16):
                     with m.If(self.row == 16):
                         m.d.sync += self.col.eq(1)
@@ -575,38 +575,38 @@ class OLED(ConfigComponent):
                     m.next = "CHPR: UNSTROBED ROM WRITER"
 
             with m.State("CHPR: UNSTROBED ROM WRITER"):
-                with m.If(~self.rom_writer.o_busy):
+                with m.If(~self.rom_writer.busy):
                     m.d.sync += [
                         self.locator.i_row.eq(self.row),
                         self.locator.i_col.eq(self.col),
-                        self.locator.i_stb.eq(1),
+                        self.locator.stb.eq(1),
                     ]
                     m.next = "CHPR: STROBED LOCATOR"
 
             with m.State("CHPR: UNSTROBED ROM WRITER, NEEDS SCROLL"):
-                with m.If(~self.rom_writer.o_busy):
-                    m.d.sync += self.scroller.i_stb.eq(1)
+                with m.If(~self.rom_writer.busy):
+                    m.d.sync += self.scroller.stb.eq(1)
                     m.next = "CHPR: STROBED SCROLLER"
 
             with m.State("CHPR: STROBED SCROLLER"):
-                m.d.sync += self.scroller.i_stb.eq(0)
+                m.d.sync += self.scroller.stb.eq(0)
                 m.next = "CHPR: UNSTROBED SCROLLER"
 
             with m.State("CHPR: UNSTROBED SCROLLER"):
-                with m.If(~self.scroller.o_busy):
+                with m.If(~self.scroller.busy):
                     m.d.sync += [
                         self.locator.i_row.eq(self.row),
                         self.locator.i_col.eq(self.col),
-                        self.locator.i_stb.eq(1),
+                        self.locator.stb.eq(1),
                     ]
                     m.next = "CHPR: STROBED LOCATOR"
 
             with m.State("CHPR: STROBED LOCATOR"):
-                m.d.sync += self.locator.i_stb.eq(0)
+                m.d.sync += self.locator.stb.eq(0)
                 m.next = "CHPR: UNSTROBED LOCATOR"
 
             with m.State("CHPR: UNSTROBED LOCATOR"):
-                with m.If(~self.locator.o_busy):
+                with m.If(~self.locator.busy):
                     m.d.sync += self.chpr_run.eq(0)
                     m.next = "IDLE"
 
@@ -618,90 +618,90 @@ class OLED(ConfigComponent):
 
         with m.State("ID: START"):
             m.d.sync += [
-                self.own_i2c_bus.i_in_fifo_w_data.eq(0x178),
-                self.own_i2c_bus.i_in_fifo_w_en.eq(1),
+                self.own_i2c_bus.in_fifo_w_data.eq(0x178),
+                self.own_i2c_bus.in_fifo_w_en.eq(1),
             ]
             m.next = "ID: START WRITE: STROBED W_EN"
 
         with m.State("ID: START WRITE: STROBED W_EN"):
             m.d.sync += [
-                self.own_i2c_bus.i_in_fifo_w_en.eq(0),
-                self.own_i2c_bus.i_stb.eq(1),
+                self.own_i2c_bus.in_fifo_w_en.eq(0),
+                self.own_i2c_bus.stb.eq(1),
             ]
             m.next = "ID: START WRITE: STROBED I_STB"
 
         with m.State("ID: START WRITE: STROBED I_STB"):
-            m.d.sync += self.own_i2c_bus.i_stb.eq(0)
+            m.d.sync += self.own_i2c_bus.stb.eq(0)
             m.next = "ID: START WRITE: UNSTROBED I_STB"
 
         with m.State("ID: START WRITE: UNSTROBED I_STB"):
             with m.If(
-                self.own_i2c_bus.o_busy
-                & self.own_i2c_bus.o_ack
-                & self.own_i2c_bus.o_in_fifo_w_rdy
+                self.own_i2c_bus.busy
+                & self.own_i2c_bus.ack
+                & self.own_i2c_bus.in_fifo_w_rdy
             ):
                 m.d.sync += [
-                    self.own_i2c_bus.i_in_fifo_w_data.eq(0x00),  # Command/NC
-                    self.own_i2c_bus.i_in_fifo_w_en.eq(1),
+                    self.own_i2c_bus.in_fifo_w_data.eq(0x00),  # Command/NC
+                    self.own_i2c_bus.in_fifo_w_en.eq(1),
                 ]
                 m.next = "ID: WRITE CMD: STROBED W_EN"
-            with m.Elif(~self.own_i2c_bus.o_busy):
+            with m.Elif(~self.own_i2c_bus.busy):
                 m.d.sync += self.o_result.eq(OLED.Result.FAILURE)
                 m.next = "IDLE"
 
         with m.State("ID: WRITE CMD: STROBED W_EN"):
-            m.d.sync += self.own_i2c_bus.i_in_fifo_w_en.eq(0)
+            m.d.sync += self.own_i2c_bus.in_fifo_w_en.eq(0)
             m.next = "ID: WRITE CMD: UNSTROBED W_EN"
 
         with m.State("ID: WRITE CMD: UNSTROBED W_EN"):
             with m.If(
-                self.own_i2c_bus.o_busy
-                & self.own_i2c_bus.o_ack
-                & self.own_i2c_bus.o_in_fifo_w_rdy
+                self.own_i2c_bus.busy
+                & self.own_i2c_bus.ack
+                & self.own_i2c_bus.in_fifo_w_rdy
             ):
                 m.d.sync += [
-                    self.own_i2c_bus.i_in_fifo_w_data.eq(0x179),
-                    self.own_i2c_bus.i_in_fifo_w_en.eq(1),
+                    self.own_i2c_bus.in_fifo_w_data.eq(0x179),
+                    self.own_i2c_bus.in_fifo_w_en.eq(1),
                 ]
                 m.next = "ID: START READ: STROBED W_EN"
-            with m.Elif(~self.own_i2c_bus.o_busy):
+            with m.Elif(~self.own_i2c_bus.busy):
                 m.d.sync += self.o_result.eq(OLED.Result.FAILURE)
                 m.next = "IDLE"
 
         with m.State("ID: START READ: STROBED W_EN"):
-            m.d.sync += self.own_i2c_bus.i_in_fifo_w_en.eq(0)
+            m.d.sync += self.own_i2c_bus.in_fifo_w_en.eq(0)
             m.next = "ID: START READ: UNSTROBED W_EN"
 
         with m.State("ID: START READ: UNSTROBED W_EN"):
             with m.If(
-                self.own_i2c_bus.o_busy
-                & self.own_i2c_bus.o_ack
-                & self.own_i2c_bus.o_in_fifo_w_rdy
+                self.own_i2c_bus.busy
+                & self.own_i2c_bus.ack
+                & self.own_i2c_bus.in_fifo_w_rdy
             ):
                 m.d.sync += [
-                    self.own_i2c_bus.i_in_fifo_w_data.eq(0x00),
-                    self.own_i2c_bus.i_in_fifo_w_en.eq(1),
+                    self.own_i2c_bus.in_fifo_w_data.eq(0x00),
+                    self.own_i2c_bus.in_fifo_w_en.eq(1),
                 ]
                 m.next = "ID: RECV: WAIT"
-            with m.Elif(~self.own_i2c_bus.o_busy):
+            with m.Elif(~self.own_i2c_bus.busy):
                 m.d.sync += self.o_result.eq(OLED.Result.FAILURE)
                 m.next = "IDLE"
 
         with m.State("ID: RECV: WAIT"):
-            m.d.sync += self.own_i2c_bus.i_in_fifo_w_en.eq(0)
-            with m.If(self.own_i2c_bus.o_out_fifo_r_rdy):
+            m.d.sync += self.own_i2c_bus.in_fifo_w_en.eq(0)
+            with m.If(self.own_i2c_bus.out_fifo_r_rdy):
                 m.d.sync += [
-                    id_recvd.eq(self.own_i2c_bus.o_out_fifo_r_data),
-                    self.own_i2c_bus.i_out_fifo_r_en.eq(1),
+                    id_recvd.eq(self.own_i2c_bus.out_fifo_r_data),
+                    self.own_i2c_bus.out_fifo_r_en.eq(1),
                 ]
                 m.next = "ID: RECV: STROBED R_EN"
-            with m.Elif(~self.own_i2c_bus.o_busy):
+            with m.Elif(~self.own_i2c_bus.busy):
                 m.d.sync += self.o_result.eq(OLED.Result.FAILURE)
                 m.next = "IDLE"
 
         with m.State("ID: RECV: STROBED R_EN"):
-            m.d.sync += self.own_i2c_bus.i_out_fifo_r_en.eq(0)
-            with m.If(~self.own_i2c_bus.o_busy):
+            m.d.sync += self.own_i2c_bus.out_fifo_r_en.eq(0)
+            with m.If(~self.own_i2c_bus.busy):
                 first_half = id_recvd[4:8]
                 m.d.sync += [
                     self.chpr_data.eq(

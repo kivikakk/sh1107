@@ -29,50 +29,50 @@ def synchronise(i2c: I2C, start_value: int, *, wait_steps: int = 20) -> sim.Proc
         if i > 0:
             yield Delay(sim.clock())
 
-        assert not (yield i2c.bus.i_stb)
-        if (yield i2c.bus.i_in_fifo_w_en):
+        assert not (yield i2c.bus.stb)
+        if (yield i2c.bus.in_fifo_w_en):
             break
     else:
         raise AssertionError(f"I2C didn't start in {wait_steps} steps")
 
     assert (
-        yield i2c.bus.i_in_fifo_w_data
-    ) == start_value, f"expected FIFO preloaded with {start_value:02x}, got {(yield i2c.bus.i_in_fifo_w_data):02x}"
-    assert not (yield i2c.bus.o_in_fifo_r_rdy)
+        yield i2c.bus.in_fifo_w_data
+    ) == start_value, f"expected FIFO preloaded with {start_value:02x}, got {(yield i2c.bus.in_fifo_w_data):02x}"
+    assert not (yield i2c.bus.in_fifo_r_rdy)
     yield Delay(sim.clock())
 
     # Data is enqueued, we're strobing I2C.  Lines still high.
-    assert (yield i2c.bus.i_stb)
-    assert not (yield i2c.bus.i_in_fifo_w_en)
-    assert (yield i2c.bus.o_in_fifo_r_rdy)
+    assert (yield i2c.bus.stb)
+    assert not (yield i2c.bus.in_fifo_w_en)
+    assert (yield i2c.bus.in_fifo_r_rdy)
 
-    assert (yield i2c.hard_bus.scl_o)
-    assert (yield i2c.hard_bus.sda_o)
+    assert (yield i2c.hw_bus.scl_o)
+    assert (yield i2c.hw_bus.sda_o)
     yield Delay(sim.clock())
 
 
 def start(i2c: I2C) -> sim.Procedure:
     # Strobed.  I2C start condition.
-    assert not (yield i2c.bus.i_stb)
-    assert (yield i2c.hard_bus.scl_o)
-    assert not (yield i2c.hard_bus.sda_o)
+    assert not (yield i2c.bus.stb)
+    assert (yield i2c.hw_bus.scl_o)
+    assert not (yield i2c.hw_bus.sda_o)
     yield Delay(5 * _tick(i2c))
 
     # I2C clock starts.
-    assert not (yield i2c.hard_bus.scl_o)
-    assert not (yield i2c.hard_bus.sda_o)
+    assert not (yield i2c.hw_bus.scl_o)
+    assert not (yield i2c.hw_bus.sda_o)
 
 
 def repeated_start(i2c: I2C) -> sim.Procedure:
-    assert not (yield i2c.hard_bus.scl_o)
+    assert not (yield i2c.hw_bus.scl_o)
     yield Delay(5 * _tick(i2c))
 
-    assert (yield i2c.hard_bus.sda_o)
+    assert (yield i2c.hw_bus.sda_o)
     yield Delay(5 * _tick(i2c))
 
     # I2C clock starts.
-    assert not (yield i2c.hard_bus.scl_o)
-    assert not (yield i2c.hard_bus.sda_o)
+    assert not (yield i2c.hw_bus.scl_o)
+    assert not (yield i2c.hw_bus.sda_o)
 
 
 class ValueChangeWatcher:
@@ -146,11 +146,11 @@ def wait_scl(
     sda_o: ValueChange = ValueChange.DONT_CARE,
     sda_oe: ValueChange = ValueChange.STEADY,
 ) -> sim.Procedure:
-    assert (yield i2c.hard_bus.scl_o) != level
+    assert (yield i2c.hw_bus.scl_o) != level
 
-    vcw_sda_o = sda_o.watcher_for(i2c.hard_bus.sda_o)
+    vcw_sda_o = sda_o.watcher_for(i2c.hw_bus.sda_o)
     yield from vcw_sda_o.start()
-    vcw_sda_oe = sda_oe.watcher_for(i2c.hard_bus.sda_oe)
+    vcw_sda_oe = sda_oe.watcher_for(i2c.hw_bus.sda_oe)
     yield from vcw_sda_oe.start()
 
     while True:
@@ -159,7 +159,7 @@ def wait_scl(
         yield from vcw_sda_o.update()
         yield from vcw_sda_oe.update()
 
-        if (yield i2c.hard_bus.scl_o) == level:
+        if (yield i2c.hw_bus.scl_o) == level:
             break
 
     vcw_sda_o.finish()
@@ -170,12 +170,12 @@ def send(
     i2c: I2C, byte: int, *, next: int | Literal["STOP"] | None = None
 ) -> sim.Procedure:
     actual = 0
-    assert not (yield i2c.hard_bus.scl_o)
-    assert (yield i2c.hard_bus.sda_oe)
+    assert not (yield i2c.hw_bus.scl_o)
+    assert (yield i2c.hw_bus.sda_oe)
     for bit in range(8):
         yield from wait_scl(i2c, 1)
 
-        actual = (actual << 1) | (yield i2c.hard_bus.sda_o)
+        actual = (actual << 1) | (yield i2c.hw_bus.sda_o)
 
         yield from wait_scl(
             i2c,
@@ -186,27 +186,27 @@ def send(
 
         if bit == 0:
             if isinstance(next, int):
-                assert (yield i2c.bus.o_in_fifo_r_rdy)
+                assert (yield i2c.bus.in_fifo_r_rdy)
                 assert (
-                    yield i2c.bus.i_in_fifo_w_data
-                ) == next, f"checking next: expected {next:02x}, got {(yield i2c.bus.i_in_fifo_w_data):02x}"
-                assert not (yield i2c.bus.i_in_fifo_w_en)
+                    yield i2c.bus.in_fifo_w_data
+                ) == next, f"checking next: expected {next:02x}, got {(yield i2c.bus.in_fifo_w_data):02x}"
+                assert not (yield i2c.bus.in_fifo_w_en)
             elif next == "STOP":
                 assert not (
-                    yield i2c.bus.o_in_fifo_r_rdy
-                ), f"checking next: expected empty FIFO, contained ({(yield i2c.bus.i_in_fifo_w_data):02x})"
+                    yield i2c.bus.in_fifo_r_rdy
+                ), f"checking next: expected empty FIFO, contained ({(yield i2c.bus.in_fifo_w_data):02x})"
 
     assert actual == byte, f"expected {byte:02x}, got {actual:02x}"
 
 
 def receive(i2c: I2C, byte: int) -> sim.Procedure:
-    assert not (yield i2c.hard_bus.scl_o)
+    assert not (yield i2c.hw_bus.scl_o)
     for bit in range(8):
-        yield i2c.hard_bus.sda_i.eq((byte >> (7 - bit)) & 1)
+        yield i2c.hw_bus.sda_i.eq((byte >> (7 - bit)) & 1)
 
         yield from wait_scl(i2c, 1)
 
-        assert not (yield i2c.hard_bus.sda_oe)
+        assert not (yield i2c.hw_bus.sda_oe)
 
         yield from wait_scl(i2c, 0, sda_oe=ValueChange.STEADY)
 
@@ -216,34 +216,34 @@ def ack(
 ) -> sim.Procedure:
     if from_us:
         # Controller takes SDA.
-        assert not (yield i2c.hard_bus.sda_oe)
+        assert not (yield i2c.hw_bus.sda_oe)
 
         yield Delay(4 * _tick(i2c))
-        assert (yield i2c.hard_bus.sda_oe)
+        assert (yield i2c.hw_bus.sda_oe)
         assert ack ^ (
-            yield i2c.hard_bus.sda_o
+            yield i2c.hw_bus.sda_o
         ), f"expected ack {ack} from us, got {not ack}"  # ACK/low or NACK/high
         yield Delay(6 * _tick(i2c))
 
-        assert retakes_sda == (yield i2c.hard_bus.sda_oe)
+        assert retakes_sda == (yield i2c.hw_bus.sda_oe)
 
     else:
         # Controller releases SDA; we ACK by driving SDA low.
-        assert not (yield i2c.hard_bus.sda_oe)
+        assert not (yield i2c.hw_bus.sda_oe)
         yield Delay(_tick(i2c))
         if ack:
-            yield cast(Signal, i2c.hard_bus.sda_i).eq(0)
+            yield cast(Signal, i2c.hw_bus.sda_i).eq(0)
         yield Delay(3 * _tick(i2c))
-        assert not (yield i2c.hard_bus.sda_oe)
+        assert not (yield i2c.hw_bus.sda_oe)
         yield Delay(_tick(i2c))
 
         yield Delay(4 * _tick(i2c))
         if ack:
-            yield cast(Signal, i2c.hard_bus.sda_i).eq(1)
+            yield cast(Signal, i2c.hw_bus.sda_i).eq(1)
         yield Delay(_tick(i2c))
 
-        assert retakes_sda == (yield i2c.hard_bus.sda_oe)
-        assert ack == (yield i2c.bus.o_ack)
+        assert retakes_sda == (yield i2c.hw_bus.sda_oe)
+        assert ack == (yield i2c.bus.ack)
 
 
 def nack(i2c: I2C, *, from_us: bool = False) -> sim.Procedure:
@@ -252,7 +252,7 @@ def nack(i2c: I2C, *, from_us: bool = False) -> sim.Procedure:
 
 def stop(i2c: I2C) -> sim.Procedure:
     # While SCL is low, bring SDA low.
-    sda_start = yield i2c.hard_bus.sda_o
+    sda_start = yield i2c.hw_bus.sda_o
     yield from wait_scl(
         i2c, 1, sda_o=ValueChange.FALL if sda_start else ValueChange.STEADY
     )
@@ -260,21 +260,21 @@ def stop(i2c: I2C) -> sim.Procedure:
     # Now while SCL is high, bring SDA high.
     while True:
         yield Delay(_tick(i2c))
-        assert (yield i2c.hard_bus.scl_o)
-        if (yield i2c.hard_bus.sda_o):
+        assert (yield i2c.hw_bus.scl_o)
+        if (yield i2c.hw_bus.sda_o):
             break
 
 
 def steady_stopped(i2c: I2C, *, wait_steps: int = 5) -> sim.Procedure:
     for _ in range(wait_steps):
         yield Delay(_tick(i2c))
-        assert (yield i2c.hard_bus.scl_o)
-        assert (yield i2c.hard_bus.sda_o)
+        assert (yield i2c.hw_bus.scl_o)
+        assert (yield i2c.hw_bus.sda_o)
 
     assert not (
-        yield i2c.bus.o_in_fifo_r_rdy
-    ), f"unexpected data waiting on I2C in fifo: {(yield i2c.bus.i_in_fifo_w_data):02x}"
-    assert not (yield i2c.bus.o_busy)
+        yield i2c.bus.in_fifo_r_rdy
+    ), f"unexpected data waiting on I2C in fifo: {(yield i2c.bus.in_fifo_w_data):02x}"
+    assert not (yield i2c.bus.busy)
 
 
 def full_sequence(

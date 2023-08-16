@@ -42,10 +42,10 @@ class TestLocator(sim.TestCase):
         def trigger() -> sim.Procedure:
             yield dut.locator.i_row.eq(16)
             yield dut.locator.i_col.eq(8)
-            yield dut.locator.i_stb.eq(1)
+            yield dut.locator.stb.eq(1)
             yield
             yield Settle()
-            yield dut.locator.i_stb.eq(0)
+            yield dut.locator.stb.eq(0)
 
         yield from sim_i2c.full_sequence(
             dut.i2c,
@@ -64,10 +64,10 @@ class TestLocator(sim.TestCase):
         def trigger() -> sim.Procedure:
             yield dut.locator.i_row.eq(7)
             yield dut.locator.i_col.eq(0)
-            yield dut.locator.i_stb.eq(1)
+            yield dut.locator.stb.eq(1)
             yield
             yield Settle()
-            yield dut.locator.i_stb.eq(0)
+            yield dut.locator.stb.eq(0)
 
         yield from sim_i2c.full_sequence(
             dut.i2c,
@@ -85,10 +85,10 @@ class TestLocator(sim.TestCase):
         def trigger() -> sim.Procedure:
             yield dut.locator.i_row.eq(0)
             yield dut.locator.i_col.eq(13)
-            yield dut.locator.i_stb.eq(1)
+            yield dut.locator.stb.eq(1)
             yield
             yield Settle()
-            yield dut.locator.i_stb.eq(0)
+            yield dut.locator.stb.eq(0)
 
         yield from sim_i2c.full_sequence(
             dut.i2c,

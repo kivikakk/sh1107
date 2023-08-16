@@ -142,11 +142,11 @@ class Top(ConfigComponent):
 
         if Blackbox.I2C not in self.config.blackboxes:
             ports += [
-                self.oled.i2c.hard_bus.scl_o,
-                self.oled.i2c.hard_bus.scl_oe,
-                self.oled.i2c.hard_bus.sda_o,
-                self.oled.i2c.hard_bus.sda_oe,
-                self.oled.i2c.hard_bus.sda_i,
+                self.oled.i2c.hw_bus.scl_o,
+                self.oled.i2c.hw_bus.scl_oe,
+                self.oled.i2c.hw_bus.sda_o,
+                self.oled.i2c.hw_bus.sda_oe,
+                self.oled.i2c.hw_bus.sda_i,
             ]
         else:
             ports += [
@@ -171,8 +171,8 @@ class Top(ConfigComponent):
                 led_ack = cast(Signal, platform.request("led", 1).o)
 
                 m.d.comb += [
-                    led_busy.eq(self.oled.i2c_bus.o_busy),
-                    led_ack.eq(self.oled.i2c_bus.o_ack),
+                    led_busy.eq(self.oled.i2c_bus.busy),
+                    led_ack.eq(self.oled.i2c_bus.ack),
                 ]
 
                 platform.add_resources(platform.break_off_pmod)
@@ -201,8 +201,8 @@ class Top(ConfigComponent):
                 led_ack = cast(Signal, cast(Record, rgb.g).o)
 
                 m.d.comb += [
-                    led_busy.eq(self.oled.i2c_bus.o_busy),
-                    led_ack.eq(self.oled.i2c_bus.o_ack),
+                    led_busy.eq(self.oled.i2c_bus.busy),
+                    led_ack.eq(self.oled.i2c_bus.ack),
                 ]
 
                 main_switch = cast(Signal, platform.request("button", 0).i)

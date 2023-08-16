@@ -16,9 +16,9 @@ class Locator(Component):
     i_adjust: In(range(16))
     i_row: In(range(17))
     i_col: In(range(17))
-    i_stb: In(1)
+    stb: In(1)
 
-    o_busy: Out(1)
+    busy: Out(1)
 
     i2c_bus: In(I2CBus)
     adjusted_row: Signal
@@ -34,122 +34,116 @@ class Locator(Component):
 
         m.d.comb += self.adjusted_row.eq(self.i_row - 1 + self.i_adjust)
 
-        transfer = Transfer(self.i2c_bus.i_in_fifo_w_data)
+        transfer = Transfer(self.i2c_bus.in_fifo_w_data)
 
         with m.FSM():
             with m.State("IDLE"):
-                with m.If(self.i_stb):
+                with m.If(self.stb):
                     m.d.sync += [
-                        self.o_busy.eq(1),
+                        self.busy.eq(1),
                         transfer.kind.eq(Transfer.Kind.START),
                         transfer.payload.start.addr.eq(self.addr),
                         transfer.payload.start.rw.eq(RW.W),
-                        self.i2c_bus.i_in_fifo_w_en.eq(1),
+                        self.i2c_bus.in_fifo_w_en.eq(1),
                     ]
                     m.next = "START: ADDR: STROBED W_EN"
 
             with m.State("START: ADDR: STROBED W_EN"):
                 m.d.sync += [
-                    self.i2c_bus.i_in_fifo_w_en.eq(0),
-                    self.i2c_bus.i_stb.eq(1),
+                    self.i2c_bus.in_fifo_w_en.eq(0),
+                    self.i2c_bus.stb.eq(1),
                 ]
                 m.next = "START: ADDR: STROBED I_STB"
 
             with m.State("START: ADDR: STROBED I_STB"):
-                m.d.sync += self.i2c_bus.i_stb.eq(0)
-                with m.If(self.i2c_bus.o_in_fifo_w_rdy):
+                m.d.sync += self.i2c_bus.stb.eq(0)
+                with m.If(self.i2c_bus.in_fifo_w_rdy):
                     m.d.sync += [
                         transfer.kind.eq(Transfer.Kind.DATA),
                         transfer.payload.data.eq(
                             ControlByte(False, "Command").to_byte()
                         ),
-                        self.i2c_bus.i_in_fifo_w_en.eq(1),
+                        self.i2c_bus.in_fifo_w_en.eq(1),
                     ]
                     m.next = "START: CONTROL: STROBED W_EN"
 
             with m.State("START: CONTROL: STROBED W_EN"):
-                m.d.sync += self.i2c_bus.i_in_fifo_w_en.eq(0)
+                m.d.sync += self.i2c_bus.in_fifo_w_en.eq(0)
                 m.next = "START: CONTROL: UNSTROBED W_EN"
 
             with m.State("START: CONTROL: UNSTROBED W_EN"):
                 with m.If(
-                    self.i2c_bus.o_busy
-                    & self.i2c_bus.o_ack
-                    & self.i2c_bus.o_in_fifo_w_rdy
+                    self.i2c_bus.busy & self.i2c_bus.ack & self.i2c_bus.in_fifo_w_rdy
                 ):
                     with m.If(self.i_col != 0):
                         byte = Cmd.SetPageAddress(0x00).to_byte() + 16 - self.i_col
                         m.d.sync += [
                             transfer.payload.data.eq(byte),
-                            self.i2c_bus.i_in_fifo_w_en.eq(1),
+                            self.i2c_bus.in_fifo_w_en.eq(1),
                         ]
                         m.next = "START: PAGE: STROBED W_EN"
                     with m.Elif(self.i_row != 0):
                         self.start_row(m)
                         m.next = "START: COL LOWER: STROBED W_EN"
                     with m.Else():
-                        m.d.sync += self.o_busy.eq(0)
+                        m.d.sync += self.busy.eq(0)
                         m.next = "IDLE"
-                with m.Elif(~self.i2c_bus.o_busy):
-                    m.d.sync += self.o_busy.eq(0)
+                with m.Elif(~self.i2c_bus.busy):
+                    m.d.sync += self.busy.eq(0)
                     m.next = "IDLE"
 
             with m.State("START: PAGE: STROBED W_EN"):
-                m.d.sync += self.i2c_bus.i_in_fifo_w_en.eq(0)
+                m.d.sync += self.i2c_bus.in_fifo_w_en.eq(0)
                 m.next = "START: PAGE: UNSTROBED W_EN"
 
             with m.State("START: PAGE: UNSTROBED W_EN"):
                 with m.If(self.i_row != 0):
                     with m.If(
-                        self.i2c_bus.o_busy
-                        & self.i2c_bus.o_ack
-                        & self.i2c_bus.o_in_fifo_w_rdy
+                        self.i2c_bus.busy
+                        & self.i2c_bus.ack
+                        & self.i2c_bus.in_fifo_w_rdy
                     ):
                         self.start_row(m)
                         m.next = "START: COL LOWER: STROBED W_EN"
-                    with m.Elif(~self.i2c_bus.o_busy):
-                        m.d.sync += self.o_busy.eq(0)
+                    with m.Elif(~self.i2c_bus.busy):
+                        m.d.sync += self.busy.eq(0)
                         m.next = "IDLE"
-                with m.Elif(~self.i2c_bus.o_busy):
-                    m.d.sync += self.o_busy.eq(0)
+                with m.Elif(~self.i2c_bus.busy):
+                    m.d.sync += self.busy.eq(0)
                     m.next = "IDLE"
 
             with m.State("START: COL LOWER: STROBED W_EN"):
-                m.d.sync += self.i2c_bus.i_in_fifo_w_en.eq(0)
+                m.d.sync += self.i2c_bus.in_fifo_w_en.eq(0)
                 m.next = "START: COL LOWER: UNSTROBED W_EN"
 
             with m.State("START: COL LOWER: UNSTROBED W_EN"):
                 with m.If(
-                    self.i2c_bus.o_busy
-                    & self.i2c_bus.o_ack
-                    & self.i2c_bus.o_in_fifo_w_rdy
+                    self.i2c_bus.busy & self.i2c_bus.ack & self.i2c_bus.in_fifo_w_rdy
                 ):
                     byte = Cmd.SetHigherColumnAddress(0x00).to_byte() + (
                         self.adjusted_row >> 1
                     )
                     m.d.sync += [
                         transfer.payload.data.eq(byte),
-                        self.i2c_bus.i_in_fifo_w_en.eq(1),
+                        self.i2c_bus.in_fifo_w_en.eq(1),
                     ]
                     m.next = "START: COL HIGHER: STROBED W_EN"
-                with m.Elif(~self.i2c_bus.o_busy):
-                    m.d.sync += self.o_busy.eq(0)
+                with m.Elif(~self.i2c_bus.busy):
+                    m.d.sync += self.busy.eq(0)
                     m.next = "IDLE"
 
             with m.State("START: COL HIGHER: STROBED W_EN"):
-                m.d.sync += self.i2c_bus.i_in_fifo_w_en.eq(0)
+                m.d.sync += self.i2c_bus.in_fifo_w_en.eq(0)
                 m.next = "START: COL HIGHER: UNSTROBED W_EN"
 
             with m.State("START: COL HIGHER: UNSTROBED W_EN"):
                 with m.If(
-                    ~self.i2c_bus.o_busy
-                    & self.i2c_bus.o_ack
-                    & self.i2c_bus.o_in_fifo_w_rdy
+                    ~self.i2c_bus.busy & self.i2c_bus.ack & self.i2c_bus.in_fifo_w_rdy
                 ):
-                    m.d.sync += self.o_busy.eq(0)
+                    m.d.sync += self.busy.eq(0)
                     m.next = "IDLE"
-                with m.Elif(~self.i2c_bus.o_busy):
-                    m.d.sync += self.o_busy.eq(0)
+                with m.Elif(~self.i2c_bus.busy):
+                    m.d.sync += self.busy.eq(0)
                     m.next = "IDLE"
 
         return m
@@ -160,8 +154,8 @@ class Locator(Component):
         byte = Cmd.SetLowerColumnAddress(0x00).to_byte() + Mux(
             self.adjusted_row[0], 8, 0
         )
-        transfer = Transfer(self.i2c_bus.i_in_fifo_w_data)
+        transfer = Transfer(self.i2c_bus.in_fifo_w_data)
         m.d.sync += [
             transfer.payload.data.eq(byte),
-            self.i2c_bus.i_in_fifo_w_en.eq(1),
+            self.i2c_bus.in_fifo_w_en.eq(1),
         ]

@@ -45,36 +45,36 @@ class TestI2CTop(Component):
             with m.State("IDLE"):
                 with m.If(self.switch):
                     m.d.sync += [
-                        bus.i_in_fifo_w_data.eq(self.data[0]),
-                        bus.i_in_fifo_w_en.eq(1),
+                        bus.in_fifo_w_data.eq(self.data[0]),
+                        bus.in_fifo_w_en.eq(1),
                     ]
                     m.next = "START: W_EN LATCHED"
 
             with m.State("START: W_EN LATCHED"):
                 m.d.sync += [
-                    bus.i_in_fifo_w_en.eq(0),
-                    bus.i_stb.eq(1),
+                    bus.in_fifo_w_en.eq(0),
+                    bus.stb.eq(1),
                 ]
                 m.next = "START: STROBED"
 
             with m.State("START: STROBED"):
-                m.d.sync += bus.i_stb.eq(0)
+                m.d.sync += bus.stb.eq(0)
                 m.next = "LOOP: UNLATCHED DATA[0]"
 
             for i, datum in list(enumerate(self.data))[1:]:
                 with m.State(f"LOOP: UNLATCHED DATA[{i-1}]"):
-                    with m.If(bus.o_busy & bus.o_ack & bus.o_in_fifo_w_rdy):
+                    with m.If(bus.busy & bus.ack & bus.in_fifo_w_rdy):
                         m.d.sync += [
-                            bus.i_in_fifo_w_data.eq(datum),
-                            bus.i_in_fifo_w_en.eq(1),
+                            bus.in_fifo_w_data.eq(datum),
+                            bus.in_fifo_w_en.eq(1),
                         ]
                         m.next = f"LOOP: LATCHED DATA[{i}]"
-                    with m.Elif(~bus.o_busy):
+                    with m.Elif(~bus.busy):
                         m.d.sync += self.aborted_at.eq(i - 1)
                         m.next = "IDLE"
 
                 with m.State(f"LOOP: LATCHED DATA[{i}]"):
-                    m.d.sync += bus.i_in_fifo_w_en.eq(0)
+                    m.d.sync += bus.in_fifo_w_en.eq(0)
                     if i < len(self.data) - 1:
                         m.next = f"LOOP: UNLATCHED DATA[{i}]"
                     else:

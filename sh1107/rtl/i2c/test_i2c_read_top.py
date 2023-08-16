@@ -51,12 +51,12 @@ class TestI2CReadTop(Component):
         m.submodules.result = self.result
 
         bus = self.i2c.bus
-        transfer = Transfer(bus.i_in_fifo_w_data)
+        transfer = Transfer(bus.in_fifo_w_data)
 
         m.d.comb += [
-            self.result.w_data.eq(bus.o_out_fifo_r_data),
-            self.result.w_en.eq(bus.o_out_fifo_r_rdy),
-            bus.i_out_fifo_r_en.eq(bus.o_out_fifo_r_rdy),
+            self.result.w_data.eq(bus.out_fifo_r_data),
+            self.result.w_en.eq(bus.out_fifo_r_rdy),
+            bus.out_fifo_r_en.eq(bus.out_fifo_r_rdy),
         ]
 
         with m.FSM():
@@ -66,7 +66,7 @@ class TestI2CReadTop(Component):
                         transfer.kind.eq(Transfer.Kind.START),
                         transfer.payload.start.rw.eq(RW.R),
                         transfer.payload.start.addr.eq(self.addr),
-                        bus.i_in_fifo_w_en.eq(1),
+                        bus.in_fifo_w_en.eq(1),
                         self.busy.eq(1),
                         self.remaining.eq(self.count),
                     ]
@@ -74,22 +74,22 @@ class TestI2CReadTop(Component):
 
             with m.State("W_EN LATCHED"):
                 m.d.sync += [
-                    bus.i_in_fifo_w_en.eq(0),
-                    bus.i_stb.eq(1),
+                    bus.in_fifo_w_en.eq(0),
+                    bus.stb.eq(1),
                 ]
                 m.next = "WAIT WRITE"
 
             with m.State("WAIT WRITE"):
-                m.d.sync += bus.i_stb.eq(0)
-                with m.If(bus.o_busy & bus.o_ack & bus.o_in_fifo_w_rdy):
+                m.d.sync += bus.stb.eq(0)
+                with m.If(bus.busy & bus.ack & bus.in_fifo_w_rdy):
                     m.d.sync += [
                         transfer.kind.eq(Transfer.Kind.DATA),
-                        bus.i_in_fifo_w_en.eq(1),
+                        bus.in_fifo_w_en.eq(1),
                     ]
                     m.next = "PLACEHOLDER LATCHED"
 
             with m.State("PLACEHOLDER LATCHED"):
-                m.d.sync += bus.i_in_fifo_w_en.eq(0)
+                m.d.sync += bus.in_fifo_w_en.eq(0)
 
                 with m.If(self.remaining == 1):
                     m.d.sync += self.busy.eq(0)
