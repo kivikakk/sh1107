@@ -14,13 +14,13 @@ __all__ = ["Scroller"]
 class Scroller(Component):
     addr: int
 
-    stb: In(1)
-    i_rst: In(1)
-    busy: Out(1)
-    o_adjusted: Out(range(16))
+    stb: Out(1)
+    rst: Out(1)
+    i2c_bus: Out(I2CBus)
+    rom_bus: Out(ROMBus(rom.ROM_ABITS, 8))
 
-    i2c_bus: In(I2CBus)
-    rom_bus: In(ROMBus(rom.ROM_ABITS, 8))
+    busy: In(1)
+    adjusted: In(range(16))
 
     offset: Signal
     remain: Signal
@@ -49,8 +49,8 @@ class Scroller(Component):
                         self.written.eq(0),
                     ]
                     m.next = "START: ADDRESSED OFFSET[0]"
-                with m.If(self.i_rst):
-                    m.d.sync += self.o_adjusted.eq(0)
+                with m.If(self.rst):
+                    m.d.sync += self.adjusted.eq(0)
 
             with m.State("START: ADDRESSED OFFSET[0]"):
                 m.d.sync += self.rom_bus.addr.eq(self.rom_bus.addr + 1)
@@ -115,20 +115,20 @@ class Scroller(Component):
                         self.written == rom.SCROLL_OFFSETS["InitialHigherColumnAddress"]
                     ):
                         m.d.sync += transfer.payload.data.eq(
-                            self.rom_bus.data + (self.o_adjusted >> 1)
+                            self.rom_bus.data + (self.adjusted >> 1)
                         )
                     for i in range(8):
                         with m.Elif(
                             self.written == rom.SCROLL_OFFSETS[f"LowerColumnAddress{i}"]
                         ):
                             m.d.sync += transfer.payload.data.eq(
-                                self.rom_bus.data + (self.o_adjusted[0] << 3)
+                                self.rom_bus.data + (self.adjusted[0] << 3)
                             )
                     with m.Elif(
                         self.written == rom.SCROLL_OFFSETS["DisplayStartLine"] + 1
                     ):
                         m.d.sync += transfer.payload.data.eq(
-                            Mux(self.o_adjusted == 15, 0, 8 + self.o_adjusted * 8)
+                            Mux(self.adjusted == 15, 0, 8 + self.adjusted * 8)
                         )
                     with m.Else():
                         m.d.sync += transfer.payload.data.eq(self.rom_bus.data)
@@ -182,7 +182,7 @@ class Scroller(Component):
                     ~self.i2c_bus.busy & self.i2c_bus.ack & self.i2c_bus.in_fifo_w_rdy
                 ):
                     m.d.sync += [
-                        self.o_adjusted.eq(self.o_adjusted + 1),
+                        self.adjusted.eq(self.adjusted + 1),
                         self.busy.eq(0),
                     ]
                     m.next = "IDLE"

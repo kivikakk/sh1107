@@ -51,7 +51,7 @@ class TestROMWriter(sim.TestCase):
     def test_sim_rom_writer_dispoff(self, dut: TestROMWriterTop) -> sim.Procedure:
         def trigger() -> sim.Procedure:
             assert not (yield dut.rom_writer.busy)
-            yield dut.rom_writer.i_index.eq(rom.OFFSET_DISPLAY_OFF)
+            yield dut.rom_writer.index.eq(rom.OFFSET_DISPLAY_OFF)
             yield dut.rom_writer.stb.eq(1)
             yield Delay(sim.clock())
             yield dut.rom_writer.stb.eq(0)
@@ -70,7 +70,7 @@ class TestROMWriter(sim.TestCase):
     def test_sim_rom_writer_chara(self, dut: TestROMWriterTop) -> sim.Procedure:
         def trigger() -> sim.Procedure:
             assert not (yield dut.rom_writer.busy)
-            yield dut.rom_writer.i_index.eq(rom.OFFSET_CHAR + 0x41)
+            yield dut.rom_writer.index.eq(rom.OFFSET_CHAR + 0x41)
             yield dut.rom_writer.stb.eq(1)
             yield Delay(sim.clock())
             yield dut.rom_writer.stb.eq(0)

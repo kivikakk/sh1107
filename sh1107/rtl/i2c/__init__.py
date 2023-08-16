@@ -59,16 +59,16 @@ class Transfer(data.Struct):
 
 I2CBus = Signature(
     {
-        "in_fifo_w_data": In(9),
-        "in_fifo_w_en": In(1),
-        "out_fifo_r_en": In(1),
-        "stb": In(1),
-        "ack": Out(1, reset=1),
-        "busy": Out(1),
-        "in_fifo_w_rdy": Out(1),
-        "in_fifo_r_rdy": Out(1),
-        "out_fifo_r_rdy": Out(1),
-        "out_fifo_r_data": Out(8),
+        "in_fifo_w_data": Out(9),
+        "in_fifo_w_en": Out(1),
+        "out_fifo_r_en": Out(1),
+        "stb": Out(1),
+        "ack": In(1, reset=1),
+        "busy": In(1),
+        "in_fifo_w_rdy": In(1),
+        "in_fifo_r_rdy": In(1),
+        "out_fifo_r_rdy": In(1),
+        "out_fifo_r_data": In(8),
     }
 )
 
@@ -117,7 +117,7 @@ class I2C(Component):
 
     c: Counter
 
-    bus: Out(I2CBus)
+    bus: In(I2CBus)
     hw_bus: Out(I2CHardwareBus)
 
     rw: Signal
@@ -211,7 +211,7 @@ class I2C(Component):
         # clock stretching?
 
         m.submodules.c = c = self.c
-        with m.If(c.o_full):
+        with m.If(c.full):
             m.d.sync += self.hw_bus.scl_o.eq(~self.hw_bus.scl_o)
 
         m.d.sync += self._in_fifo.r_en.eq(0)
@@ -245,23 +245,23 @@ class I2C(Component):
 
             with m.State("START: WAIT SCL"):
                 # SDA is low.
-                with m.If(c.o_full):
+                with m.If(c.full):
                     fh(m, self.formal_scl, False)
                     m.next = "WRITE DATA BIT: SCL LOW"
 
             # This comes from "START: WAIT SCL" or "WRITE ACK BIT: SCL HIGH".
             with m.State("WRITE DATA BIT: SCL LOW"):
-                with m.If(c.o_half):
+                with m.If(c.half):
                     # Set SDA in prep for SCL high. (MSB)
                     m.d.sync += self.hw_bus.sda_o.eq(
                         (self.byte >> (7 - self.byte_ix)[:3]) & 0x1
                     )
-                with m.Elif(c.o_full):
+                with m.Elif(c.full):
                     fh(m, self.formal_scl, True)
                     m.next = "WRITE DATA BIT: SCL HIGH"
 
             with m.State("WRITE DATA BIT: SCL HIGH"):
-                with m.If(c.o_full):
+                with m.If(c.full):
                     fh(m, self.formal_scl, False)
                     with m.If(self.byte_ix == 7):
                         # Let go of SDA.
@@ -274,12 +274,12 @@ class I2C(Component):
                         # Wait for next SCL^ before next data bit.
 
             with m.State("WRITE ACK BIT: SCL LOW"):
-                with m.If(c.o_full):
+                with m.If(c.full):
                     fh(m, self.formal_scl, True)
                     m.next = "WRITE ACK BIT: SCL HIGH"
 
             with m.State("WRITE ACK BIT: SCL HIGH"):
-                with m.If(c.o_half):
+                with m.If(c.half):
                     # Read ACK. SDA should be brought low by the addressee.
                     # Don't take SDA back until end of the cycle, otherwise it
                     # looks like a STOP condition if sda_o was left high.
@@ -287,12 +287,12 @@ class I2C(Component):
                     m.next = "COMMON ACK BIT: SCL HIGH"
 
             with m.State("READ DATA BIT: SCL LOW"):
-                with m.If(c.o_full):
+                with m.If(c.full):
                     fh(m, self.formal_scl, True)
                     m.next = "READ DATA BIT: SCL HIGH"
 
             with m.State("READ DATA BIT: SCL HIGH"):
-                with m.If(c.o_half):
+                with m.If(c.half):
                     with m.If(self.byte_ix == 7):
                         m.d.sync += [
                             self._out_fifo.w_data.eq(
@@ -312,18 +312,18 @@ class I2C(Component):
                             ),
                         ]
 
-                with m.If(c.o_full):
+                with m.If(c.full):
                     fh(m, self.formal_scl, False)
                     m.next = "READ DATA BIT: SCL LOW"
 
             with m.State("READ DATA BIT (LAST): SCL HIGH"):
                 m.d.sync += self._out_fifo.w_en.eq(0)
-                with m.If(c.o_full):
+                with m.If(c.full):
                     fh(m, self.formal_scl, False)
                     m.next = "READ ACK BIT: SCL LOW"
 
             with m.State("READ ACK BIT: SCL LOW"):
-                with m.If(c.o_half):
+                with m.If(c.half):
                     # Take back SDA & set.
                     # If the next byte is more data, we want to read more, so bring SDA low.
                     m.d.sync += [
@@ -335,12 +335,12 @@ class I2C(Component):
                             )
                         ),
                     ]
-                with m.Elif(c.o_full):
+                with m.Elif(c.full):
                     fh(m, self.formal_scl, True)
                     m.next = "COMMON ACK BIT: SCL HIGH"
 
             with m.State("COMMON ACK BIT: SCL HIGH"):
-                with m.If(c.o_full):
+                with m.If(c.full):
                     fh(m, self.formal_scl, False)
                     with m.If(self._in_fifo.r_rdy):
                         with m.If(
@@ -395,38 +395,38 @@ class I2C(Component):
                         m.next = "FIN: SCL LOW"
 
             with m.State("REP START: SCL LOW"):
-                with m.If(c.o_half):
+                with m.If(c.half):
                     # Bring SDA high so we can drop it during the SCL high
                     # period.
                     m.d.sync += self.hw_bus.sda_o.eq(1)
-                with m.If(c.o_full):
+                with m.If(c.full):
                     fh(m, self.formal_scl, True)
                     m.next = "REP START: SCL HIGH"
 
             with m.State("REP START: SCL HIGH"):
                 # SDA is high.
-                with m.If(c.o_half):
+                with m.If(c.half):
                     # Bring SDA low mid SCL-high to repeat start.
                     fh(m, self.formal_repeated_start, True)
                     m.d.sync += self.hw_bus.sda_o.eq(0)
-                with m.Elif(c.o_full):
+                with m.Elif(c.full):
                     fh(m, self.formal_scl, False)
                     m.next = "WRITE DATA BIT: SCL LOW"
 
             with m.State("FIN: SCL LOW"):
-                with m.If(c.o_half):
+                with m.If(c.half):
                     # Bring SDA low during SCL low.
                     m.d.sync += self.hw_bus.sda_o.eq(0)
-                with m.Elif(c.o_full):
+                with m.Elif(c.full):
                     fh(m, self.formal_scl, True)
                     m.next = "FIN: SCL HIGH"
 
             with m.State("FIN: SCL HIGH"):
-                with m.If(c.o_half):
+                with m.If(c.half):
                     # Bring SDA high during SCL high to finish.
                     m.d.sync += self.hw_bus.sda_o.eq(1)
                     fh(m, self.formal_stop, True)
-                with m.Elif(c.o_full):
+                with m.Elif(c.full):
                     # Turn off the clock to keep SCL high.
                     m.d.sync += [
                         c.en.eq(0),

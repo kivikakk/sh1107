@@ -21,8 +21,8 @@ class Timer(Component):
 
     time: float
 
-    i: In(1)
-    o: Out(1)
+    i: Out(1)
+    o: In(1)
 
     def __init__(self, *, time: float):
         super().__init__()
@@ -37,7 +37,7 @@ class Timer(Component):
         with m.If(~self.i):
             m.d.sync += self.o.eq(0)
 
-        with m.If(c.o_full):
+        with m.If(c.full):
             m.d.sync += self.o.eq(1)
 
         return m

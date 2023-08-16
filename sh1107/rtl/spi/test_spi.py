@@ -8,14 +8,14 @@ from amaranth.lib.wiring import Component, In, Out
 
 from ... import sim
 from ...base import Config
-from . import SPIBus, SPIFlashReader
+from . import SPIFlashReader, SPIHardwareBus
 
 
 # TODO(Ch): try using this + initted Memory in vsh instead of the whitebox, just
 # to see how hard/easy it is.
 class MockSPIFlashPeripheral(Component):
     data: Value
-    spi: In(SPIBus)
+    spi: In(SPIHardwareBus)
 
     def __init__(self, *, data: Value):
         super().__init__()
@@ -85,9 +85,9 @@ class TestSPIFlashReaderTop(Component):
     data: Value
     len: int
 
-    stb: In(1)
-    o_fifo: SyncFIFO
-    busy: Out(1)
+    stb: Out(1)
+    out: SyncFIFO
+    busy: In(1)
 
     spifr: SPIFlashReader
     peripheral: MockSPIFlashPeripheral
@@ -97,7 +97,7 @@ class TestSPIFlashReaderTop(Component):
         self.len = len(self.data) // 8
 
         self.stb = Signal()
-        self.o_fifo = SyncFIFO(width=8, depth=self.len)
+        self.fifo_out = SyncFIFO(width=8, depth=self.len)
         self.busy = Signal()
 
         self.spifr = SPIFlashReader(config=Config.test)
@@ -106,7 +106,7 @@ class TestSPIFlashReaderTop(Component):
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
 
-        m.submodules.o_fifo = self.o_fifo
+        m.submodules.fifo_out = self.fifo_out
         m.submodules.spifr = self.spifr
         m.submodules.peripheral = self.peripheral
 
@@ -119,7 +119,7 @@ class TestSPIFlashReaderTop(Component):
 
         m.d.sync += [
             self.spifr.bus.stb.eq(0),
-            self.o_fifo.w_en.eq(0),
+            self.fifo_out.w_en.eq(0),
         ]
 
         with m.FSM() as fsm:
@@ -140,8 +140,8 @@ class TestSPIFlashReaderTop(Component):
             with m.State("WAITING SPIFR"):
                 with m.If(self.spifr.bus.valid):
                     m.d.sync += [
-                        self.o_fifo.w_data.eq(self.spifr.bus.data),
-                        self.o_fifo.w_en.eq(1),
+                        self.fifo_out.w_data.eq(self.spifr.bus.data),
+                        self.fifo_out.w_en.eq(1),
                     ]
                 with m.Elif(~self.spifr.bus.busy):
                     m.next = "IDLE"
@@ -166,4 +166,4 @@ class TestSPIFlashReader(sim.TestCase):
         expected = []
         for i in reversed(range(len(dut.data) // 8)):
             expected.append((yield dut.data[i * 8 : (i + 1) * 8]))
-        self.assertEqual((yield from sim.fifo_content(dut.o_fifo)), expected)
+        self.assertEqual((yield from sim.fifo_content(dut.fifo_out)), expected)

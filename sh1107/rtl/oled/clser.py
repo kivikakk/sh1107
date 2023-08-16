@@ -13,11 +13,10 @@ __all__ = ["Clser"]
 class Clser(Component):
     addr: int
 
-    stb: In(1)
+    stb: Out(1)
+    i2c_bus: Out(I2CBus)
 
-    busy: Out(1)
-
-    i2c_bus: In(I2CBus)
+    busy: In(1)
 
     current_page: Signal
     current_column: Signal
@@ -57,9 +56,9 @@ class Clser(Component):
                     self.i2c_bus.in_fifo_w_en.eq(0),
                     self.i2c_bus.stb.eq(1),
                 ]
-                m.next = "START: ADDR: STROBED I_STB"
+                m.next = "START: ADDR: STROBED STB"
 
-            with m.State("START: ADDR: STROBED I_STB"):
+            with m.State("START: ADDR: STROBED STB"):
                 m.d.sync += self.i2c_bus.stb.eq(0)
                 with m.If(self.i2c_bus.in_fifo_w_rdy):
                     m.d.sync += [
@@ -194,6 +193,6 @@ class Clser(Component):
 
             with m.State("LOOP: NEXT PAGE: ADDR: STROBED W_EN"):
                 m.d.sync += self.i2c_bus.in_fifo_w_en.eq(0)
-                m.next = "START: ADDR: STROBED I_STB"
+                m.next = "START: ADDR: STROBED STB"
 
         return m

@@ -13,14 +13,14 @@ __all__ = ["Locator"]
 class Locator(Component):
     addr: int
 
-    i_adjust: In(range(16))
-    i_row: In(range(17))
-    i_col: In(range(17))
-    stb: In(1)
+    adjust: Out(range(16))
+    row: Out(range(17))
+    col: Out(range(17))
+    stb: Out(1)
+    i2c_bus: Out(I2CBus)
 
-    busy: Out(1)
+    busy: In(1)
 
-    i2c_bus: In(I2CBus)
     adjusted_row: Signal
 
     def __init__(self, *, addr: int):
@@ -32,7 +32,7 @@ class Locator(Component):
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
 
-        m.d.comb += self.adjusted_row.eq(self.i_row - 1 + self.i_adjust)
+        m.d.comb += self.adjusted_row.eq(self.row - 1 + self.adjust)
 
         transfer = Transfer(self.i2c_bus.in_fifo_w_data)
 
@@ -53,9 +53,9 @@ class Locator(Component):
                     self.i2c_bus.in_fifo_w_en.eq(0),
                     self.i2c_bus.stb.eq(1),
                 ]
-                m.next = "START: ADDR: STROBED I_STB"
+                m.next = "START: ADDR: STROBED STB"
 
-            with m.State("START: ADDR: STROBED I_STB"):
+            with m.State("START: ADDR: STROBED STB"):
                 m.d.sync += self.i2c_bus.stb.eq(0)
                 with m.If(self.i2c_bus.in_fifo_w_rdy):
                     m.d.sync += [
@@ -75,14 +75,14 @@ class Locator(Component):
                 with m.If(
                     self.i2c_bus.busy & self.i2c_bus.ack & self.i2c_bus.in_fifo_w_rdy
                 ):
-                    with m.If(self.i_col != 0):
-                        byte = Cmd.SetPageAddress(0x00).to_byte() + 16 - self.i_col
+                    with m.If(self.col != 0):
+                        byte = Cmd.SetPageAddress(0x00).to_byte() + 16 - self.col
                         m.d.sync += [
                             transfer.payload.data.eq(byte),
                             self.i2c_bus.in_fifo_w_en.eq(1),
                         ]
                         m.next = "START: PAGE: STROBED W_EN"
-                    with m.Elif(self.i_row != 0):
+                    with m.Elif(self.row != 0):
                         self.start_row(m)
                         m.next = "START: COL LOWER: STROBED W_EN"
                     with m.Else():
@@ -97,7 +97,7 @@ class Locator(Component):
                 m.next = "START: PAGE: UNSTROBED W_EN"
 
             with m.State("START: PAGE: UNSTROBED W_EN"):
-                with m.If(self.i_row != 0):
+                with m.If(self.row != 0):
                     with m.If(
                         self.i2c_bus.busy
                         & self.i2c_bus.ack

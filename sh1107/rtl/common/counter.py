@@ -13,10 +13,10 @@ class Counter(Component):
     time: Optional[float]
     hz: Optional[int]
 
-    en: In(1)
+    en: Out(1)
 
-    o_half: Out(1)
-    o_full: Out(1)
+    half: In(1)
+    full: In(1)
 
     def __init__(
         self,
@@ -55,11 +55,11 @@ class Counter(Component):
         ), f"{assertion_msg}; !(0 <= {half_clock_tgt} < {full_clock_tgt})"
 
         m.d.comb += [
-            self.o_half.eq(clk_counter == half_clock_tgt),
-            self.o_full.eq(clk_counter == full_clock_tgt),
+            self.half.eq(clk_counter == half_clock_tgt),
+            self.full.eq(clk_counter == full_clock_tgt),
         ]
 
-        with m.If(self.en & ~self.o_full):
+        with m.If(self.en & ~self.full):
             m.d.sync += clk_counter.eq(clk_counter + 1)
         with m.Else():
             m.d.sync += clk_counter.eq(0)

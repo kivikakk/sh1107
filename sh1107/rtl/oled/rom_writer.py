@@ -14,12 +14,12 @@ __all__ = ["ROMWriter"]
 class ROMWriter(Component):
     addr: int
 
-    i_index: In(range(rom.SEQ_COUNT))
-    stb: In(1)
-    busy: Out(1)
+    index: Out(range(rom.SEQ_COUNT))
+    stb: Out(1)
+    i2c_bus: Out(I2CBus)
+    rom_bus: Out(ROMBus(rom.ROM_ABITS, 8))
 
-    i2c_bus: In(I2CBus)
-    rom_bus: In(ROMBus(rom.ROM_ABITS, 8))
+    busy: In(1)
 
     offset: Signal
     remain: Signal
@@ -40,7 +40,7 @@ class ROMWriter(Component):
             with m.State("IDLE"):
                 with m.If(self.stb):
                     m.d.sync += [
-                        self.rom_bus.addr.eq(self.i_index * 4),
+                        self.rom_bus.addr.eq(self.index * 4),
                         self.busy.eq(1),
                     ]
                     m.next = "START: ADDRESSED OFFSET[0]"

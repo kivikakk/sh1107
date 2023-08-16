@@ -10,10 +10,10 @@ from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
 from ... import sim
 from ...base import Blackbox, Config, ConfigComponent
 
-__all__ = ["SPIBus", "SPIFlashReaderBus", "SPIFlashReader"]
+__all__ = ["SPIHardwareBus", "SPIFlashReaderBus", "SPIFlashReader"]
 
 
-SPIBus = Signature(
+SPIHardwareBus = Signature(
     {
         "copi": Out(1),
         "cipo": In(1),
@@ -25,19 +25,19 @@ SPIBus = Signature(
 
 SPIFlashReaderBus = Signature(
     {
-        "addr": In(24),
-        "len": In(16),
-        "stb": In(1),
-        "busy": Out(1),
-        "data": Out(8),
-        "valid": Out(1),
+        "addr": Out(24),
+        "len": Out(16),
+        "stb": Out(1),
+        "busy": In(1),
+        "data": In(8),
+        "valid": In(1),
     }
 )
 
 
 class SPIFlashReader(ConfigComponent):
-    spi: Out(SPIBus)
-    bus: Out(SPIFlashReaderBus)
+    spi: Out(SPIHardwareBus)
+    bus: In(SPIFlashReaderBus)
 
     def __init__(
         self,

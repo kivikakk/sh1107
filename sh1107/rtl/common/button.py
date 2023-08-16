@@ -15,14 +15,14 @@ class Button(ConfigComponent):
     """
     A simple debounced button.
 
-    o_down strobes when the button is registered as pressed down.
-    o_up strobes when the button is registered as released.
+    down strobes when the button is registered as pressed down.
+    up strobes when the button is registered as released.
     """
 
-    i: In(1)
+    i: Out(1)
 
-    o_down: Out(1)
-    o_up: Out(1)
+    down: In(1)
+    up: In(1)
 
     debounce: Debounce
 
@@ -40,8 +40,8 @@ class Button(ConfigComponent):
         m.d.sync += registered.eq(self.debounce.o)
 
         m.d.comb += [
-            self.o_down.eq(~registered & self.debounce.o),
-            self.o_up.eq(registered & ~self.debounce.o),
+            self.down.eq(~registered & self.debounce.o),
+            self.up.eq(registered & ~self.debounce.o),
         ]
 
         return m
@@ -51,7 +51,7 @@ class ButtonWithHold(Button):
     """
     Adds a configurable hold signal to Button.
 
-    When o_up strobes, o_held will be high if the button was held for the
+    When up strobes, held will be high if the button was held for the
     configure hold time.
     """
 
@@ -60,7 +60,7 @@ class ButtonWithHold(Button):
 
     hold_time: float
 
-    o_held: Out(1)
+    held: In(1)
 
     def __init__(self, *, hold_time: Optional[float] = None, config: Config):
         super().__init__(config=config)
@@ -69,24 +69,22 @@ class ButtonWithHold(Button):
             self.SIM_HOLD_TIME if config.target.simulation else self.DEFAULT_HOLD_TIME
         )
 
-        self.o_held = Signal()
-
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = super().elaborate(platform)
 
         m.submodules.timer = timer = Timer(time=self.hold_time)
 
         holding = Signal()
-        with m.If(self.o_down):
+        with m.If(self.down):
             m.d.sync += [
                 holding.eq(1),
-                self.o_held.eq(0),
+                self.held.eq(0),
             ]
-        with m.If(self.o_up):
+        with m.If(self.up):
             m.d.sync += holding.eq(0)
 
         m.d.comb += timer.i.eq(holding)
         with m.If(timer.o):
-            m.d.sync += self.o_held.eq(1)
+            m.d.sync += self.held.eq(1)
 
         return m

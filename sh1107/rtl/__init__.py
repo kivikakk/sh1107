@@ -187,13 +187,13 @@ class Top(ConfigComponent):
                             config=self.config
                         )
                         m.d.comb += button.i.eq(switch)
-                        button_up_signals.append(button.o_up)
+                        button_up_signals.append(button.up)
 
                 led_l = platform.request("led_g", 1)
                 led_m = platform.request("led_r", 1)
                 led_r = platform.request("led_g", 2)
 
-                m.d.comb += Cat(led_r, led_m, led_l).eq(self.oled.o_result)
+                m.d.comb += Cat(led_r, led_m, led_l).eq(self.oled.result)
 
             case OrangeCrabR0_2_85FPlatform():
                 rgb = platform.request("rgb_led")
@@ -208,10 +208,10 @@ class Top(ConfigComponent):
                 main_switch = cast(Signal, platform.request("button", 0).i)
                 m.submodules.button_0 = button_0 = ButtonWithHold(config=self.config)
                 m.d.comb += button_0.i.eq(main_switch)
-                button_up_signals.append(button_0.o_up)
+                button_up_signals.append(button_0.up)
 
                 program = cast(Signal, platform.request("program").o)
-                with m.If(button_0.o_held):
+                with m.If(button_0.held):
                     m.d.sync += program.eq(1)
 
                 for i, _ in list(enumerate(self.switches))[1:]:
@@ -224,7 +224,7 @@ class Top(ConfigComponent):
                             config=self.config
                         )
                         m.d.comb += button.i.eq(switch)
-                        button_up_signals.append(button.o_up)
+                        button_up_signals.append(button.up)
 
             case None:
                 for i, switch in enumerate(self.switches):
@@ -244,10 +244,10 @@ class Top(ConfigComponent):
 
         with m.FSM():
             with m.State("IDLE"):
-                m.d.sync += self.oled.i_fifo.w_en.eq(0)
+                m.d.sync += self.oled.fifo_in.w_en.eq(0)
 
                 for i, button_up in enumerate(button_up_signals):
-                    with m.If(button_up & self.oled.i_fifo.w_rdy):
+                    with m.If(button_up & self.oled.fifo_in.w_rdy):
                         m.d.sync += [
                             offset.eq(sum(len(seq) for seq in self.sequences[:i])),
                             remain.eq(len(self.sequences[i])),
@@ -258,15 +258,15 @@ class Top(ConfigComponent):
                 m.next = "LOOP: AVAILABLE"
 
             with m.State("LOOP: AVAILABLE"):
-                with m.If(self.oled.i_fifo.w_rdy):
+                with m.If(self.oled.fifo_in.w_rdy):
                     m.d.sync += [
-                        self.oled.i_fifo.w_data.eq(self.rom_rd.data),
-                        self.oled.i_fifo.w_en.eq(1),
+                        self.oled.fifo_in.w_data.eq(self.rom_rd.data),
+                        self.oled.fifo_in.w_en.eq(1),
                     ]
                     m.next = "LOOP: STROBED W_EN"
 
             with m.State("LOOP: STROBED W_EN"):
-                m.d.sync += self.oled.i_fifo.w_en.eq(0)
+                m.d.sync += self.oled.fifo_in.w_en.eq(0)
                 with m.If(remain == 1):
                     m.next = "IDLE"
                 with m.Else():

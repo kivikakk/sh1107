@@ -14,8 +14,8 @@ class ROMBus(Signature):
     ):
         return super().__init__(
             {
-                "addr": In(addr),
-                "data": Out(data),
+                "addr": Out(addr),
+                "data": In(data),
             }
         )
 
