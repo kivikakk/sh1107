@@ -29,6 +29,7 @@
     flake-utils.lib.eachDefaultSystem (system: let
       pkgs = import nixpkgs {inherit overlays system;};
       hdx = pkgs.hdx.default;
+      inherit (pkgs) lib;
       inherit (hdx) python;
       zig =
         if pkgs.stdenv.isDarwin
@@ -43,45 +44,63 @@
         format = "pyproject";
         src = ./.;
 
-        nativeBuildInputs =
-          [
-            python.pkgs.setuptools
-            python.pkgs.black
-            python.pkgs.isort
-            pkgs.nodePackages.pyright
-            hdx
-            zig
-            pkgs.dfu-util
-          ]
-          ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
-            pkgs.xcbuild
-          ];
+        nativeBuildInputs = builtins.attrValues ({
+            inherit
+              (python.pkgs)
+              setuptools
+              black
+              isort
+              ;
 
-        buildInputs = with pkgs;
-          [
-            zig
-            pkgs.SDL2
-            pkgs.iconv
-          ]
-          ++ pkgs.lib.optionals pkgs.stdenv.isDarwin (with pkgs.darwin.apple_sdk.frameworks; [
-            OpenGL
-            ForceFeedback
-            CoreGraphics
-            CoreVideo
-            MetalKit
-            Cocoa
-            IOKit
-            AudioToolbox
-            AppKit
-            CoreAudio
-            CoreHaptics
-            Metal
-            QuartzCore
-            Carbon
-            GameController
-            Foundation
-            Quartz
-          ]);
+            inherit
+              (pkgs.nodePackages)
+              pyright
+              ;
+
+            inherit
+              (pkgs)
+              dfu-util
+              ;
+
+            inherit
+              hdx
+              zig
+              ;
+          }
+          // lib.optionalAttrs (pkgs.stdenv.isDarwin) {
+            inherit (pkgs) xcbuild;
+          });
+
+        buildInputs = builtins.attrValues ({
+            inherit
+              (pkgs)
+              SDL2
+              iconv
+              ;
+            inherit zig;
+          }
+          // lib.optionalAttrs (pkgs.stdenv.isDarwin) {
+            inherit
+              (pkgs.darwin.apple_sdk.frameworks)
+              OpenGL
+              ForceFeedback
+              CoreGraphics
+              CoreVideo
+              MetalKit
+              Cocoa
+              IOKit
+              AudioToolbox
+              AppKit
+              CoreAudio
+              CoreHaptics
+              Metal
+              QuartzCore
+              Carbon
+              GameController
+              Foundation
+              Quartz
+              ;
+          });
 
         dontAddExtraLibs = true;
 
