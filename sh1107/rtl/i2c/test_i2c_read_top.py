@@ -1,8 +1,9 @@
 from typing import Optional
 
-from amaranth import Elaboratable, Module, Signal
+from amaranth import Module, Signal
 from amaranth.build import Platform
 from amaranth.lib.fifo import SyncFIFO
+from amaranth.lib.wiring import Component, In, Out, Signature
 
 from ..common import Hz
 from . import I2C, RW, Transfer
@@ -10,7 +11,7 @@ from . import I2C, RW, Transfer
 __all__ = ["TestI2CReadTop"]
 
 
-class TestI2CReadTop(Elaboratable):
+class TestI2CReadTop(Component):
     addr: int
     count: int
     speed: Hz
@@ -28,12 +29,20 @@ class TestI2CReadTop(Elaboratable):
         self.count = count
         self.speed = speed
 
-        self.switch = Signal()
-        self.busy = Signal()
-        self.remaining = Signal(range(count + 1))
-        self.result = SyncFIFO(width=8, depth=count)
+        super().__init__()
 
+        self.result = SyncFIFO(width=8, depth=count)
         self.i2c = I2C(speed=speed)
+
+    @property
+    def signature(self):
+        return Signature(
+            {
+                "switch": In(1),
+                "busy": Out(1),
+                "remaining": Out(range(self.count + 1)),
+            }
+        )
 
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()

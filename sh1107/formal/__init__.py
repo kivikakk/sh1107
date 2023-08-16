@@ -92,13 +92,13 @@ def prep_formal() -> Tuple[Module, list[Signal | Value]]:
 
     byte_ix = dut.byte_ix
 
-    scl_o = dut.scl_o
+    scl_o = dut.hard_bus.scl_o
     scl_o_past = past(m, scl_o)
 
-    sda_oe = dut.sda_oe
+    sda_oe = dut.hard_bus.sda_oe
     # sda_oe_past = past(m, sda_oe)
 
-    sda_o = dut.sda_o
+    sda_o = dut.hard_bus.sda_o
     sda_o_past = past(m, sda_o)
 
     # Start with no strobes high.

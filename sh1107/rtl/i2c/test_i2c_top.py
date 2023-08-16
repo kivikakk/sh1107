@@ -1,18 +1,16 @@
 from typing import Optional
 
-from amaranth import Elaboratable, Module, Signal, Value
+from amaranth import Module, Value
 from amaranth.build import Platform
+from amaranth.lib.wiring import Component, In, Out, Signature
 
 from ..common import Hz
 from . import I2C
 
 
-class TestI2CTop(Elaboratable):
+class TestI2CTop(Component):
     data: list[int]
     speed: Hz
-
-    switch: Signal
-    aborted_at: Signal
 
     i2c: I2C
 
@@ -23,10 +21,18 @@ class TestI2CTop(Elaboratable):
         self.data = data
         self.speed = speed
 
-        self.switch = Signal()
-        self.aborted_at = Signal(range(len(data)))
+        super().__init__()
 
         self.i2c = I2C(speed=speed)
+
+    @property
+    def signature(self):
+        return Signature(
+            {
+                "switch": In(1),
+                "aborted_at": Out(range(len(self.data))),
+            }
+        )
 
     def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
