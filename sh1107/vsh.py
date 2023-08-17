@@ -1,5 +1,5 @@
 import os
-import platform
+import platform as pyplatform
 import subprocess
 from argparse import ArgumentParser, Namespace
 from enum import Enum
@@ -11,9 +11,10 @@ from amaranth._toolchain.yosys import YosysBinary, find_yosys
 from amaranth.back import rtlil
 
 from . import rom
-from .base import build_top, path
+from .base import path
+from .build import build_top
+from .platform import Platform
 from .rtl.oled import OLED
-from .target import Target
 
 __all__ = ["add_main_arguments"]
 
@@ -79,7 +80,7 @@ def add_main_arguments(parser: ArgumentParser):
     )
     parser.add_argument(
         "-O",
-        "--_Optimize",
+        "--optimize",
         type=_Optimize,
         choices=_Optimize,
         help="build RTL or Zig with optimizations (default: both)",
@@ -90,7 +91,7 @@ def add_main_arguments(parser: ArgumentParser):
 def main(args: Namespace):
     if (
         os.environ.get("VIRTUAL_ENV") == "OSS Cad Suite"
-        and platform.system() == "Windows"
+        and pyplatform.system() == "Windows"
     ):
         # NOTE: osscad's yosys-config (used by _SystemYosys.data_dir) on Windows
         # (a) doesn't execute as-is (bash script, can't popen directly from
@@ -99,7 +100,8 @@ def main(args: Namespace):
 
     yosys = cast(YosysBinary, find_yosys(lambda ver: ver >= (0, 10)))
 
-    design = build_top(args, Target["vsh"])
+    platform = Platform["vsh"]
+    design = build_top(args, platform)
 
     black_boxes = {}
     if args.blackbox_i2c:
@@ -117,8 +119,9 @@ def main(args: Namespace):
         yosys,
         cxxrtl_cc_path,
         design,
+        platform,
         black_boxes=black_boxes,
-        ports=getattr(design, "ports", []),
+        ports=design.ports(platform),
     )
 
     cc_o_paths = {cxxrtl_cc_path: cxxrtl_cc_path.with_suffix(".o")}
@@ -134,7 +137,7 @@ def main(args: Namespace):
             [
                 "zig",
                 "c++",
-                *(["-O3"] if args._Optimize.opt_rtl else []),
+                *(["-O3"] if args.optimize.opt_rtl else []),
                 "-DCXXRTL_INCLUDE_CAPI_IMPL",
                 "-DCXXRTL_INCLUDE_VCD_CAPI_IMPL",
                 "-I" + str(path(".")),
@@ -154,7 +157,7 @@ def main(args: Namespace):
     if not args.compile:
         cmd += ["run"]
     cmd += [
-        *(["-Doptimize=ReleaseFast"] if args._Optimize.opt_zig else []),
+        *(["-Doptimize=ReleaseFast"] if args.optimize.opt_zig else []),
         f"-Dyosys_data_dir={yosys.data_dir()}",
         f"-Dcxxrtl_lib_paths={','.join(str(o_path) for o_path in cc_o_paths.values())}",
     ]
@@ -170,6 +173,7 @@ def _cxxrtl_convert_with_header(
     yosys: YosysBinary,
     cc_out: Path,
     design: Elaboratable,
+    platform: Platform,
     *,
     black_boxes: dict[str, str],
     ports: list[Signal],
@@ -181,7 +185,7 @@ def _cxxrtl_convert_with_header(
             raise AssertionError(
                 "cc_out must be relative to cwd for builtin-yosys to write to it"
             )
-    rtlil_text = rtlil.convert(design, ports=ports)
+    rtlil_text = rtlil.convert(design, platform=platform, ports=ports)
     script = []
     for box_source in black_boxes.values():
         script.append(f"read_rtlil <<rtlil\n{box_source}\nrtlil")

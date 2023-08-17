@@ -101,7 +101,7 @@ fn tick_i2c(self: *OLEDConnector, fpga_thread: *FPGAThread) void {
 pub fn init(cxxrtl: Cxxrtl, addr: u7) OLEDConnector {
     var i2c_connector: InnerI2CConnector = undefined;
 
-    if (cxxrtl.find(bool, "scl__o") != null) {
+    if (cxxrtl.find(bool, "hw_bus__scl_o") != null) {
         i2c_connector = .{ .I2CConnector = I2CConnector.init(cxxrtl, addr) };
     } else {
         i2c_connector = .{ .I2CBBConnector = I2CBBConnector.init(cxxrtl, addr) };

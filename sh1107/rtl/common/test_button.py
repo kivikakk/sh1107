@@ -10,8 +10,8 @@ class TestButton(sim.TestCase):
     def _button_down(self, b: Button) -> sim.Procedure:
         assert not (yield b.i)
 
-        assert not (yield b.o_down)
-        assert not (yield b.o_up)
+        assert not (yield b.down)
+        assert not (yield b.up)
 
         yield b.i.eq(1)
 
@@ -19,12 +19,12 @@ class TestButton(sim.TestCase):
         yield Settle()
         yield
         yield Settle()
-        assert (yield b.o_down)
-        assert not (yield b.o_up)
+        assert (yield b.down)
+        assert not (yield b.up)
 
         yield
         yield Settle()
-        assert not (yield b.o_down)
+        assert not (yield b.down)
 
     def _button_up(self, b: Button) -> sim.Procedure:
         assert (yield b.i)
@@ -34,14 +34,14 @@ class TestButton(sim.TestCase):
         yield Settle()
         yield
         yield Settle()
-        assert not (yield b.o_down)
-        assert (yield b.o_up)
+        assert not (yield b.down)
+        assert (yield b.up)
 
     def _button_up_post(self, b: Button) -> sim.Procedure:
-        assert (yield b.o_up)
+        assert (yield b.up)
         yield
         yield Settle()
-        assert not (yield b.o_up)
+        assert not (yield b.up)
 
     def test_sim_button(self, b: Button) -> sim.Procedure:
         yield from self._button_down(b)
@@ -52,19 +52,19 @@ class TestButton(sim.TestCase):
         yield from self._button_down(b)
         # No delay
         yield from self._button_up(b)
-        assert not (yield b.o_held)
+        assert not (yield b.held)
         yield from self._button_up_post(b)
 
         yield from self._button_down(b)
         yield Delay(b.hold_time)
         yield from self._button_up(b)
-        assert (yield b.o_up & b.o_held)
+        assert (yield b.up & b.held)
         yield from self._button_up_post(b)
 
         yield from self._button_down(b)
         yield Delay(b.hold_time / 2)
-        assert not (yield b.o_held)
+        assert not (yield b.held)
         yield Delay(b.hold_time)
         yield from self._button_up(b)
-        assert (yield b.o_up & b.o_held)
+        assert (yield b.up & b.held)
         yield from self._button_up_post(b)

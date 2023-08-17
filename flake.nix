@@ -8,6 +8,7 @@
       flake = false;
     };
     hdx.url = github:charlottia/hdx?ref=v0.1;
+    hdx.inputs.amaranth.url = github:charlottia/amaranth?ref=rfc-2-implement;
     zig.url = github:mitchellh/zig-overlay;
   };
 
@@ -28,11 +29,12 @@
     flake-utils.lib.eachDefaultSystem (system: let
       pkgs = import nixpkgs {inherit overlays system;};
       hdx = pkgs.hdx.default;
+      inherit (pkgs) lib;
       inherit (hdx) python;
-      zig = if pkgs.stdenv.isDarwin then
-        pkgs.zig-overlay.master
-      else
-        pkgs.zig;
+      zig =
+        if pkgs.stdenv.isDarwin
+        then pkgs.zig-overlay.master
+        else pkgs.zig;
     in rec {
       formatter = pkgs.alejandra;
 
@@ -42,24 +44,43 @@
         format = "pyproject";
         src = ./.;
 
-        nativeBuildInputs =
-          [
-            python.pkgs.setuptools
-            hdx
-            zig
-            pkgs.dfu-util
-          ]
-          ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
-            pkgs.xcbuild
-          ];
+        nativeBuildInputs = builtins.attrValues ({
+            inherit
+              (python.pkgs)
+              setuptools
+              black
+              isort
+              ;
 
-        buildInputs = with pkgs;
-          [
-            zig
-            pkgs.SDL2
-            pkgs.iconv
-          ]
-          ++ pkgs.lib.optionals pkgs.stdenv.isDarwin (with pkgs.darwin.apple_sdk.frameworks; [
+            inherit
+              (pkgs.nodePackages)
+              pyright
+              ;
+
+            inherit
+              (pkgs)
+              dfu-util
+              ;
+
+            inherit
+              hdx
+              zig
+              ;
+          }
+          // lib.optionalAttrs (pkgs.stdenv.isDarwin) {
+            inherit (pkgs) xcbuild;
+          });
+
+        buildInputs =
+          (builtins.attrValues {
+            inherit
+              (pkgs)
+              SDL2
+              iconv
+              ;
+            inherit zig;
+          })
+          ++ lib.optionals (pkgs.stdenv.isDarwin) (with pkgs.darwin.apple_sdk.frameworks; [
             OpenGL
             ForceFeedback
             CoreGraphics
@@ -70,7 +91,7 @@
             AudioToolbox
             AppKit
             CoreAudio
-            CoreHaptics
+            # CoreHaptics XXX
             Metal
             QuartzCore
             Carbon

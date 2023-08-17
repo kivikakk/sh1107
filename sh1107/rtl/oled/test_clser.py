@@ -2,6 +2,7 @@ from typing import Final, Optional
 
 from amaranth import Elaboratable, Module
 from amaranth.build import Platform
+from amaranth.lib.wiring import connect
 from amaranth.sim import Delay
 
 from ... import sim
@@ -24,13 +25,13 @@ class TestClserTop(Elaboratable):
         self.i2c = I2C(speed=speed)
         self.clser = Clser(addr=TestClserTop.ADDR)
 
-    def elaborate(self, platform: Optional[Platform]) -> Module:
+    def elaborate(self, platform: Optional[Platform]) -> Elaboratable:
         m = Module()
 
         m.submodules.i2c = self.i2c
         m.submodules.clser = self.clser
 
-        m.d.comb += self.i2c.bus.connect(self.clser.i2c_bus)
+        connect(m, self.i2c.bus, self.clser.i2c_bus)
 
         return m
 
@@ -41,9 +42,9 @@ class TestClser(sim.TestCase):
     @sim.args(speed=Hz(2_000_000))
     def test_sim_clser(self, dut: TestClserTop) -> sim.Procedure:
         def trigger() -> sim.Procedure:
-            yield dut.clser.i_stb.eq(1)
+            yield dut.clser.stb.eq(1)
             yield Delay(sim.clock())
-            yield dut.clser.i_stb.eq(0)
+            yield dut.clser.stb.eq(0)
 
         yield from sim_i2c.full_sequence(
             dut.i2c,

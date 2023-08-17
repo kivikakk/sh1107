@@ -53,7 +53,8 @@ latest commit.
 
 For a detailed guide on installing specific versions of some of these tools,
 please see [Installing an HDL toolchain from source][notes-0001].  On Nix,
-[hdx] packages everything — `nix develop`/`nix-shell` will use it.
+[hdx] packages everything — `nix develop '.?submodules=1'`/`nix-shell` will
+use it.
 
 To run at all:
 

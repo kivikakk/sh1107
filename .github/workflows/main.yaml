@@ -1,5 +1,8 @@
-on: [push, pull_request]
+on: [push]
 name: CI
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -10,5 +13,5 @@ jobs:
         uses: DeterminateSystems/nix-installer-action@v4
       - name: Run the Magic Nix Cache
         uses: DeterminateSystems/magic-nix-cache-action@v2
-      - name: Build everything
-        run: nix build '.?submodules=1' -L
+      - name: nix flake check
+        run: nix flake check '.?submodules=1' -L

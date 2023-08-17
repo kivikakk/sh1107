@@ -1,32 +1,32 @@
 from typing import Final, Optional
 
-from amaranth import Module, Signal
-from amaranth.build import Platform
+from amaranth import Elaboratable, Module
+from amaranth.lib.wiring import Component, In, Out
 
-from ...base import Config, ConfigElaboratable
+from ...platform import Platform
 from .timer import Timer
 
 __all__ = ["Debounce"]
 
 
-class Debounce(ConfigElaboratable):
+class Debounce(Component):
     DEFAULT_HOLD_TIME: Final[float] = 1e-2
     SIM_HOLD_TIME: Final[float] = 1e-4
 
     hold_time: float
 
-    i: Signal
-    o: Signal
+    i: In(1)
+    o: Out(1)
 
-    def __init__(self, *, config: Config):
-        self.hold_time = (
-            self.SIM_HOLD_TIME if config.target.simulation else self.DEFAULT_HOLD_TIME
+    def __init__(self, *, hold_time: Optional[float] = None):
+        super().__init__()
+        self.hold_time = hold_time or 0
+
+    def elaborate(self, platform: Platform) -> Elaboratable:
+        self.hold_time = self.hold_time or (
+            self.SIM_HOLD_TIME if platform.simulation else self.DEFAULT_HOLD_TIME
         )
 
-        self.i = Signal()
-        self.o = Signal()
-
-    def elaborate(self, platform: Optional[Platform]) -> Module:
         m = Module()
 
         m.submodules.timer = timer = Timer(time=self.hold_time)

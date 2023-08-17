@@ -1,62 +1,56 @@
-from typing import Optional, cast
+from typing import cast
 
 from amaranth import Cat, Elaboratable, Module, Mux, Signal
-from amaranth.build import Platform
+from amaranth.lib.wiring import Component, In, Out
 
 from ... import rom
+from ...platform import Platform
 from ..i2c import RW, I2CBus, Transfer
 from .rom_bus import ROMBus
 
 __all__ = ["Scroller"]
 
 
-class Scroller(Elaboratable):
+class Scroller(Component):
     addr: int
 
-    i_stb: Signal
-    i_rst: Signal
-    o_busy: Signal
-    o_adjusted: Signal
+    stb: Out(1)
+    rst: Out(1)
+    i2c_bus: Out(I2CBus)
+    rom_bus: Out(ROMBus(rom.ROM_ABITS, 8))
 
-    i2c_bus: I2CBus
-    rom_bus: ROMBus
+    busy: In(1)
+    adjusted: In(range(16))
 
     offset: Signal
     remain: Signal
     written: Signal
 
-    def __init__(self, *, rom_bus: ROMBus, addr: int):
+    def __init__(self, *, addr: int):
+        super().__init__()
         self.addr = addr
-
-        self.i_stb = Signal()
-        self.i_rst = Signal()
-        self.o_busy = Signal()
-        self.o_adjusted = Signal(range(16))
-
-        self.i2c_bus = I2CBus()
-        self.rom_bus = rom_bus.clone(name="scroller")
 
         self.offset = Signal(range(rom.ROM_LENGTH))
         self.remain = Signal(range(rom.ROM_LENGTH))
         self.written = Signal(range(rom.ROM_LENGTH))
 
-    def elaborate(self, platform: Optional[Platform]) -> Module:
+    def elaborate(self, platform: Platform) -> Elaboratable:
         # XXX: This is an exact copy of ROMWriter with some bits added.
         m = Module()
 
-        transfer = Transfer(self.i2c_bus.i_in_fifo_w_data)
+        transfer = Transfer(self.i2c_bus.in_fifo_w_data)
 
         with m.FSM():
             with m.State("IDLE"):
-                with m.If(self.i_stb):
+                with m.If(self.stb):
                     m.d.sync += [
                         self.rom_bus.addr.eq(rom.OFFSET_SCROLL * 4),
-                        self.o_busy.eq(1),
+                        self.busy.eq(1),
                         self.written.eq(0),
                     ]
                     m.next = "START: ADDRESSED OFFSET[0]"
-                with m.If(self.i_rst):
-                    m.d.sync += self.o_adjusted.eq(0)
+                with m.If(self.rst):
+                    m.d.sync += self.adjusted.eq(0)
 
             with m.State("START: ADDRESSED OFFSET[0]"):
                 m.d.sync += self.rom_bus.addr.eq(self.rom_bus.addr + 1)
@@ -89,31 +83,31 @@ class Scroller(Elaboratable):
                     transfer.kind.eq(Transfer.Kind.START),
                     transfer.payload.start.addr.eq(self.addr),
                     transfer.payload.start.rw.eq(RW.W),
-                    self.i2c_bus.i_in_fifo_w_en.eq(1),
+                    self.i2c_bus.in_fifo_w_en.eq(1),
                 ]
                 m.next = "ADDRESS PERIPHERAL: LATCHED W_EN"
 
             with m.State("ADDRESS PERIPHERAL: LATCHED W_EN"):
                 m.d.sync += [
-                    self.i2c_bus.i_in_fifo_w_en.eq(0),
-                    self.i2c_bus.i_stb.eq(1),
+                    self.i2c_bus.in_fifo_w_en.eq(0),
+                    self.i2c_bus.stb.eq(1),
                 ]
                 m.next = "LOOP HEAD: SEQ BREAK OR WAIT I2C"
 
             with m.State("LOOP HEAD: SEQ BREAK OR WAIT I2C"):
-                m.d.sync += self.i2c_bus.i_stb.eq(0)
+                m.d.sync += self.i2c_bus.stb.eq(0)
                 with m.If(self.remain == 0):
                     m.d.sync += [
                         self.rom_bus.addr.eq(self.offset + 1),
                         self.offset.eq(self.offset + 1),
                     ]
                     m.next = "SEQ BREAK: ADDRESSED NEXTLEN[1], NEXTLEN[0] AVAILABLE"
-                with m.Elif(self.i2c_bus.o_in_fifo_w_rdy):
+                with m.Elif(self.i2c_bus.in_fifo_w_rdy):
                     m.d.sync += [
                         self.offset.eq(self.offset + 1),
                         self.remain.eq(self.remain - 1),
                         transfer.kind.eq(Transfer.Kind.DATA),
-                        self.i2c_bus.i_in_fifo_w_en.eq(1),
+                        self.i2c_bus.in_fifo_w_en.eq(1),
                         self.written.eq(self.written + 1),
                     ]
 
@@ -121,20 +115,20 @@ class Scroller(Elaboratable):
                         self.written == rom.SCROLL_OFFSETS["InitialHigherColumnAddress"]
                     ):
                         m.d.sync += transfer.payload.data.eq(
-                            self.rom_bus.data + (self.o_adjusted >> 1)
+                            self.rom_bus.data + (self.adjusted >> 1)
                         )
                     for i in range(8):
                         with m.Elif(
                             self.written == rom.SCROLL_OFFSETS[f"LowerColumnAddress{i}"]
                         ):
                             m.d.sync += transfer.payload.data.eq(
-                                self.rom_bus.data + (self.o_adjusted[0] << 3)
+                                self.rom_bus.data + (self.adjusted[0] << 3)
                             )
                     with m.Elif(
                         self.written == rom.SCROLL_OFFSETS["DisplayStartLine"] + 1
                     ):
                         m.d.sync += transfer.payload.data.eq(
-                            Mux(self.o_adjusted == 15, 0, 8 + self.o_adjusted * 8)
+                            Mux(self.adjusted == 15, 0, 8 + self.adjusted * 8)
                         )
                     with m.Else():
                         m.d.sync += transfer.payload.data.eq(self.rom_bus.data)
@@ -144,19 +138,17 @@ class Scroller(Elaboratable):
                     m.next = "SEND: LATCHED W_EN"
 
             with m.State("SEND: LATCHED W_EN"):
-                m.d.sync += self.i2c_bus.i_in_fifo_w_en.eq(0)
+                m.d.sync += self.i2c_bus.in_fifo_w_en.eq(0)
                 m.next = "SEND: WAIT FOR I2C"
 
             with m.State("SEND: WAIT FOR I2C"):
                 with m.If(
-                    self.i2c_bus.o_busy
-                    & self.i2c_bus.o_ack
-                    & self.i2c_bus.o_in_fifo_w_rdy
+                    self.i2c_bus.busy & self.i2c_bus.ack & self.i2c_bus.in_fifo_w_rdy
                 ):
                     m.next = "LOOP HEAD: SEQ BREAK OR WAIT I2C"
-                with m.Elif(~self.i2c_bus.o_busy):
+                with m.Elif(~self.i2c_bus.busy):
                     # Failed.  Stop.
-                    m.d.sync += self.o_busy.eq(0)
+                    m.d.sync += self.busy.eq(0)
                     m.next = "IDLE"
 
             with m.State("SEQ BREAK: ADDRESSED NEXTLEN[1], NEXTLEN[0] AVAILABLE"):
@@ -177,27 +169,25 @@ class Scroller(Elaboratable):
                         transfer.kind.eq(Transfer.Kind.START),
                         transfer.payload.start.addr.eq(self.addr),
                         transfer.payload.start.rw.eq(RW.W),
-                        self.i2c_bus.i_in_fifo_w_en.eq(1),
+                        self.i2c_bus.in_fifo_w_en.eq(1),
                     ]
                     m.next = "SEQ BREAK: LATCHED W_EN"
 
             with m.State("SEQ BREAK: LATCHED W_EN"):
-                m.d.sync += self.i2c_bus.i_in_fifo_w_en.eq(0)
+                m.d.sync += self.i2c_bus.in_fifo_w_en.eq(0)
                 m.next = "LOOP HEAD: SEQ BREAK OR WAIT I2C"
 
             with m.State("FIN: WAIT I2C DONE"):
                 with m.If(
-                    ~self.i2c_bus.o_busy
-                    & self.i2c_bus.o_ack
-                    & self.i2c_bus.o_in_fifo_w_rdy
+                    ~self.i2c_bus.busy & self.i2c_bus.ack & self.i2c_bus.in_fifo_w_rdy
                 ):
                     m.d.sync += [
-                        self.o_adjusted.eq(self.o_adjusted + 1),
-                        self.o_busy.eq(0),
+                        self.adjusted.eq(self.adjusted + 1),
+                        self.busy.eq(0),
                     ]
                     m.next = "IDLE"
-                with m.Elif(~self.i2c_bus.o_busy):
-                    m.d.sync += self.o_busy.eq(0)
+                with m.Elif(~self.i2c_bus.busy):
+                    m.d.sync += self.busy.eq(0)
                     m.next = "IDLE"
 
         return m

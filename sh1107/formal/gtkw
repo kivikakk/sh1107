@@ -31,8 +31,8 @@ formal_top.dut.I2CBus__o_ack
 formal_top.dut.fsm_state[3:0]
 @28
 formal_top.dut.c.en
-formal_top.dut.c.o_half
-formal_top.dut.c.o_full
+formal_top.dut.c.half
+formal_top.dut.c.full
 formal_top.dut.formal_start
 @29
 formal_top.dut.formal_repeated_start

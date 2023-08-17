@@ -1,11 +1,12 @@
-from typing import Final, Optional
+from typing import Final
 
 from amaranth import Elaboratable, Memory, Module
-from amaranth.build import Platform
 from amaranth.hdl.mem import ReadPort
+from amaranth.lib.wiring import connect
 from amaranth.sim import Delay
 
 from ... import rom, sim
+from ...platform import Platform
 from ..common import Hz
 from ..i2c import I2C, sim_i2c
 from .rom_bus import ROMBus
@@ -30,22 +31,17 @@ class TestScrollerTop(Elaboratable):
             depth=rom.ROM_LENGTH,
             init=rom.ROM_CONTENT,
         ).read_port()
-        self.scroller = Scroller(
-            rom_bus=ROMBus.for_read_port(self.rom_rd, name="mem"),
-            addr=TestScrollerTop.ADDR,
-        )
+        self.scroller = Scroller(addr=TestScrollerTop.ADDR)
 
-    def elaborate(self, platform: Optional[Platform]) -> Module:
+    def elaborate(self, platform: Platform) -> Elaboratable:
         m = Module()
 
         m.submodules.i2c = self.i2c
         m.submodules.rom_rd = self.rom_rd
         m.submodules.scroller = self.scroller
 
-        m.d.comb += [
-            self.i2c.bus.connect(self.scroller.i2c_bus),
-            self.scroller.rom_bus.connect_read_port(self.rom_rd),
-        ]
+        connect(m, self.i2c.bus, self.scroller.i2c_bus)
+        ROMBus.connect_read_port(m, self.rom_rd, self.scroller.rom_bus)
 
         return m
 
@@ -56,10 +52,10 @@ class TestScroller(sim.TestCase):
     @sim.args(speed=Hz(2_000_000))
     def test_sim_scroller(self, dut: TestScrollerTop) -> sim.Procedure:
         def trigger() -> sim.Procedure:
-            assert not (yield dut.scroller.o_busy)
-            yield dut.scroller.i_stb.eq(1)
+            assert not (yield dut.scroller.busy)
+            yield dut.scroller.stb.eq(1)
             yield Delay(sim.clock())
-            yield dut.scroller.i_stb.eq(0)
+            yield dut.scroller.stb.eq(0)
 
         yield from sim_i2c.full_sequence(
             dut.i2c,

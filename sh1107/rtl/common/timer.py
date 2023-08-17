@@ -1,14 +1,13 @@
-from typing import Optional
+from amaranth import Elaboratable, Module
+from amaranth.lib.wiring import Component, In, Out
 
-from amaranth import Elaboratable, Module, Signal
-from amaranth.build import Platform
-
+from ...platform import Platform
 from .counter import Counter
 
 __all__ = ["Timer"]
 
 
-class Timer(Elaboratable):
+class Timer(Component):
     """
     A timer.
 
@@ -20,16 +19,14 @@ class Timer(Elaboratable):
 
     time: float
 
-    i: Signal
-    o: Signal
+    i: Out(1)
+    o: In(1)
 
     def __init__(self, *, time: float):
+        super().__init__()
         self.time = time
 
-        self.i = Signal()
-        self.o = Signal()
-
-    def elaborate(self, platform: Optional[Platform]) -> Module:
+    def elaborate(self, platform: Platform) -> Elaboratable:
         m = Module()
 
         m.submodules.c = c = Counter(time=self.time)
@@ -38,7 +35,7 @@ class Timer(Elaboratable):
         with m.If(~self.i):
             m.d.sync += self.o.eq(0)
 
-        with m.If(c.o_full):
+        with m.If(c.full):
             m.d.sync += self.o.eq(1)
 
         return m

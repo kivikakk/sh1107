@@ -19,3 +19,15 @@ build = [
 
 [tool.setuptools]
 packages = ["sh1107"]
+
+[tool.pyright]
+typeCheckingMode = "strict"
+ignore = ["result"]
+extraPaths = ["../amaranth"]
+reportUnknownMemberType = false
+reportInconsistentConstructor = false
+reportMissingTypeStubs = false
+reportUnknownVariableType = false
+reportUnknownLambdaType = false
+reportUnknownArgumentType = false
+reportGeneralTypeIssues = false

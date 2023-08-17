@@ -1,13 +1,12 @@
 from typing import Optional, cast
 
 from amaranth import Cat, Memory, Module, Record, Signal
-from amaranth.build import Platform
 from amaranth.build.res import ResourceError
 from amaranth.hdl.mem import ReadPort
-from amaranth_boards.icebreaker import ICEBreakerPlatform
-from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
+from amaranth.lib.wiring import Component, In, Signature
 
-from ..base import Blackbox, Config, ConfigElaboratable
+from ..base import Blackbox
+from ..platform import Platform, icebreaker, orangecrab, vsh
 from .common import Button, ButtonWithHold, Hz
 from .oled import OLED
 
@@ -95,12 +94,10 @@ SEQUENCES.append(
 )
 
 
-class Top(ConfigElaboratable):
+class Top(Component):
     oled: OLED
     sequences: list[list[int]]
     speed: Hz
-
-    switches: list[Signal]
 
     rom_len: int
     rom_rd: ReadPort
@@ -108,16 +105,16 @@ class Top(ConfigElaboratable):
     def __init__(
         self,
         *,
-        config: Config,
+        platform: Platform,
         sequences: list[list[int]] = SEQUENCES,
         speed: Hz = Hz(400_000),
     ):
-        super().__init__(config)
-        self.oled = OLED(config=config, speed=speed)
         self.sequences = sequences
-        self.speed = speed
+        super().__init__()
+        self.switches = [getattr(self, f"switch_{i}") for i in range(len(sequences))]
 
-        self.switches = [Signal(name=f"switch_{i}") for i, _ in enumerate(sequences)]
+        self.oled = OLED(platform=platform, speed=speed)
+        self.speed = speed
 
         self.rom_len = sum(len(seq) for seq in sequences)
         self.rom_rd = Memory(
@@ -127,16 +124,26 @@ class Top(ConfigElaboratable):
         ).read_port()
 
     @property
-    def ports(self) -> list[Signal]:
+    def signature(self):
+        return Signature(
+            {
+                # Note that these remain disconnected/unused when building for an
+                # actual target.
+                f"switch_{i}": In(1)
+                for i in range(len(self.sequences))
+            }
+        )
+
+    def ports(self, platform: Platform) -> list[Signal]:
         ports = self.switches[:]
 
-        if Blackbox.I2C not in self.config.blackboxes:
+        if Blackbox.I2C not in platform.blackboxes:
             ports += [
-                self.oled.i2c.scl_o,
-                self.oled.i2c.scl_oe,
-                self.oled.i2c.sda_o,
-                self.oled.i2c.sda_oe,
-                self.oled.i2c.sda_i,
+                self.oled.i2c.hw_bus.scl_o,
+                self.oled.i2c.hw_bus.scl_oe,
+                self.oled.i2c.hw_bus.sda_o,
+                self.oled.i2c.hw_bus.sda_oe,
+                self.oled.i2c.hw_bus.sda_i,
             ]
         else:
             ports += [
@@ -156,13 +163,13 @@ class Top(ConfigElaboratable):
         button_up_signals: list[Signal] = []
 
         match platform:
-            case ICEBreakerPlatform():
+            case icebreaker():
                 led_busy = cast(Signal, platform.request("led", 0).o)
                 led_ack = cast(Signal, platform.request("led", 1).o)
 
                 m.d.comb += [
-                    led_busy.eq(self.oled.i2c_bus.o_busy),
-                    led_ack.eq(self.oled.i2c_bus.o_ack),
+                    led_busy.eq(self.oled.i2c_bus.busy),
+                    led_ack.eq(self.oled.i2c_bus.ack),
                 ]
 
                 platform.add_resources(platform.break_off_pmod)
@@ -173,35 +180,33 @@ class Top(ConfigElaboratable):
                     except ResourceError:
                         break
                     else:
-                        m.submodules[f"button_{i}"] = button = Button(
-                            config=self.config
-                        )
+                        m.submodules[f"button_{i}"] = button = Button()
                         m.d.comb += button.i.eq(switch)
-                        button_up_signals.append(button.o_up)
+                        button_up_signals.append(button.up)
 
                 led_l = platform.request("led_g", 1)
                 led_m = platform.request("led_r", 1)
                 led_r = platform.request("led_g", 2)
 
-                m.d.comb += Cat(led_r, led_m, led_l).eq(self.oled.o_result)
+                m.d.comb += Cat(led_r, led_m, led_l).eq(self.oled.result)
 
-            case OrangeCrabR0_2_85FPlatform():
+            case orangecrab():
                 rgb = platform.request("rgb_led")
                 led_busy = cast(Signal, cast(Record, rgb.r).o)
                 led_ack = cast(Signal, cast(Record, rgb.g).o)
 
                 m.d.comb += [
-                    led_busy.eq(self.oled.i2c_bus.o_busy),
-                    led_ack.eq(self.oled.i2c_bus.o_ack),
+                    led_busy.eq(self.oled.i2c_bus.busy),
+                    led_ack.eq(self.oled.i2c_bus.ack),
                 ]
 
                 main_switch = cast(Signal, platform.request("button", 0).i)
-                m.submodules.button_0 = button_0 = ButtonWithHold(config=self.config)
+                m.submodules.button_0 = button_0 = ButtonWithHold()
                 m.d.comb += button_0.i.eq(main_switch)
-                button_up_signals.append(button_0.o_up)
+                button_up_signals.append(button_0.up)
 
                 program = cast(Signal, platform.request("program").o)
-                with m.If(button_0.o_held):
+                with m.If(button_0.held):
                     m.d.sync += program.eq(1)
 
                 for i, _ in list(enumerate(self.switches))[1:]:
@@ -210,13 +215,11 @@ class Top(ConfigElaboratable):
                     except ResourceError:
                         break
                     else:
-                        m.submodules[f"button_{i}"] = button = Button(
-                            config=self.config
-                        )
+                        m.submodules[f"button_{i}"] = button = Button()
                         m.d.comb += button.i.eq(switch)
-                        button_up_signals.append(button.o_up)
+                        button_up_signals.append(button.up)
 
-            case None:
+            case vsh():
                 for i, switch in enumerate(self.switches):
                     buffer = Signal()
                     button_up = Signal()
@@ -234,10 +237,10 @@ class Top(ConfigElaboratable):
 
         with m.FSM():
             with m.State("IDLE"):
-                m.d.sync += self.oled.i_fifo.w_en.eq(0)
+                m.d.sync += self.oled.fifo_in.w_en.eq(0)
 
                 for i, button_up in enumerate(button_up_signals):
-                    with m.If(button_up & self.oled.i_fifo.w_rdy):
+                    with m.If(button_up & self.oled.fifo_in.w_rdy):
                         m.d.sync += [
                             offset.eq(sum(len(seq) for seq in self.sequences[:i])),
                             remain.eq(len(self.sequences[i])),
@@ -248,15 +251,15 @@ class Top(ConfigElaboratable):
                 m.next = "LOOP: AVAILABLE"
 
             with m.State("LOOP: AVAILABLE"):
-                with m.If(self.oled.i_fifo.w_rdy):
+                with m.If(self.oled.fifo_in.w_rdy):
                     m.d.sync += [
-                        self.oled.i_fifo.w_data.eq(self.rom_rd.data),
-                        self.oled.i_fifo.w_en.eq(1),
+                        self.oled.fifo_in.w_data.eq(self.rom_rd.data),
+                        self.oled.fifo_in.w_en.eq(1),
                     ]
                     m.next = "LOOP: STROBED W_EN"
 
             with m.State("LOOP: STROBED W_EN"):
-                m.d.sync += self.oled.i_fifo.w_en.eq(0)
+                m.d.sync += self.oled.fifo_in.w_en.eq(0)
                 with m.If(remain == 1):
                     m.next = "IDLE"
                 with m.Else():

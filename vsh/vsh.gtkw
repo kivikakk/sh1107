@@ -18,9 +18,9 @@
 @28
 oled.clk
 [color] 2
-oled.rom_writer.o_busy
-oled.scroller.i_stb
-oled.scroller.o_busy
+oled.rom_writer.busy
+oled.scroller.stb
+oled.scroller.busy
 @22
 oled.scroller.offset[11:0]
 oled.scroller.remain[11:0]

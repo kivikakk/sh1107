@@ -1,10 +1,11 @@
-from typing import Final, Optional
+from typing import Final
 
 from amaranth import Elaboratable, Module
-from amaranth.build import Platform
+from amaranth.lib.wiring import connect
 from amaranth.sim import Settle
 
 from ... import sim
+from ...platform import Platform
 from ..common import Hz
 from ..i2c import I2C, sim_i2c
 from .locator import Locator
@@ -24,13 +25,13 @@ class TestLocatorTop(Elaboratable):
         self.i2c = I2C(speed=speed)
         self.locator = Locator(addr=TestLocatorTop.ADDR)
 
-    def elaborate(self, platform: Optional[Platform]) -> Module:
+    def elaborate(self, platform: Platform) -> Elaboratable:
         m = Module()
 
         m.submodules.i2c = self.i2c
         m.submodules.locator = self.locator
 
-        m.d.comb += self.i2c.bus.connect(self.locator.i2c_bus)
+        connect(m, self.i2c.bus, self.locator.i2c_bus)
 
         return m
 
@@ -39,12 +40,12 @@ class TestLocator(sim.TestCase):
     @sim.i2c_speeds
     def test_sim_locator(self, dut: TestLocatorTop) -> sim.Procedure:
         def trigger() -> sim.Procedure:
-            yield dut.locator.i_row.eq(16)
-            yield dut.locator.i_col.eq(8)
-            yield dut.locator.i_stb.eq(1)
+            yield dut.locator.row.eq(16)
+            yield dut.locator.col.eq(8)
+            yield dut.locator.stb.eq(1)
             yield
             yield Settle()
-            yield dut.locator.i_stb.eq(0)
+            yield dut.locator.stb.eq(0)
 
         yield from sim_i2c.full_sequence(
             dut.i2c,
@@ -61,12 +62,12 @@ class TestLocator(sim.TestCase):
     @sim.i2c_speeds
     def test_sim_locator_row_only(self, dut: TestLocatorTop) -> sim.Procedure:
         def trigger() -> sim.Procedure:
-            yield dut.locator.i_row.eq(7)
-            yield dut.locator.i_col.eq(0)
-            yield dut.locator.i_stb.eq(1)
+            yield dut.locator.row.eq(7)
+            yield dut.locator.col.eq(0)
+            yield dut.locator.stb.eq(1)
             yield
             yield Settle()
-            yield dut.locator.i_stb.eq(0)
+            yield dut.locator.stb.eq(0)
 
         yield from sim_i2c.full_sequence(
             dut.i2c,
@@ -82,12 +83,12 @@ class TestLocator(sim.TestCase):
     @sim.i2c_speeds
     def test_sim_locator_col_only(self, dut: TestLocatorTop) -> sim.Procedure:
         def trigger() -> sim.Procedure:
-            yield dut.locator.i_row.eq(0)
-            yield dut.locator.i_col.eq(13)
-            yield dut.locator.i_stb.eq(1)
+            yield dut.locator.row.eq(0)
+            yield dut.locator.col.eq(13)
+            yield dut.locator.stb.eq(1)
             yield
             yield Settle()
-            yield dut.locator.i_stb.eq(0)
+            yield dut.locator.stb.eq(0)
 
         yield from sim_i2c.full_sequence(
             dut.i2c,

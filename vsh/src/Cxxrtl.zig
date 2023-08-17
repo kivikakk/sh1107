@@ -18,7 +18,7 @@ pub fn init() Cxxrtl {
 }
 
 pub fn get(self: Cxxrtl, comptime T: type, name: [:0]const u8) Object(T) {
-    return self.find(T, name) orelse @panic("object not found");
+    return self.find(T, name) orelse std.debug.panic("object not found: {s}", .{name});
 }
 
 pub fn find(self: Cxxrtl, comptime T: type, name: [:0]const u8) ?Object(T) {

@@ -1,12 +1,16 @@
+import importlib
+import inspect
 import re
 from argparse import ArgumentParser, Namespace
-from typing import Optional
+from typing import Any, Optional
 
-from .base import build_top
+from amaranth import Elaboratable
+
+from .base import Blackbox, Blackboxes
+from .platform import Platform
 from .rtl.oled import OLED
-from .target import Target
 
-__all__ = ["add_main_arguments"]
+__all__ = ["add_main_arguments", "build_top"]
 
 
 def add_main_arguments(parser: ArgumentParser):
@@ -19,7 +23,7 @@ def add_main_arguments(parser: ArgumentParser):
     )
     parser.add_argument(
         "target",
-        choices=Target.platform_targets,
+        choices=Platform.build_targets,
         help="which board to build for",
     )
     parser.add_argument(
@@ -44,11 +48,11 @@ def add_main_arguments(parser: ArgumentParser):
 
 
 def main(args: Namespace):
-    target = Target[args.target]
+    platform = Platform[args.target]
 
-    component = build_top(args, target)
+    component = build_top(args, platform)
 
-    target.platform().build(
+    platform.build(
         component,
         do_program=args.program,
         debug_verilog=args.verilog,
@@ -63,6 +67,30 @@ def main(args: Namespace):
     heading = re.compile(r"^Info: Device utilisation:$", flags=re.MULTILINE)
     next_heading = re.compile(r"^Info: Placed ", flags=re.MULTILINE)
     _print_file_between("build/top.tim", heading, next_heading, prefix="Info: ")
+
+
+def build_top(args: Namespace, platform: Platform, **kwargs: Any) -> Elaboratable:
+    from .rtl.common import Hz
+
+    mod, klass_name = args.top.rsplit(".", 1)
+    klass = getattr(importlib.import_module(mod), klass_name)
+
+    sig = inspect.signature(klass)
+    if "speed" in sig.parameters and "speed" in args:
+        kwargs["speed"] = Hz(args.speed)
+
+    blackboxes = kwargs.pop("blackboxes", Blackboxes())
+    if kwargs.get("blackbox_i2c", getattr(args, "blackbox_i2c", False)):
+        blackboxes.add(Blackbox.I2C)
+    if kwargs.get("blackbox_spifr", getattr(args, "blackbox_spifr", False)):
+        blackboxes.add(Blackbox.SPIFR)
+    else:
+        blackboxes.add(Blackbox.SPIFR_WHITEBOX)
+
+    platform.blackboxes = blackboxes
+    kwargs["platform"] = platform
+
+    return klass(**kwargs)
 
 
 def _print_file_between(
