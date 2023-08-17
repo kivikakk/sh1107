@@ -1,14 +1,12 @@
 import math
-from typing import Optional, cast
+from typing import cast
 
 from amaranth import C, Cat, ClockSignal, Elaboratable, Instance, Module, Signal
-from amaranth.build import Attrs, Pins, PinsN, Platform, Resource, Subsignal
-from amaranth.lib.wiring import In, Out, Signature
-from amaranth_boards.icebreaker import ICEBreakerPlatform
-from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
+from amaranth.build import Attrs, Pins, PinsN, Resource, Subsignal
+from amaranth.lib.wiring import Component, In, Out, Signature
 
-from ... import sim
-from ...base import Blackbox, Config, ConfigComponent
+from ...base import Blackbox
+from ...platform import Platform, icebreaker, orangecrab
 
 __all__ = ["SPIHardwareBus", "SPIFlashReaderBus", "SPIFlashReader"]
 
@@ -35,24 +33,17 @@ SPIFlashReaderBus = Signature(
 )
 
 
-class SPIFlashReader(ConfigComponent):
+class SPIFlashReader(Component):
     spi: Out(SPIHardwareBus)
     bus: In(SPIFlashReaderBus)
 
-    def __init__(
-        self,
-        *,
-        config: Config,
-    ):
-        super().__init__(config=config)
-
-    def elaborate(self, platform: Optional[Platform]) -> Elaboratable:
+    def elaborate(self, platform: Platform) -> Elaboratable:
         m = Module()
 
         clk = ClockSignal()
 
         match platform:
-            case ICEBreakerPlatform():
+            case icebreaker():
                 spi = platform.request("spi_flash_1x")
                 m.d.comb += [
                     spi.copi.o.eq(self.spi.copi),
@@ -61,7 +52,7 @@ class SPIFlashReader(ConfigComponent):
                     spi.clk.o.eq(self.spi.clk),
                 ]
 
-            case OrangeCrabR0_2_85FPlatform():
+            case orangecrab():
                 # XXX(Ch): At least until I know what the hell I'm doing here
                 # *and* have tested it.
                 platform.add_resources(
@@ -94,7 +85,7 @@ class SPIFlashReader(ConfigComponent):
                 )
 
             case _:
-                if Blackbox.SPIFR_WHITEBOX in self.config.blackboxes:
+                if Blackbox.SPIFR_WHITEBOX in platform.blackboxes:
                     m.submodules.spifr_whitebox = Instance(
                         "spifr_whitebox",
                         i_clk=ClockSignal(),
@@ -103,11 +94,7 @@ class SPIFlashReader(ConfigComponent):
                         i_cs=self.spi.cs,
                     )
 
-        freq = (
-            cast(int, platform.default_clk_frequency)
-            if platform
-            else int(1 / sim.clock())
-        )
+        freq = cast(int, platform.default_clk_frequency)
         # tRES1 (/CS High to Standby Mode without ID Read) and tDP (/CS High to
         # Power-down Mode) are both max 3us.
         TRES1_TDP_CYCLES = math.floor(freq / 1_000_000 * 3) + 1

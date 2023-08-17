@@ -1,17 +1,16 @@
 from typing import Final, Optional
 
 from amaranth import Elaboratable, Module, Signal
-from amaranth.build import Platform
-from amaranth.lib.wiring import In, Out
+from amaranth.lib.wiring import Component, In, Out
 
-from ...base import Config, ConfigComponent
+from ...platform import Platform
 from .debounce import Debounce
 from .timer import Timer
 
 __all__ = ["Button", "ButtonWithHold"]
 
 
-class Button(ConfigComponent):
+class Button(Component):
     """
     A simple debounced button.
 
@@ -26,11 +25,11 @@ class Button(ConfigComponent):
 
     debounce: Debounce
 
-    def __init__(self, *, config: Config):
-        super().__init__(config=config)
-        self.debounce = Debounce(config=config)
+    def __init__(self):
+        super().__init__()
+        self.debounce = Debounce()
 
-    def elaborate(self, platform: Optional[Platform]) -> Elaboratable:
+    def elaborate(self, platform: Platform) -> Elaboratable:
         m = Module()
 
         m.submodules.debounce = self.debounce
@@ -62,14 +61,15 @@ class ButtonWithHold(Button):
 
     held: In(1)
 
-    def __init__(self, *, hold_time: Optional[float] = None, config: Config):
-        super().__init__(config=config)
+    def __init__(self, *, hold_time: Optional[float] = None):
+        super().__init__()
+        self.hold_time = hold_time or 0
 
-        self.hold_time = hold_time or (
-            self.SIM_HOLD_TIME if config.target.simulation else self.DEFAULT_HOLD_TIME
+    def elaborate(self, platform: Platform) -> Elaboratable:
+        self.hold_time = self.hold_time or (
+            self.SIM_HOLD_TIME if platform.simulation else self.DEFAULT_HOLD_TIME
         )
 
-    def elaborate(self, platform: Optional[Platform]) -> Elaboratable:
         m = Module()
 
         m.submodules.button = super().elaborate(platform)

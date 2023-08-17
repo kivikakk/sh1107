@@ -1,10 +1,10 @@
-from typing import Optional, cast
+from typing import cast
 
 from amaranth import Cat, Elaboratable, Module, Mux, Signal
-from amaranth.build import Platform
 from amaranth.lib.wiring import Component, In, Out
 
 from ... import rom
+from ...platform import Platform
 from ..i2c import RW, I2CBus, Transfer
 from .rom_bus import ROMBus
 
@@ -34,7 +34,7 @@ class Scroller(Component):
         self.remain = Signal(range(rom.ROM_LENGTH))
         self.written = Signal(range(rom.ROM_LENGTH))
 
-    def elaborate(self, platform: Optional[Platform]) -> Elaboratable:
+    def elaborate(self, platform: Platform) -> Elaboratable:
         # XXX: This is an exact copy of ROMWriter with some bits added.
         m = Module()
 

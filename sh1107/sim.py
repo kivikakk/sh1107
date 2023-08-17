@@ -8,10 +8,12 @@ from typing import Any, Callable, Iterator, Optional, Self, Tuple
 
 from amaranth import Elaboratable, Record, Signal
 from amaranth.hdl.ast import Operator, Statement
+from amaranth.hdl.ir import Fragment
 from amaranth.lib.fifo import SyncFIFO
 from amaranth.sim import Delay, Settle, Simulator
 
-from .base import Config, ConfigComponent, path
+from .base import path
+from .platform import Platform
 
 __all__ = [
     "clock",
@@ -82,6 +84,8 @@ class TestCase(unittest.TestCase):
 
         pattern = re.compile(r"[\W_]+")
 
+        platform = Platform["test"]
+
         def sim_args_into_str(sim_args: SimArgs) -> str:
             subbed = pattern.sub("_", "_".join(str(v) for v in sim_args))
             return subbed.removesuffix("_").removeprefix("_")
@@ -96,8 +100,11 @@ class TestCase(unittest.TestCase):
             else:
                 target = name
 
-            if issubclass(dutc, ConfigComponent):
-                sim_args[1]["config"] = Config.test
+            dutc_sig = inspect.signature(dutc)
+            platformp = dutc_sig.parameters.get("platform")
+            if platformp is not None:
+                assert platformp.annotation is Platform
+                sim_args[1]["platform"] = platform
 
             for args, kwargs in sim_always_args:
                 sim_args = (args + sim_args[0], {**kwargs, **sim_args[1]})
@@ -110,7 +117,7 @@ class TestCase(unittest.TestCase):
                 def bench() -> Procedure:
                     yield from sim_test(self, dut)
 
-                sim = Simulator(dut)
+                sim = Simulator(Fragment.get(dut, platform))
                 sim.add_clock(clock())
                 sim.add_sync_process(bench)
 

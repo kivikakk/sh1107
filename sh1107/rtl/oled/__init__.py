@@ -1,5 +1,5 @@
 import math
-from typing import Final, Optional
+from typing import Final
 
 from amaranth import (
     C,
@@ -12,14 +12,13 @@ from amaranth import (
     Mux,
     Signal,
 )
-from amaranth.build import Platform
 from amaranth.lib.enum import IntEnum
 from amaranth.lib.fifo import SyncFIFO
-from amaranth.lib.wiring import In, Out, connect, transpose
-from amaranth_boards.icebreaker import ICEBreakerPlatform
+from amaranth.lib.wiring import Component, In, Out, connect, transpose
 
 from ... import rom
-from ...base import Blackbox, Config, ConfigComponent
+from ...base import Blackbox
+from ...platform import Platform, icebreaker
 from ..common import Hz
 from ..i2c import I2C, I2CBus
 from ..spi import SPIFlashReader, SPIFlashReaderBus
@@ -32,7 +31,7 @@ from .scroller import Scroller
 __all__ = ["OLED"]
 
 
-class OLED(ConfigComponent):
+class OLED(Component):
     ADDR: Final[int] = 0x3C
 
     # 1MHz is a bit unacceptable.  It seems to mostly work, except that
@@ -110,14 +109,14 @@ class OLED(ConfigComponent):
     def __init__(
         self,
         *,
-        config: Config,
+        platform: Platform,
         speed: Hz,
     ):
-        super().__init__(config=config)
+        super().__init__()
 
         assert speed.value in self.VALID_SPEEDS
 
-        if Blackbox.I2C not in self.config.blackboxes:
+        if Blackbox.I2C not in platform.blackboxes:
             self.i2c = I2C(speed=speed)
         else:
             self.i_i2c_bb_in_ack = Signal()
@@ -140,8 +139,8 @@ class OLED(ConfigComponent):
                 o_out_fifo_r_data=self.i2c_bus.out_fifo_r_data,
             )
 
-        if Blackbox.SPIFR not in self.config.blackboxes:
-            self.spifr = SPIFlashReader(config=self.config)
+        if Blackbox.SPIFR not in platform.blackboxes:
+            self.spifr = SPIFlashReader()
         else:
             self.spifr = Instance(
                 "spifr",
@@ -170,11 +169,11 @@ class OLED(ConfigComponent):
         self.chpr_data = Signal(8)
         self.chpr_run = Signal()
 
-    def elaborate(self, platform: Optional[Platform]) -> Elaboratable:
+    def elaborate(self, platform: Platform) -> Elaboratable:
         m = Module()
 
         self.elaborate_memory(m, platform)
-        self.elaborate_submodules(m)
+        self.elaborate_submodules(m, platform)
 
         # TODO: actually flash cursor when on
 
@@ -184,7 +183,7 @@ class OLED(ConfigComponent):
             with m.State("INIT: BEGIN"):
                 m.d.sync += [
                     self.own_rom_bus.addr.eq(0),
-                    self.spifr_bus.addr.eq(self.config.target.flash_rom_base),
+                    self.spifr_bus.addr.eq(platform.flash_rom_base),
                     self.spifr_bus.len.eq(rom.ROM_LENGTH),
                     self.spifr_bus.stb.eq(1),
                 ]
@@ -299,7 +298,7 @@ class OLED(ConfigComponent):
             self.print_states(m)
             self.id_states(m)
             self.print_byte_states(m)
-            self.spi_test_states(m)
+            self.spi_test_states(m, platform)
 
             with m.State("CLSER: STROBED"):
                 m.d.sync += self.clser.stb.eq(0)
@@ -343,7 +342,7 @@ class OLED(ConfigComponent):
 
         return m
 
-    def elaborate_memory(self, m: Module, platform: Optional[Platform]):
+    def elaborate_memory(self, m: Module, platform: Platform):
         # Our platform memories are all 16 bits wide, so pack 2 bytes of ROM
         # data into each word.
         #
@@ -371,7 +370,7 @@ class OLED(ConfigComponent):
         ]
 
         match platform:
-            case ICEBreakerPlatform():
+            case icebreaker():
                 self.rom_mem = Instance(
                     "$mem",
                     a_ram_style="huge",
@@ -414,11 +413,11 @@ class OLED(ConfigComponent):
                     rom_wr.en.eq(wr_en),
                 ]
 
-    def elaborate_submodules(self, m: Module):
-        if Blackbox.I2C not in self.config.blackboxes:
+    def elaborate_submodules(self, m: Module, platform: Platform):
+        if Blackbox.I2C not in platform.blackboxes:
             connect(m, self.i2c_bus, self.i2c.bus)
 
-        if Blackbox.SPIFR not in self.config.blackboxes:
+        if Blackbox.SPIFR not in platform.blackboxes:
             connect(m, self.spifr.bus, self.spifr_bus)
 
         m.submodules.i2c = self.i2c
@@ -782,7 +781,7 @@ class OLED(ConfigComponent):
                 m.d.sync += self.result.eq(OLED.Result.SUCCESS)
                 m.next = "IDLE"
 
-    def spi_test_states(self, m: Module):
+    def spi_test_states(self, m: Module, platform: Platform):
         TO_READ = 0x20
 
         m.submodules.spi_test_fifo = fifo = SyncFIFO(width=8, depth=TO_READ)
@@ -791,7 +790,7 @@ class OLED(ConfigComponent):
 
         with m.State("SPI_TEST: START"):
             m.d.sync += [
-                self.spifr_bus.addr.eq(self.config.target.flash_rom_base),
+                self.spifr_bus.addr.eq(platform.flash_rom_base),
                 self.spifr_bus.len.eq(0x100),
                 self.spifr_bus.stb.eq(1),
             ]

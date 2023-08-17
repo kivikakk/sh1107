@@ -1,10 +1,9 @@
 from typing import Optional, cast
 
 from amaranth import Elaboratable, Module, Signal
-from amaranth.build import Platform
 from amaranth.lib.wiring import Component, In, Out
 
-from ... import sim
+from ...platform import Platform
 
 __all__ = ["Counter"]
 
@@ -29,14 +28,10 @@ class Counter(Component):
         self.time = time
         self.hz = hz
 
-    def elaborate(self, platform: Optional[Platform]) -> Elaboratable:
+    def elaborate(self, platform: Platform) -> Elaboratable:
         m = Module()
 
-        freq = (
-            cast(int, platform.default_clk_frequency)
-            if platform
-            else int(1 / sim.clock())
-        )
+        freq = cast(int, platform.default_clk_frequency)
         if self.time:
             clk_counter_max = int(freq * self.time)
             assertion_msg = f"cannot count to {self.time}s with {freq}Hz clock"

@@ -1,14 +1,13 @@
 from typing import Final, Optional, Self, cast
 
 from amaranth import Elaboratable, Module, Signal
-from amaranth.build import Attrs, Platform
+from amaranth.build import Attrs
 from amaranth.lib import data, enum
 from amaranth.lib.fifo import SyncFIFO
 from amaranth.lib.wiring import Component, In, Out, Signature
-from amaranth_boards.icebreaker import ICEBreakerPlatform
-from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
 from amaranth_boards.resources import I2CResource
 
+from ...platform import Platform, icebreaker, orangecrab
 from ..common import Counter, Hz
 
 __all__ = ["I2C", "I2CFormal", "I2CBus", "RW", "Transfer"]
@@ -151,7 +150,7 @@ class I2C(Component):
         self.formal_repeated_start = None
         self.formal_stop = None
 
-    def elaborate(self, platform: Optional[Platform]) -> Elaboratable:
+    def elaborate(self, platform: Platform) -> Elaboratable:
         m = Module()
 
         m.submodules.in_fifo = self._in_fifo
@@ -168,7 +167,7 @@ class I2C(Component):
         ]
 
         match platform:
-            case ICEBreakerPlatform():
+            case icebreaker():
                 platform.add_resources(
                     [
                         I2CResource(
@@ -181,7 +180,7 @@ class I2C(Component):
                     ]
                 )
                 plat_i2c = platform.request("i2c")
-            case OrangeCrabR0_2_85FPlatform():
+            case orangecrab():
                 platform.add_resources(
                     [
                         I2CResource(

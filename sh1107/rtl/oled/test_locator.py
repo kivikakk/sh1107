@@ -1,11 +1,11 @@
-from typing import Final, Optional
+from typing import Final
 
 from amaranth import Elaboratable, Module
-from amaranth.build import Platform
 from amaranth.lib.wiring import connect
 from amaranth.sim import Settle
 
 from ... import sim
+from ...platform import Platform
 from ..common import Hz
 from ..i2c import I2C, sim_i2c
 from .locator import Locator
@@ -25,7 +25,7 @@ class TestLocatorTop(Elaboratable):
         self.i2c = I2C(speed=speed)
         self.locator = Locator(addr=TestLocatorTop.ADDR)
 
-    def elaborate(self, platform: Optional[Platform]) -> Elaboratable:
+    def elaborate(self, platform: Platform) -> Elaboratable:
         m = Module()
 
         m.submodules.i2c = self.i2c

@@ -3,8 +3,8 @@ import struct
 from argparse import ArgumentParser, Namespace
 
 from ..base import path
+from ..platform import Platform
 from ..proto import Cmd, DataBytes
-from ..target import Target
 from .chars import CHARS
 
 __all__ = [
@@ -27,7 +27,7 @@ def add_main_arguments(parser: ArgumentParser):
         "-p",
         "--program",
         dest="target",
-        choices=Target.platform_targets,
+        choices=Platform.build_targets,
         help="program the ROM onto the specified board",
     )
 
@@ -38,7 +38,7 @@ def main(args: Namespace):
         f.write(ROM_CONTENT)
 
     if args.target:
-        Target[args.target].flash_rom(out)
+        Platform[args.target].flash_rom(out)
 
 
 INIT_SEQUENCE = Cmd.compose(

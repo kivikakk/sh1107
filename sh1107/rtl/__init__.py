@@ -1,14 +1,12 @@
 from typing import Optional, cast
 
 from amaranth import Cat, Memory, Module, Record, Signal
-from amaranth.build import Platform
 from amaranth.build.res import ResourceError
 from amaranth.hdl.mem import ReadPort
-from amaranth.lib.wiring import In, Signature
-from amaranth_boards.icebreaker import ICEBreakerPlatform
-from amaranth_boards.orangecrab_r0_2 import OrangeCrabR0_2_85FPlatform
+from amaranth.lib.wiring import Component, In, Signature
 
-from ..base import Blackbox, Config, ConfigComponent
+from ..base import Blackbox
+from ..platform import Platform, icebreaker, orangecrab, vsh
 from .common import Button, ButtonWithHold, Hz
 from .oled import OLED
 
@@ -96,7 +94,7 @@ SEQUENCES.append(
 )
 
 
-class Top(ConfigComponent):
+class Top(Component):
     oled: OLED
     sequences: list[list[int]]
     speed: Hz
@@ -107,15 +105,15 @@ class Top(ConfigComponent):
     def __init__(
         self,
         *,
-        config: Config,
+        platform: Platform,
         sequences: list[list[int]] = SEQUENCES,
         speed: Hz = Hz(400_000),
     ):
         self.sequences = sequences
-        super().__init__(config=config)
+        super().__init__()
         self.switches = [getattr(self, f"switch_{i}") for i in range(len(sequences))]
 
-        self.oled = OLED(config=config, speed=speed)
+        self.oled = OLED(platform=platform, speed=speed)
         self.speed = speed
 
         self.rom_len = sum(len(seq) for seq in sequences)
@@ -136,11 +134,10 @@ class Top(ConfigComponent):
             }
         )
 
-    @property
-    def ports(self) -> list[Signal]:
+    def ports(self, platform: Platform) -> list[Signal]:
         ports = self.switches[:]
 
-        if Blackbox.I2C not in self.config.blackboxes:
+        if Blackbox.I2C not in platform.blackboxes:
             ports += [
                 self.oled.i2c.hw_bus.scl_o,
                 self.oled.i2c.hw_bus.scl_oe,
@@ -166,7 +163,7 @@ class Top(ConfigComponent):
         button_up_signals: list[Signal] = []
 
         match platform:
-            case ICEBreakerPlatform():
+            case icebreaker():
                 led_busy = cast(Signal, platform.request("led", 0).o)
                 led_ack = cast(Signal, platform.request("led", 1).o)
 
@@ -183,9 +180,7 @@ class Top(ConfigComponent):
                     except ResourceError:
                         break
                     else:
-                        m.submodules[f"button_{i}"] = button = Button(
-                            config=self.config
-                        )
+                        m.submodules[f"button_{i}"] = button = Button()
                         m.d.comb += button.i.eq(switch)
                         button_up_signals.append(button.up)
 
@@ -195,7 +190,7 @@ class Top(ConfigComponent):
 
                 m.d.comb += Cat(led_r, led_m, led_l).eq(self.oled.result)
 
-            case OrangeCrabR0_2_85FPlatform():
+            case orangecrab():
                 rgb = platform.request("rgb_led")
                 led_busy = cast(Signal, cast(Record, rgb.r).o)
                 led_ack = cast(Signal, cast(Record, rgb.g).o)
@@ -206,7 +201,7 @@ class Top(ConfigComponent):
                 ]
 
                 main_switch = cast(Signal, platform.request("button", 0).i)
-                m.submodules.button_0 = button_0 = ButtonWithHold(config=self.config)
+                m.submodules.button_0 = button_0 = ButtonWithHold()
                 m.d.comb += button_0.i.eq(main_switch)
                 button_up_signals.append(button_0.up)
 
@@ -220,13 +215,11 @@ class Top(ConfigComponent):
                     except ResourceError:
                         break
                     else:
-                        m.submodules[f"button_{i}"] = button = Button(
-                            config=self.config
-                        )
+                        m.submodules[f"button_{i}"] = button = Button()
                         m.d.comb += button.i.eq(switch)
                         button_up_signals.append(button.up)
 
-            case None:
+            case vsh():
                 for i, switch in enumerate(self.switches):
                     buffer = Signal()
                     button_up = Signal()

@@ -2,12 +2,13 @@ import subprocess
 from argparse import ArgumentParser, Namespace
 from typing import Optional, Tuple
 
-from amaranth import ClockSignal, Fragment, Module, ResetSignal, Signal, Value
+from amaranth import ClockSignal, Module, ResetSignal, Signal, Value
 from amaranth.asserts import Assert, Assume, Cover, Initial
 from amaranth.back import rtlil
 from amaranth.hdl.ast import ValueCastable
 
 from ..base import path
+from ..platform import Platform
 from ..rtl.common import Hz
 from ..rtl.i2c import RW, I2CFormal
 
@@ -23,8 +24,9 @@ def add_main_arguments(parser: ArgumentParser):
 
 def main(args: Namespace):
     design, ports = prep_formal()
-    fragment = Fragment.get(design, None)
-    output = rtlil.convert(fragment, name="formal_top", ports=ports)
+    output = rtlil.convert(
+        design, platform=Platform["test"], name="formal_top", ports=ports
+    )
     with open(path("build/sh1107.il"), "w") as f:
         f.write(output)
 

@@ -1,12 +1,12 @@
-from typing import Final, Optional
+from typing import Final
 
 from amaranth import Elaboratable, Memory, Module
-from amaranth.build import Platform
 from amaranth.hdl.mem import ReadPort
 from amaranth.lib.wiring import connect
 from amaranth.sim import Delay
 
 from ... import rom, sim
+from ...platform import Platform
 from ..common import Hz
 from ..i2c import I2C, sim_i2c
 from .rom_bus import ROMBus
@@ -33,7 +33,7 @@ class TestScrollerTop(Elaboratable):
         ).read_port()
         self.scroller = Scroller(addr=TestScrollerTop.ADDR)
 
-    def elaborate(self, platform: Optional[Platform]) -> Elaboratable:
+    def elaborate(self, platform: Platform) -> Elaboratable:
         m = Module()
 
         m.submodules.i2c = self.i2c

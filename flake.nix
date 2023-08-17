@@ -71,36 +71,34 @@
             inherit (pkgs) xcbuild;
           });
 
-        buildInputs = builtins.attrValues ({
+        buildInputs =
+          (builtins.attrValues {
             inherit
               (pkgs)
               SDL2
               iconv
               ;
             inherit zig;
-          }
-          // lib.optionalAttrs (pkgs.stdenv.isDarwin) {
-            inherit
-              (pkgs.darwin.apple_sdk.frameworks)
-              OpenGL
-              ForceFeedback
-              CoreGraphics
-              CoreVideo
-              MetalKit
-              Cocoa
-              IOKit
-              AudioToolbox
-              AppKit
-              CoreAudio
-              CoreHaptics
-              Metal
-              QuartzCore
-              Carbon
-              GameController
-              Foundation
-              Quartz
-              ;
-          });
+          })
+          ++ lib.optionals (pkgs.stdenv.isDarwin) (with pkgs.darwin.apple_sdk.frameworks; [
+            OpenGL
+            ForceFeedback
+            CoreGraphics
+            CoreVideo
+            MetalKit
+            Cocoa
+            IOKit
+            AudioToolbox
+            AppKit
+            CoreAudio
+            # CoreHaptics XXX
+            Metal
+            QuartzCore
+            Carbon
+            GameController
+            Foundation
+            Quartz
+          ]);
 
         dontAddExtraLibs = true;
 
