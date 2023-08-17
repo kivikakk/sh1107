@@ -44,9 +44,7 @@ class Platform(metaclass=PlatformRegistry):
     def flash_rom(self, path: Path) -> None:
         raise NotImplementedError()
 
-    @property
-    def simulation(self) -> bool:
-        return False
+    simulation = False
 
 
 class icebreaker(ICEBreakerPlatform, Platform):
@@ -90,9 +88,7 @@ class test(Platform):
     def flash_rom_base(self) -> int:
         return 0x00_CAFE
 
-    @property
-    def simulation(self) -> bool:
-        return True
+    simulation = True
 
     @property
     def default_clk_frequency(self):
