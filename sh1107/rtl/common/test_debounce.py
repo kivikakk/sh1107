@@ -12,24 +12,24 @@ class TestDebounce(sim.TestCase):
         assert not (yield d.o)
 
         yield d.i.eq(1)
-        yield Delay(d.hold_time / 2)
+        yield Delay(d._hold_time / 2)
         yield Settle()
         yield
         yield Settle()
         assert not (yield d.o)
-        yield Delay(d.hold_time / 2)
+        yield Delay(d._hold_time / 2)
         yield Settle()
         yield
         yield Settle()
         assert (yield d.o)
 
         yield d.i.eq(0)
-        yield Delay(d.hold_time / 2)
+        yield Delay(d._hold_time / 2)
         yield Settle()
         yield
         yield Settle()
         assert (yield d.o)
-        yield Delay(d.hold_time / 2)
+        yield Delay(d._hold_time / 2)
         yield Settle()
         yield
         yield Settle()

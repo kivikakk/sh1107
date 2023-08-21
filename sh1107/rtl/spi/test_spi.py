@@ -11,15 +11,15 @@ from . import SPIFlashReader, SPIHardwareBus
 # TODO(Ch): try using this + initted Memory in vsh instead of the whitebox, just
 # to see how hard/easy it is.
 class MockSPIFlashPeripheral(Component):
-    data: Value
+    _data: Value
     spi: In(SPIHardwareBus)
 
     def __init__(self, *, data: Value):
         super().__init__()
 
-        self.data = data
-        assert len(self.data) <= 32
-        assert len(self.data) % 8 == 0
+        self._data = data
+        assert len(self._data) <= 32
+        assert len(self._data) % 8 == 0
 
     def elaborate(self, platform: Platform) -> Elaboratable:
         m = Module()
@@ -66,7 +66,7 @@ class MockSPIFlashPeripheral(Component):
                 with m.If((edges == 31) & (srnext[24:] == 0x03)):
                     m.d.sync += [
                         addr.eq(srnext[:24]),
-                        sr.eq(Cat(C(0, 32 - len(self.data)), self.data)),
+                        sr.eq(Cat(C(0, 32 - len(self._data)), self._data)),
                     ]
                     m.next = "READING"
 
@@ -79,44 +79,44 @@ class MockSPIFlashPeripheral(Component):
 
 
 class TestSPIFlashReaderTop(Component):
-    data: Value
-    len: int
+    _data: Value
+    _len: int
 
     stb: Out(1)
-    out: SyncFIFO
+    _fifo_out: SyncFIFO
     busy: In(1)
 
-    spifr: SPIFlashReader
-    peripheral: MockSPIFlashPeripheral
+    _spifr: SPIFlashReader
+    _peripheral: MockSPIFlashPeripheral
 
     def __init__(self, *, data: ValueCastable):
-        self.data = Value.cast(data)
-        self.len = len(self.data) // 8
+        super().__init__()
 
-        self.stb = Signal()
-        self.fifo_out = SyncFIFO(width=8, depth=self.len)
-        self.busy = Signal()
+        self._data = Value.cast(data)
+        self._len = len(self._data) // 8
 
-        self.spifr = SPIFlashReader()
-        self.peripheral = MockSPIFlashPeripheral(data=self.data)
+        self._fifo_out = SyncFIFO(width=8, depth=self._len)
+
+        self._spifr = SPIFlashReader()
+        self._peripheral = MockSPIFlashPeripheral(data=self._data)
 
     def elaborate(self, platform: Platform) -> Elaboratable:
         m = Module()
 
-        m.submodules.fifo_out = self.fifo_out
-        m.submodules.spifr = self.spifr
-        m.submodules.peripheral = self.peripheral
+        m.submodules.fifo_out = self._fifo_out
+        m.submodules.spifr = self._spifr
+        m.submodules.peripheral = self._peripheral
 
         m.d.comb += [
-            self.peripheral.spi.copi.eq(self.spifr.spi.copi),
-            self.spifr.spi.cipo.eq(self.peripheral.spi.cipo),
-            self.peripheral.spi.cs.eq(self.spifr.spi.cs),
-            self.peripheral.spi.clk.eq(self.spifr.spi.clk),
+            self._peripheral.spi.copi.eq(self._spifr.spi.copi),
+            self._spifr.spi.cipo.eq(self._peripheral.spi.cipo),
+            self._peripheral.spi.cs.eq(self._spifr.spi.cs),
+            self._peripheral.spi.clk.eq(self._spifr.spi.clk),
         ]
 
         m.d.sync += [
-            self.spifr.bus.stb.eq(0),
-            self.fifo_out.w_en.eq(0),
+            self._spifr.bus.stb.eq(0),
+            self._fifo_out.w_en.eq(0),
         ]
 
         with m.FSM() as fsm:
@@ -125,9 +125,9 @@ class TestSPIFlashReaderTop(Component):
             with m.State("IDLE"):
                 with m.If(self.stb):
                     m.d.sync += [
-                        self.spifr.bus.addr.eq(0x00CAFE),
-                        self.spifr.bus.len.eq(self.len),
-                        self.spifr.bus.stb.eq(1),
+                        self._spifr.bus.addr.eq(0x00CAFE),
+                        self._spifr.bus.len.eq(self._len),
+                        self._spifr.bus.stb.eq(1),
                     ]
                     m.next = "STROBED SPIFR"
 
@@ -135,12 +135,12 @@ class TestSPIFlashReaderTop(Component):
                 m.next = "WAITING SPIFR"
 
             with m.State("WAITING SPIFR"):
-                with m.If(self.spifr.bus.valid):
+                with m.If(self._spifr.bus.valid):
                     m.d.sync += [
-                        self.fifo_out.w_data.eq(self.spifr.bus.data),
-                        self.fifo_out.w_en.eq(1),
+                        self._fifo_out.w_data.eq(self._spifr.bus.data),
+                        self._fifo_out.w_en.eq(1),
                     ]
-                with m.Elif(~self.spifr.bus.busy):
+                with m.Elif(~self._spifr.bus.busy):
                     m.next = "IDLE"
 
         return m
@@ -151,7 +151,7 @@ class TestSPIFlashReader(sim.TestCase):
     @sim.args(data=C(0x0101, 16))
     @sim.args(data=C(0x7EEF08, 24))
     @sim.args(data=C(0xBEEFFEED, 32))
-    def test_sim_spifr(self, dut: TestSPIFlashReaderTop) -> sim.Procedure:
+    def test_sim_spifr(self, dut: TestSPIFlashReaderTop, data: Value) -> sim.Procedure:
         yield dut.stb.eq(1)
         yield
         yield dut.stb.eq(0)
@@ -161,6 +161,6 @@ class TestSPIFlashReader(sim.TestCase):
             yield
 
         expected = []
-        for i in reversed(range(len(dut.data) // 8)):
-            expected.append((yield dut.data[i * 8 : (i + 1) * 8]))
-        self.assertEqual((yield from sim.fifo_content(dut.fifo_out)), expected)
+        for i in reversed(range(len(data) // 8)):
+            expected.append((yield data[i * 8 : (i + 1) * 8]))
+        self.assertEqual((yield from sim.fifo_content(dut._fifo_out)), expected)

@@ -9,26 +9,26 @@ __all__ = ["Clser"]
 
 
 class Clser(Component):
-    addr: int
+    _addr: int
 
     stb: Out(1)
     i2c_bus: Out(I2CBus)
 
     busy: In(1)
 
-    current_page: Signal
-    current_column: Signal
+    _current_page: Signal
+    _current_column: Signal
 
     def __init__(self, *, addr: int):
         super().__init__()
-        self.addr = addr
+        self._addr = addr
 
         self.stb = Signal()
 
         self.busy = Signal()
 
-        self.current_page = Signal(range(0x10))
-        self.current_column = Signal(range(0x81))
+        self._current_page = Signal(range(0x10))
+        self._current_column = Signal(range(0x81))
 
     def elaborate(self, platform: Platform) -> Elaboratable:
         m = Module()
@@ -40,10 +40,10 @@ class Clser(Component):
                 with m.If(self.stb):
                     m.d.sync += [
                         self.busy.eq(1),
-                        self.current_page.eq(0),
-                        self.current_column.eq(0),
+                        self._current_page.eq(0),
+                        self._current_column.eq(0),
                         transfer.kind.eq(Transfer.Kind.START),
-                        transfer.payload.start.addr.eq(self.addr),
+                        transfer.payload.start.addr.eq(self._addr),
                         transfer.payload.start.rw.eq(RW.W),
                         self.i2c_bus.in_fifo_w_en.eq(1),
                     ]
@@ -70,7 +70,7 @@ class Clser(Component):
 
             with m.State("START: CONTROL: STROBED W_EN"):
                 m.d.sync += self.i2c_bus.in_fifo_w_en.eq(0)
-                with m.If(self.current_page == 0):
+                with m.If(self._current_page == 0):
                     m.next = "START: CONTROL: UNSTROBED W_EN"
                 with m.Else():
                     m.next = "START: COL HIGHER: UNSTROBED W_EN"
@@ -115,7 +115,7 @@ class Clser(Component):
                 with m.If(
                     self.i2c_bus.busy & self.i2c_bus.ack & self.i2c_bus.in_fifo_w_rdy
                 ):
-                    byte = Cmd.SetPageAddress(0x00).to_byte() + self.current_page
+                    byte = Cmd.SetPageAddress(0x00).to_byte() + self._current_page
                     m.d.sync += [
                         transfer.payload.data.eq(byte),
                         self.i2c_bus.in_fifo_w_en.eq(1),
@@ -135,7 +135,7 @@ class Clser(Component):
                 ):
                     m.d.sync += [
                         transfer.kind.eq(Transfer.Kind.START),
-                        transfer.payload.start.addr.eq(self.addr),
+                        transfer.payload.start.addr.eq(self._addr),
                         transfer.payload.start.rw.eq(RW.W),
                         self.i2c_bus.in_fifo_w_en.eq(1),
                     ]
@@ -165,19 +165,19 @@ class Clser(Component):
                 with m.If(
                     self.i2c_bus.busy & self.i2c_bus.ack & self.i2c_bus.in_fifo_w_rdy
                 ):
-                    with m.If(self.current_column != 0x80):
+                    with m.If(self._current_column != 0x80):
                         m.d.sync += [
                             transfer.payload.data.eq(0x00),
                             self.i2c_bus.in_fifo_w_en.eq(1),
-                            self.current_column.eq(self.current_column + 1),
+                            self._current_column.eq(self._current_column + 1),
                         ]
                         m.next = "LOOP: CONTROL: STROBED W_EN"
-                    with m.Elif(self.current_page != 0x0F):
+                    with m.Elif(self._current_page != 0x0F):
                         m.d.sync += [
-                            self.current_column.eq(0),
-                            self.current_page.eq(self.current_page + 1),
+                            self._current_column.eq(0),
+                            self._current_page.eq(self._current_page + 1),
                             transfer.kind.eq(Transfer.Kind.START),
-                            transfer.payload.start.addr.eq(self.addr),
+                            transfer.payload.start.addr.eq(self._addr),
                             transfer.payload.start.rw.eq(RW.W),
                             self.i2c_bus.in_fifo_w_en.eq(1),
                         ]

@@ -1,4 +1,4 @@
-from amaranth import Elaboratable, Module, Signal
+from amaranth import Elaboratable, Module
 from amaranth.lib.fifo import SyncFIFO
 from amaranth.lib.wiring import Component, In, Out, Signature
 
@@ -10,27 +10,24 @@ __all__ = ["TestI2CReadTop"]
 
 
 class TestI2CReadTop(Component):
-    addr: int
-    count: int
-    speed: Hz
+    _addr: int
+    _count: int
+    _speed: Hz
 
-    switch: Signal
-    busy: Signal
-    remaining: Signal
-    result: SyncFIFO
+    _result: SyncFIFO
 
-    i2c: I2C
+    _i2c: I2C
 
     def __init__(self, addr: int, count: int, *, speed: Hz):
-        self.addr = addr
+        self._addr = addr
         assert count >= 1  # O permitir cero? (para NACK inmediato)
-        self.count = count
-        self.speed = speed
+        self._count = count
+        self._speed = speed
 
         super().__init__()
 
-        self.result = SyncFIFO(width=8, depth=count)
-        self.i2c = I2C(speed=speed)
+        self._result = SyncFIFO(width=8, depth=count)
+        self._i2c = I2C(speed=speed)
 
     @property
     def signature(self):
@@ -38,22 +35,22 @@ class TestI2CReadTop(Component):
             {
                 "switch": In(1),
                 "busy": Out(1),
-                "remaining": Out(range(self.count + 1)),
+                "remaining": Out(range(self._count + 1)),
             }
         )
 
     def elaborate(self, platform: Platform) -> Elaboratable:
         m = Module()
 
-        m.submodules.i2c = self.i2c
-        m.submodules.result = self.result
+        m.submodules.i2c = self._i2c
+        m.submodules.result = self._result
 
-        bus = self.i2c.bus
+        bus = self._i2c.bus
         transfer = Transfer(bus.in_fifo_w_data)
 
         m.d.comb += [
-            self.result.w_data.eq(bus.out_fifo_r_data),
-            self.result.w_en.eq(bus.out_fifo_r_rdy),
+            self._result.w_data.eq(bus.out_fifo_r_data),
+            self._result.w_en.eq(bus.out_fifo_r_rdy),
             bus.out_fifo_r_en.eq(bus.out_fifo_r_rdy),
         ]
 
@@ -63,10 +60,10 @@ class TestI2CReadTop(Component):
                     m.d.sync += [
                         transfer.kind.eq(Transfer.Kind.START),
                         transfer.payload.start.rw.eq(RW.R),
-                        transfer.payload.start.addr.eq(self.addr),
+                        transfer.payload.start.addr.eq(self._addr),
                         bus.in_fifo_w_en.eq(1),
                         self.busy.eq(1),
-                        self.remaining.eq(self.count),
+                        self.remaining.eq(self._count),
                     ]
                     m.next = "W_EN LATCHED"
 

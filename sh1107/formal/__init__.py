@@ -92,7 +92,7 @@ def prep_formal() -> Tuple[Module, list[Signal | Value]]:
     busy = dut.bus.busy
     # busy_past = past(m, busy)
 
-    byte_ix = dut.byte_ix
+    byte_ix = dut._byte_ix
 
     scl_o = dut.hw_bus.scl_o
     scl_o_past = past(m, scl_o)
@@ -113,9 +113,9 @@ def prep_formal() -> Tuple[Module, list[Signal | Value]]:
         m.d.comb += Assume(~busy & ~in_fifo_r_en)
         m.d.sync += Assert(in_fifo_r_en == busy)
 
-    m.d.comb += Assume(busy == dut.c.en)
+    m.d.comb += Assume(busy == dut._c.en)
 
-    with m.If(dut.rw == RW.W):
+    with m.If(dut._rw == RW.W):
         m.d.comb += Assert(sda_oe | (byte_ix == 7))
 
     # Cover strobing that both does and doesn't result in popping the FIFO.
@@ -133,10 +133,13 @@ def prep_formal() -> Tuple[Module, list[Signal | Value]]:
     # START condition: SDA falls while SCL high
     start_cond = scl_o_past & scl_o & sda_o_past & ~sda_o
     m.d.comb += Cover(start_cond)
-    m.d.comb += Assert(scl_o == dut.formal_scl)
+    m.d.comb += Assert(scl_o == dut._formal_scl)
     m.d.comb += Assert(
-        (~start_cond & ~dut.formal_start & ~dut.formal_repeated_start)
-        | ((start_cond == dut.formal_start) ^ (start_cond == dut.formal_repeated_start))
+        (~start_cond & ~dut._formal_start & ~dut._formal_repeated_start)
+        | (
+            (start_cond == dut._formal_start)
+            ^ (start_cond == dut._formal_repeated_start)
+        )
     )
 
     # SDA released to look for ACK
@@ -149,16 +152,16 @@ def prep_formal() -> Tuple[Module, list[Signal | Value]]:
     # m.d.comb += Cover(scl_o_past & scl_o & ~sda_o_past & sda_o)
 
     # Cover repeated START.
-    # m.d.comb += Cover(dut.formal_repeated_start)
+    # m.d.comb += Cover(dut._formal_repeated_start)
 
     # SDA should be stable when SCL is high, unless START or STOP.
     # NOTE: pasts_valid doesn't seem to be necessary.
     with m.If(scl_o & pasts_valid):
         m.d.comb += Assert(
             (sda_o_past == sda_o)
-            | dut.formal_start
-            | dut.formal_repeated_start
-            | dut.formal_stop
+            | dut._formal_start
+            | dut._formal_repeated_start
+            | dut._formal_stop
         )
 
     return m, [

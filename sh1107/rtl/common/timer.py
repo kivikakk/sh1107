@@ -17,19 +17,19 @@ class Timer(Component):
     configured time elapses, the output is brought high.
     """
 
-    time: float
+    _time: float
 
     i: Out(1)
     o: In(1)
 
     def __init__(self, *, time: float):
         super().__init__()
-        self.time = time
+        self._time = time
 
     def elaborate(self, platform: Platform) -> Elaboratable:
         m = Module()
 
-        m.submodules.c = c = Counter(time=self.time)
+        m.submodules.c = c = Counter(time=self._time)
         m.d.comb += c.en.eq(self.i)
 
         with m.If(~self.i):

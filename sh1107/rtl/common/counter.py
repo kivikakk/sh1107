@@ -9,8 +9,8 @@ __all__ = ["Counter"]
 
 
 class Counter(Component):
-    time: Optional[float]
-    hz: Optional[int]
+    _time: Optional[float]
+    _hz: Optional[int]
 
     en: Out(1)
 
@@ -25,19 +25,19 @@ class Counter(Component):
     ):
         super().__init__()
         assert time or hz
-        self.time = time
-        self.hz = hz
+        self._time = time
+        self._hz = hz
 
     def elaborate(self, platform: Platform) -> Elaboratable:
         m = Module()
 
         freq = cast(int, platform.default_clk_frequency)
-        if self.time:
-            clk_counter_max = int(freq * self.time)
-            assertion_msg = f"cannot count to {self.time}s with {freq}Hz clock"
-        elif self.hz:
-            clk_counter_max = int(freq // self.hz)
-            assertion_msg = f"cannot clock at {self.hz}Hz with {freq}Hz clock"
+        if self._time:
+            clk_counter_max = int(freq * self._time)
+            assertion_msg = f"cannot count to {self._time}s with {freq}Hz clock"
+        elif self._hz:
+            clk_counter_max = int(freq // self._hz)
+            assertion_msg = f"cannot clock at {self._hz}Hz with {freq}Hz clock"
         else:
             raise AssertionError
 

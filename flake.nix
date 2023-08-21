@@ -8,7 +8,7 @@
       flake = false;
     };
     hdx.url = github:charlottia/hdx?ref=v0.1;
-    hdx.inputs.amaranth.url = github:charlottia/amaranth?ref=rfc-2-implement;
+    hdx.inputs.amaranth.url = github:whitequark/amaranth?ref=rfc-2-implement;
     zig.url = github:mitchellh/zig-overlay;
   };
 
@@ -50,6 +50,7 @@
               setuptools
               black
               isort
+              python-lsp-server
               ;
 
             inherit

@@ -15,7 +15,7 @@ class TestButton(sim.TestCase):
 
         yield b.i.eq(1)
 
-        yield Delay(b.debounce.hold_time)
+        yield Delay(b._debounce._hold_time)
         yield Settle()
         yield
         yield Settle()
@@ -30,7 +30,7 @@ class TestButton(sim.TestCase):
         assert (yield b.i)
         yield b.i.eq(0)
 
-        yield Delay(b.debounce.hold_time)
+        yield Delay(b._debounce._hold_time)
         yield Settle()
         yield
         yield Settle()
@@ -56,15 +56,15 @@ class TestButton(sim.TestCase):
         yield from self._button_up_post(b)
 
         yield from self._button_down(b)
-        yield Delay(b.hold_time)
+        yield Delay(b._hold_time)
         yield from self._button_up(b)
         assert (yield b.up & b.held)
         yield from self._button_up_post(b)
 
         yield from self._button_down(b)
-        yield Delay(b.hold_time / 2)
+        yield Delay(b._hold_time / 2)
         assert not (yield b.held)
-        yield Delay(b.hold_time)
+        yield Delay(b._hold_time)
         yield from self._button_up(b)
         assert (yield b.up & b.held)
         yield from self._button_up_post(b)

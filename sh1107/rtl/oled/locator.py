@@ -9,7 +9,7 @@ __all__ = ["Locator"]
 
 
 class Locator(Component):
-    addr: int
+    _addr: int
 
     adjust: Out(range(16))
     row: Out(range(17))
@@ -19,18 +19,18 @@ class Locator(Component):
 
     busy: In(1)
 
-    adjusted_row: Signal
+    _adjusted_row: Signal
 
     def __init__(self, *, addr: int):
         super().__init__()
-        self.addr = addr
+        self._addr = addr
 
-        self.adjusted_row = Signal(range(16))
+        self._adjusted_row = Signal(range(16))
 
     def elaborate(self, platform: Platform) -> Elaboratable:
         m = Module()
 
-        m.d.comb += self.adjusted_row.eq(self.row - 1 + self.adjust)
+        m.d.comb += self._adjusted_row.eq(self.row - 1 + self.adjust)
 
         transfer = Transfer(self.i2c_bus.in_fifo_w_data)
 
@@ -40,7 +40,7 @@ class Locator(Component):
                     m.d.sync += [
                         self.busy.eq(1),
                         transfer.kind.eq(Transfer.Kind.START),
-                        transfer.payload.start.addr.eq(self.addr),
+                        transfer.payload.start.addr.eq(self._addr),
                         transfer.payload.start.rw.eq(RW.W),
                         self.i2c_bus.in_fifo_w_en.eq(1),
                     ]
@@ -119,7 +119,7 @@ class Locator(Component):
                     self.i2c_bus.busy & self.i2c_bus.ack & self.i2c_bus.in_fifo_w_rdy
                 ):
                     byte = Cmd.SetHigherColumnAddress(0x00).to_byte() + (
-                        self.adjusted_row >> 1
+                        self._adjusted_row >> 1
                     )
                     m.d.sync += [
                         transfer.payload.data.eq(byte),
@@ -150,7 +150,7 @@ class Locator(Component):
         # For (adjusted) rows 0, 2, 4, 6, .., the column addresses are 0x00, 0x10, 0x20, ...
         # For (adjusted) rows 1, 3, 5, 7, .., the column addresses are 0x08, 0x18, 0x28, ...
         byte = Cmd.SetLowerColumnAddress(0x00).to_byte() + Mux(
-            self.adjusted_row[0], 8, 0
+            self._adjusted_row[0], 8, 0
         )
         transfer = Transfer(self.i2c_bus.in_fifo_w_data)
         m.d.sync += [

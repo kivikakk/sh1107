@@ -16,7 +16,7 @@ class TestTimer(sim.TestCase):
         yield
         assert not (yield d.o)
 
-        yield Delay(d.time)
+        yield Delay(d._time)
         yield
         assert (yield d.o)
 

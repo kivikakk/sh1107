@@ -23,24 +23,24 @@ class Button(Component):
     down: In(1)
     up: In(1)
 
-    debounce: Debounce
+    _debounce: Debounce
 
     def __init__(self):
         super().__init__()
-        self.debounce = Debounce()
+        self._debounce = Debounce()
 
     def elaborate(self, platform: Platform) -> Elaboratable:
         m = Module()
 
-        m.submodules.debounce = self.debounce
+        m.submodules.debounce = self._debounce
 
         registered = Signal()
-        m.d.comb += self.debounce.i.eq(self.i)
-        m.d.sync += registered.eq(self.debounce.o)
+        m.d.comb += self._debounce.i.eq(self.i)
+        m.d.sync += registered.eq(self._debounce.o)
 
         m.d.comb += [
-            self.down.eq(~registered & self.debounce.o),
-            self.up.eq(registered & ~self.debounce.o),
+            self.down.eq(~registered & self._debounce.o),
+            self.up.eq(registered & ~self._debounce.o),
         ]
 
         return m
@@ -57,23 +57,23 @@ class ButtonWithHold(Button):
     DEFAULT_HOLD_TIME: Final[float] = 1.5
     SIM_HOLD_TIME: Final[float] = 1e-2
 
-    hold_time: float
+    _hold_time: float
 
     held: In(1)
 
     def __init__(self, *, hold_time: Optional[float] = None):
         super().__init__()
-        self.hold_time = hold_time or 0
+        self._hold_time = hold_time or 0
 
     def elaborate(self, platform: Platform) -> Elaboratable:
-        self.hold_time = self.hold_time or (
+        self._hold_time = self._hold_time or (
             self.SIM_HOLD_TIME if platform.simulation else self.DEFAULT_HOLD_TIME
         )
 
         m = Module()
 
         m.submodules.button = super().elaborate(platform)
-        m.submodules.timer = timer = Timer(time=self.hold_time)
+        m.submodules.timer = timer = Timer(time=self._hold_time)
 
         holding = Signal()
         with m.If(self.down):
