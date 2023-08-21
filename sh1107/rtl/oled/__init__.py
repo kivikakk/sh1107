@@ -19,7 +19,7 @@ from amaranth.lib.wiring import Component, In, Out, connect, flipped
 from ... import rom
 from ...base import Blackbox
 from ...platform import Platform, icebreaker
-from ..common import Hz, Counter
+from ..common import Counter, Hz
 from ..i2c import I2C, I2CBus
 from ..spi import SPIFlashReader, SPIFlashReaderBus
 from .clser import Clser
@@ -76,6 +76,7 @@ class OLED(Component):
 
     _addr: int
     _cursor_rate: float  # Seconds before toggling.
+    _cursor_char: str
 
     i2c_bus: Out(I2CBus)
     own_i2c_bus: Out(I2CBus)
@@ -119,7 +120,8 @@ class OLED(Component):
         speed: Hz,
     ):
         self._addr = OLED.ADDR
-        self._cursor_rate = 1
+        self._cursor_rate = 0.5
+        self._cursor_char = "_"
 
         super().__init__()
 
@@ -877,7 +879,7 @@ class OLED(Component):
         with m.If(self._cursor_c.full & ~self._cursor_state):
             m.d.sync += [
                 self._cursor_state.eq(1),
-                self._chpr_data.eq(ord("_")),
+                self._chpr_data.eq(ord(self._cursor_char)),
                 self._chpr_advance.eq(0),
                 self._chpr_run.eq(1),
             ]
