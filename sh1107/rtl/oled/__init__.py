@@ -19,7 +19,7 @@ from amaranth.lib.wiring import Component, In, Out, connect, flipped
 from ... import rom
 from ...base import Blackbox
 from ...platform import Platform, icebreaker
-from ..common import Hz
+from ..common import Hz, Counter
 from ..i2c import I2C, I2CBus
 from ..spi import SPIFlashReader, SPIFlashReaderBus
 from .clser import Clser
@@ -74,6 +74,9 @@ class OLED(Component):
         BUSY = 1
         FAILURE = 2
 
+    _addr: int
+    _cursor_rate: float  # Seconds before toggling.
+
     i2c_bus: Out(I2CBus)
     own_i2c_bus: Out(I2CBus)
     _i2c: I2C | Instance
@@ -95,15 +98,18 @@ class OLED(Component):
     _locator: Locator
     _clser: Clser
     _scroller: Scroller
+    _cursor_c: Counter
 
     _fifo_in: SyncFIFO
     result: In(Result, reset=Result.BUSY)
 
     _row: Signal
     _col: Signal
-    _cursor: Signal
+    _cursor_en: Signal
+    _cursor_state: Signal
 
     _chpr_data: Signal
+    _chpr_advance: Signal
     _chpr_run: Signal
 
     def __init__(
@@ -112,6 +118,9 @@ class OLED(Component):
         platform: Platform,
         speed: Hz,
     ):
+        self._addr = OLED.ADDR
+        self._cursor_rate = 1
+
         super().__init__()
 
         assert speed.value in self.VALID_SPEEDS
@@ -155,18 +164,21 @@ class OLED(Component):
 
         self._rom_wr_en = Signal()
         self._rom_wr_data = Signal(8)
-        self._rom_writer = ROMWriter(addr=OLED.ADDR)
-        self._locator = Locator(addr=OLED.ADDR)
-        self._clser = Clser(addr=OLED.ADDR)
-        self._scroller = Scroller(addr=OLED.ADDR)
+        self._rom_writer = ROMWriter(addr=self._addr)
+        self._locator = Locator(addr=self._addr)
+        self._clser = Clser(addr=self._addr)
+        self._scroller = Scroller(addr=self._addr)
+        self._cursor_c = Counter(time=self._cursor_rate)
 
         self.fifo_in = SyncFIFO(width=8, depth=1)
 
         self._row = Signal(range(1, 17), reset=1)
         self._col = Signal(range(1, 17), reset=1)
-        self._cursor = Signal()
+        self._cursor_en = Signal()
+        self._cursor_state = Signal()
 
         self._chpr_data = Signal(8)
+        self._chpr_advance = Signal(reset=1)
         self._chpr_run = Signal()
 
     def elaborate(self, platform: Platform) -> Elaboratable:
@@ -273,14 +285,14 @@ class OLED(Component):
 
                     with m.Case(OLED.Command.CURSOR_ON):
                         m.d.sync += [
-                            self._cursor.eq(1),
+                            self._cursor_en.eq(1),
                             self.result.eq(OLED.Result.SUCCESS),
                         ]
                         m.next = "IDLE"
 
                     with m.Case(OLED.Command.CURSOR_OFF):
                         m.d.sync += [
-                            self._cursor.eq(0),
+                            self._cursor_en.eq(0),
                             self.result.eq(OLED.Result.SUCCESS),
                         ]
                         m.next = "IDLE"
@@ -339,6 +351,7 @@ class OLED(Component):
                     m.next = "IDLE"
 
         self.chpr_fsm(m)
+        self.cursor_fsm(m)
 
         return m
 
@@ -426,6 +439,7 @@ class OLED(Component):
         m.submodules.locator = self._locator
         m.submodules.clser = self._clser
         m.submodules.scroller = self._scroller
+        m.submodules.cursor_c = self._cursor_c
 
         m.submodules.fifo_in = self.fifo_in
 
@@ -568,7 +582,10 @@ class OLED(Component):
 
             with m.State("CHPR: STROBED ROM WRITER"):
                 m.d.sync += self._rom_writer.stb.eq(0)
-                with m.If(self._col == 16):
+                with m.If(~self._chpr_advance):
+                    m.d.sync += self._chpr_advance.eq(1)
+                    m.next = "CHPR: UNSTROBED ROM WRITER"
+                with m.Elif(self._col == 16):
                     with m.If(self._row == 16):
                         m.d.sync += self._col.eq(1)
                         m.next = "CHPR: UNSTROBED ROM WRITER, NEEDS SCROLL"
@@ -848,3 +865,26 @@ class OLED(Component):
         with m.State("SPI_TEST: SECOND HALF: CHPR RUNNING"):
             with m.If(~self._chpr_run):
                 m.next = "SPI_TEST: WRITE LOOP"
+
+    def cursor_fsm(self, m: Module):
+        # When switching cursor on, initially display it.
+        # P: Note how detecting the edge necessitates the sync assignment
+        # (i.e. register), but that this is also sufficient!
+        m.d.sync += self._cursor_c.en.eq(self._cursor_en)
+        with m.If(self._cursor_en & ~self._cursor_c.en):
+            m.d.sync += self._cursor_state.eq(1)
+
+        with m.If(self._cursor_c.full & ~self._cursor_state):
+            m.d.sync += [
+                self._cursor_state.eq(1),
+                self._chpr_data.eq(ord("_")),
+                self._chpr_advance.eq(0),
+                self._chpr_run.eq(1),
+            ]
+        with m.Elif(self._cursor_c.full & self._cursor_state):
+            m.d.sync += [
+                self._cursor_state.eq(0),
+                self._chpr_data.eq(ord(" ")),
+                self._chpr_advance.eq(0),
+                self._chpr_run.eq(1),
+            ]

@@ -77,10 +77,7 @@ class vsh(Platform):
 
     @property
     def default_clk_frequency(self):
-        from .sim import clock
-
-        # ? Sure.
-        return int(1 / clock())
+        return 2_000_000
 
 
 class test(Platform):
