@@ -9,7 +9,7 @@ __all__ = ["Locator"]
 
 
 class Locator(Component):
-    addr: int
+    _addr: int
 
     adjust: Out(range(16))
     row: Out(range(17))
@@ -23,7 +23,7 @@ class Locator(Component):
 
     def __init__(self, *, addr: int):
         super().__init__()
-        self.addr = addr
+        self._addr = addr
 
         self._adjusted_row = Signal(range(16))
 
@@ -40,7 +40,7 @@ class Locator(Component):
                     m.d.sync += [
                         self.busy.eq(1),
                         transfer.kind.eq(Transfer.Kind.START),
-                        transfer.payload.start.addr.eq(self.addr),
+                        transfer.payload.start.addr.eq(self._addr),
                         transfer.payload.start.rw.eq(RW.W),
                         self.i2c_bus.in_fifo_w_en.eq(1),
                     ]

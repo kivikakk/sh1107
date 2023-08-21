@@ -31,3 +31,6 @@ reportUnknownVariableType = false
 reportUnknownLambdaType = false
 reportUnknownArgumentType = false
 reportGeneralTypeIssues = false
+
+# XXX While we're just reaching inside everywhere.
+reportPrivateUsage = false

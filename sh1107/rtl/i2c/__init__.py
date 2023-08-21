@@ -443,10 +443,10 @@ def fh(m: Module, s: Optional[Signal], high: bool):
 
 
 class I2CFormal(I2C):
-    formal_scl: Signal
-    formal_start: Signal
-    formal_repeated_start: Signal
-    formal_stop: Signal
+    _formal_scl: Signal
+    _formal_start: Signal
+    _formal_repeated_start: Signal
+    _formal_stop: Signal
 
     def __init__(self, *, speed: Hz):
         super().__init__(speed=speed)

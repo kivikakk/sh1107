@@ -22,7 +22,7 @@ class TestI2C(sim.TestCase):
             yield dut.switch.eq(0)
 
         yield from sim_i2c.full_sequence(
-            dut.i2c,
+            dut._i2c,
             trigger,
             [
                 0x178,
@@ -48,7 +48,7 @@ class TestI2C(sim.TestCase):
             yield dut.switch.eq(0)
 
         yield from sim_i2c.full_sequence(
-            dut.i2c,
+            dut._i2c,
             trigger,
             [
                 0x178,

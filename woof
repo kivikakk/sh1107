@@ -1,1 +1,1 @@
-pyright && isort --profile black --nlb LOCALFOLDER . && black .
+pyright && isort --profile black --nlb LOCALFOLDER sh1107 && black sh1107

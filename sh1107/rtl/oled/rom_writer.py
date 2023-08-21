@@ -12,7 +12,7 @@ __all__ = ["ROMWriter"]
 
 
 class ROMWriter(Component):
-    addr: int
+    _addr: int
 
     index: Out(range(rom.SEQ_COUNT))
     stb: Out(1)
@@ -26,7 +26,7 @@ class ROMWriter(Component):
 
     def __init__(self, *, addr: int):
         super().__init__()
-        self.addr = addr
+        self._addr = addr
 
         self._offset = Signal(range(rom.ROM_LENGTH))
         self._remain = Signal(range(rom.ROM_LENGTH))
@@ -74,7 +74,7 @@ class ROMWriter(Component):
                 m.d.sync += [
                     self._remain.eq(self._remain | self.rom_bus.data.shift_left(8)),
                     transfer.kind.eq(Transfer.Kind.START),
-                    transfer.payload.start.addr.eq(self.addr),
+                    transfer.payload.start.addr.eq(self._addr),
                     transfer.payload.start.rw.eq(RW.W),
                     self.i2c_bus.in_fifo_w_en.eq(1),
                 ]
@@ -138,7 +138,7 @@ class ROMWriter(Component):
                     m.d.sync += [
                         self._remain.eq(_remain),
                         transfer.kind.eq(Transfer.Kind.START),
-                        transfer.payload.start.addr.eq(self.addr),
+                        transfer.payload.start.addr.eq(self._addr),
                         transfer.payload.start.rw.eq(RW.W),
                         self.i2c_bus.in_fifo_w_en.eq(1),
                     ]

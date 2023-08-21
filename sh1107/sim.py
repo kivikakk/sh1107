@@ -73,7 +73,7 @@ class TestCase(unittest.TestCase):
         sim_test: Callable[[Self, Elaboratable], Procedure],
     ) -> None:
         sig = inspect.signature(sim_test)
-        assert len(sig.parameters) == 2
+        assert len(sig.parameters) >= 2
         dutpn = list(sig.parameters)[1]
         dutc = sig.parameters[dutpn].annotation
 
@@ -115,7 +115,12 @@ class TestCase(unittest.TestCase):
                 dut = dutc(*dutc_args, **dutc_kwargs)
 
                 def bench() -> Procedure:
-                    yield from sim_test(self, dut)
+                    sim_test_kwargs = {}
+                    sim_test_sig = inspect.signature(sim_test)
+                    for arg_name, arg_value in dutc_kwargs.items():
+                        if arg_name in sim_test_sig.parameters:
+                            sim_test_kwargs[arg_name] = arg_value
+                    yield from sim_test(self, dut, **sim_test_kwargs)
 
                 sim = Simulator(Fragment.get(dut, platform))
                 sim.add_clock(clock())

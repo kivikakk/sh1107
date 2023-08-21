@@ -76,27 +76,27 @@ class OLED(Component):
 
     i2c_bus: Out(I2CBus)
     own_i2c_bus: Out(I2CBus)
-    i2c: I2C | Instance
+    _i2c: I2C | Instance
     # For blackbox simulation only; not defined otherwise.
     _i_i2c_bb_in_ack: Signal
     _i_i2c_bb_in_out_fifo_data: Signal
     _i_i2c_bb_in_out_fifo_stb: Signal
 
     spifr_bus: Out(SPIFlashReaderBus)
-    spifr: SPIFlashReader | Instance
+    _spifr: SPIFlashReader | Instance
 
     _rom_wr_en: Signal
     _rom_wr_data: Signal
     rom_bus: Out(ROMBus(rom.ROM_ABITS, 8))
     own_rom_bus: Out(ROMBus(rom.ROM_ABITS, 8))
-    rom_mem: Instance | Memory
+    _rom_mem: Instance | Memory
 
-    rom_writer: ROMWriter
-    locator: Locator
-    clser: Clser
-    scroller: Scroller
+    _rom_writer: ROMWriter
+    _locator: Locator
+    _clser: Clser
+    _scroller: Scroller
 
-    fifo_in: SyncFIFO
+    _fifo_in: SyncFIFO
     result: In(Result, reset=Result.BUSY)
 
     _row: Signal
@@ -117,12 +117,12 @@ class OLED(Component):
         assert speed.value in self.VALID_SPEEDS
 
         if Blackbox.I2C not in platform.blackboxes:
-            self.i2c = I2C(speed=speed)
+            self._i2c = I2C(speed=speed)
         else:
             self._i_i2c_bb_in_ack = Signal()
             self._i_i2c_bb_in_out_fifo_data = Signal(8)
             self._i_i2c_bb_in_out_fifo_stb = Signal()
-            self.i2c = Instance(
+            self._i2c = Instance(
                 "i2c",
                 i_clk=ClockSignal(),
                 i_in_fifo_w_data=self.i2c_bus.in_fifo_w_data,
@@ -140,9 +140,9 @@ class OLED(Component):
             )
 
         if Blackbox.SPIFR not in platform.blackboxes:
-            self.spifr = SPIFlashReader()
+            self._spifr = SPIFlashReader()
         else:
-            self.spifr = Instance(
+            self._spifr = Instance(
                 "spifr",
                 i_clk=ClockSignal(),
                 i_addr=self.spifr_bus.addr,
@@ -155,10 +155,10 @@ class OLED(Component):
 
         self._rom_wr_en = Signal()
         self._rom_wr_data = Signal(8)
-        self.rom_writer = ROMWriter(addr=OLED.ADDR)
-        self.locator = Locator(addr=OLED.ADDR)
-        self.clser = Clser(addr=OLED.ADDR)
-        self.scroller = Scroller(addr=OLED.ADDR)
+        self._rom_writer = ROMWriter(addr=OLED.ADDR)
+        self._locator = Locator(addr=OLED.ADDR)
+        self._clser = Clser(addr=OLED.ADDR)
+        self._scroller = Scroller(addr=OLED.ADDR)
 
         self.fifo_in = SyncFIFO(width=8, depth=1)
 
@@ -235,31 +235,31 @@ class OLED(Component):
 
                     with m.Case(OLED.Command.INIT):
                         m.d.sync += [
-                            self.rom_writer.index.eq(rom.OFFSET_INIT),
-                            self.rom_writer.stb.eq(1),
+                            self._rom_writer.index.eq(rom.OFFSET_INIT),
+                            self._rom_writer.stb.eq(1),
                             self._row.eq(1),
                             self._col.eq(1),
-                            self.scroller.rst.eq(1),
+                            self._scroller.rst.eq(1),
                         ]
                         m.next = "INIT: STROBED ROM WRITER"
 
                     with m.Case(OLED.Command.DISPLAY_ON):
                         m.d.sync += [
-                            self.rom_writer.index.eq(rom.OFFSET_DISPLAY_ON),
-                            self.rom_writer.stb.eq(1),
+                            self._rom_writer.index.eq(rom.OFFSET_DISPLAY_ON),
+                            self._rom_writer.stb.eq(1),
                         ]
                         m.next = "ROM WRITE SINGLE: STROBED ROM WRITER"
 
                     with m.Case(OLED.Command.DISPLAY_OFF):
                         m.d.sync += [
-                            self.rom_writer.index.eq(rom.OFFSET_DISPLAY_OFF),
-                            self.rom_writer.stb.eq(1),
+                            self._rom_writer.index.eq(rom.OFFSET_DISPLAY_OFF),
+                            self._rom_writer.stb.eq(1),
                         ]
                         m.next = "ROM WRITE SINGLE: STROBED ROM WRITER"
 
                     with m.Case(OLED.Command.CLS):
                         m.d.sync += [
-                            self.clser.stb.eq(1),
+                            self._clser.stb.eq(1),
                             self._row.eq(1),
                             self._col.eq(1),
                         ]
@@ -301,40 +301,40 @@ class OLED(Component):
             self.spi_test_states(m, platform)
 
             with m.State("CLSER: STROBED"):
-                m.d.sync += self.clser.stb.eq(0)
+                m.d.sync += self._clser.stb.eq(0)
                 m.next = "CLSER: UNSTROBED"
 
             with m.State("CLSER: UNSTROBED"):
-                with m.If(~self.clser.busy):
+                with m.If(~self._clser.busy):
                     m.d.sync += [
-                        self.locator.row.eq(self._row),
-                        self.locator.col.eq(self._col),
-                        self.locator.stb.eq(1),
+                        self._locator.row.eq(self._row),
+                        self._locator.col.eq(self._col),
+                        self._locator.stb.eq(1),
                     ]
                     m.next = "CLSER: STROBED LOCATOR"
 
             with m.State("CLSER: STROBED LOCATOR"):
-                m.d.sync += self.locator.stb.eq(0)
+                m.d.sync += self._locator.stb.eq(0)
                 m.next = "CLSER: UNSTROBED LOCATOR"
 
             with m.State("CLSER: UNSTROBED LOCATOR"):
-                with m.If(~self.locator.busy):
+                with m.If(~self._locator.busy):
                     m.d.sync += self.result.eq(OLED.Result.SUCCESS)
                     m.next = "IDLE"
 
             with m.State("INIT: STROBED ROM WRITER"):
                 m.d.sync += [
-                    self.rom_writer.stb.eq(0),
-                    self.scroller.rst.eq(0),
+                    self._rom_writer.stb.eq(0),
+                    self._scroller.rst.eq(0),
                 ]
                 m.next = "ROM WRITE SINGLE: UNSTROBED ROM WRITER"
 
             with m.State("ROM WRITE SINGLE: STROBED ROM WRITER"):
-                m.d.sync += self.rom_writer.stb.eq(0)
+                m.d.sync += self._rom_writer.stb.eq(0)
                 m.next = "ROM WRITE SINGLE: UNSTROBED ROM WRITER"
 
             with m.State("ROM WRITE SINGLE: UNSTROBED ROM WRITER"):
-                with m.If(~self.rom_writer.busy):
+                with m.If(~self._rom_writer.busy):
                     m.d.sync += self.result.eq(OLED.Result.SUCCESS)
                     m.next = "IDLE"
 
@@ -371,7 +371,7 @@ class OLED(Component):
 
         match platform:
             case icebreaker():
-                self.rom_mem = Instance(
+                self._rom_mem = Instance(
                     "$mem",
                     a_ram_style="huge",
                     p_MEMID="\\rom_mem",
@@ -396,15 +396,15 @@ class OLED(Component):
                     i_WR_ADDR=addr,
                     i_WR_DATA=self._rom_wr_data.replicate(2),
                 )
-                m.submodules.rom_mem = self.rom_mem
+                m.submodules.rom_mem = self._rom_mem
             case _:
                 # OrangeCrab, simulation, etc.
                 # As is typical, zero-init ends up making the bitstream slightly
                 # larger than if we'd put actual data in it, so this is very
                 # much for Fun(tm).
-                self.rom_mem = Memory(width=16, depth=packed_size)
-                m.submodules.rom_rd = rom_rd = self.rom_mem.read_port()
-                m.submodules.rom_wr = rom_wr = self.rom_mem.write_port(granularity=8)
+                self._rom_mem = Memory(width=16, depth=packed_size)
+                m.submodules.rom_rd = rom_rd = self._rom_mem.read_port()
+                m.submodules.rom_wr = rom_wr = self._rom_mem.write_port(granularity=8)
                 m.d.comb += [
                     rom_rd.addr.eq(addr),
                     rd_data.eq(rom_rd.data),
@@ -415,35 +415,35 @@ class OLED(Component):
 
     def elaborate_submodules(self, m: Module, platform: Platform):
         if Blackbox.I2C not in platform.blackboxes:
-            connect(m, self.i2c_bus, self.i2c.bus)
+            connect(m, self.i2c_bus, self._i2c.bus)
 
         if Blackbox.SPIFR not in platform.blackboxes:
-            connect(m, self.spifr.bus, self.spifr_bus)
+            connect(m, self._spifr.bus, self.spifr_bus)
 
-        m.submodules.i2c = self.i2c
-        m.submodules.spifr = self.spifr
-        m.submodules.rom_writer = self.rom_writer
-        m.submodules.locator = self.locator
-        m.submodules.clser = self.clser
-        m.submodules.scroller = self.scroller
+        m.submodules.i2c = self._i2c
+        m.submodules.spifr = self._spifr
+        m.submodules.rom_writer = self._rom_writer
+        m.submodules.locator = self._locator
+        m.submodules.clser = self._clser
+        m.submodules.scroller = self._scroller
 
         m.submodules.fifo_in = self.fifo_in
 
-        with m.If(self.rom_writer.busy):
-            connect(m, flipped(self.i2c_bus), self.rom_writer.i2c_bus)
-            connect(m, flipped(self.rom_bus), self.rom_writer.rom_bus)
-        with m.Elif(self.locator.busy):
-            connect(m, flipped(self.i2c_bus), self.locator.i2c_bus)
-        with m.Elif(self.clser.busy):
-            connect(m, flipped(self.i2c_bus), self.clser.i2c_bus)
-        with m.Elif(self.scroller.busy):
-            connect(m, flipped(self.i2c_bus), self.scroller.i2c_bus)
-            connect(m, flipped(self.rom_bus), self.scroller.rom_bus)
+        with m.If(self._rom_writer.busy):
+            connect(m, flipped(self.i2c_bus), self._rom_writer.i2c_bus)
+            connect(m, flipped(self.rom_bus), self._rom_writer.rom_bus)
+        with m.Elif(self._locator.busy):
+            connect(m, flipped(self.i2c_bus), self._locator.i2c_bus)
+        with m.Elif(self._clser.busy):
+            connect(m, flipped(self.i2c_bus), self._clser.i2c_bus)
+        with m.Elif(self._scroller.busy):
+            connect(m, flipped(self.i2c_bus), self._scroller.i2c_bus)
+            connect(m, flipped(self.rom_bus), self._scroller.rom_bus)
         with m.Else():
             connect(m, flipped(self.i2c_bus), self.own_i2c_bus)
             connect(m, flipped(self.rom_bus), self.own_rom_bus)
 
-        m.d.comb += self.locator.adjust.eq(self.scroller.adjusted)
+        m.d.comb += self._locator.adjust.eq(self._scroller.adjusted)
 
     def locate_states(self, m: Module):
         with m.State("LOCATE: ROW: WAIT"):
@@ -451,10 +451,10 @@ class OLED(Component):
                 with m.If(self.fifo_in.r_data != 0):
                     m.d.sync += [
                         self._row.eq(self.fifo_in.r_data),
-                        self.locator.row.eq(self.fifo_in.r_data),
+                        self._locator.row.eq(self.fifo_in.r_data),
                     ]
                 with m.Else():
-                    m.d.sync += self.locator.row.eq(0)
+                    m.d.sync += self._locator.row.eq(0)
                 m.d.sync += self.fifo_in.r_en.eq(1)
                 m.next = "LOCATE: ROW: STROBED R_EN"
 
@@ -467,25 +467,25 @@ class OLED(Component):
                 with m.If(self.fifo_in.r_data != 0):
                     m.d.sync += [
                         self._col.eq(self.fifo_in.r_data),
-                        self.locator.col.eq(self.fifo_in.r_data),
+                        self._locator.col.eq(self.fifo_in.r_data),
                     ]
                 with m.Else():
-                    m.d.sync += self.locator.col.eq(0)
+                    m.d.sync += self._locator.col.eq(0)
                 m.d.sync += [
                     self.fifo_in.r_en.eq(1),
-                    self.locator.stb.eq(1),
+                    self._locator.stb.eq(1),
                 ]
                 m.next = "LOCATE: COL: STROBED R_EN"
 
         with m.State("LOCATE: COL: STROBED R_EN"):
             m.d.sync += [
                 self.fifo_in.r_en.eq(0),
-                self.locator.stb.eq(0),
+                self._locator.stb.eq(0),
             ]
             m.next = "LOCATE: UNSTROBED LOCATOR"
 
         with m.State("LOCATE: UNSTROBED LOCATOR"):
-            with m.If(~self.locator.busy):
+            with m.If(~self._locator.busy):
                 m.d.sync += self.result.eq(OLED.Result.SUCCESS)
                 m.next = "IDLE"
 
@@ -535,9 +535,9 @@ class OLED(Component):
                         # CR
                         m.d.sync += [
                             self._col.eq(1),
-                            self.locator.col.eq(1),
-                            self.locator.row.eq(0),
-                            self.locator.stb.eq(1),
+                            self._locator.col.eq(1),
+                            self._locator.row.eq(0),
+                            self._locator.stb.eq(1),
                         ]
                         m.next = "CHPR: STROBED LOCATOR"
                     with m.Elif(self._chpr_data == 10):
@@ -545,27 +545,29 @@ class OLED(Component):
                         with m.If(self._row == 16):
                             m.d.sync += [
                                 self._col.eq(1),
-                                self.scroller.stb.eq(1),
+                                self._scroller.stb.eq(1),
                             ]
                             m.next = "CHPR: STROBED SCROLLER"
                         with m.Else():
                             m.d.sync += [
                                 self._col.eq(1),
                                 self._row.eq(self._row + 1),
-                                self.locator.row.eq(self._row + 1),
-                                self.locator.col.eq(1),
-                                self.locator.stb.eq(1),
+                                self._locator.row.eq(self._row + 1),
+                                self._locator.col.eq(1),
+                                self._locator.stb.eq(1),
                             ]
                             m.next = "CHPR: STROBED LOCATOR"
                     with m.Else():
                         m.d.sync += [
-                            self.rom_writer.index.eq(rom.OFFSET_CHAR + self._chpr_data),
-                            self.rom_writer.stb.eq(1),
+                            self._rom_writer.index.eq(
+                                rom.OFFSET_CHAR + self._chpr_data
+                            ),
+                            self._rom_writer.stb.eq(1),
                         ]
                         m.next = "CHPR: STROBED ROM WRITER"
 
             with m.State("CHPR: STROBED ROM WRITER"):
-                m.d.sync += self.rom_writer.stb.eq(0)
+                m.d.sync += self._rom_writer.stb.eq(0)
                 with m.If(self._col == 16):
                     with m.If(self._row == 16):
                         m.d.sync += self._col.eq(1)
@@ -581,38 +583,38 @@ class OLED(Component):
                     m.next = "CHPR: UNSTROBED ROM WRITER"
 
             with m.State("CHPR: UNSTROBED ROM WRITER"):
-                with m.If(~self.rom_writer.busy):
+                with m.If(~self._rom_writer.busy):
                     m.d.sync += [
-                        self.locator.row.eq(self._row),
-                        self.locator.col.eq(self._col),
-                        self.locator.stb.eq(1),
+                        self._locator.row.eq(self._row),
+                        self._locator.col.eq(self._col),
+                        self._locator.stb.eq(1),
                     ]
                     m.next = "CHPR: STROBED LOCATOR"
 
             with m.State("CHPR: UNSTROBED ROM WRITER, NEEDS SCROLL"):
-                with m.If(~self.rom_writer.busy):
-                    m.d.sync += self.scroller.stb.eq(1)
+                with m.If(~self._rom_writer.busy):
+                    m.d.sync += self._scroller.stb.eq(1)
                     m.next = "CHPR: STROBED SCROLLER"
 
             with m.State("CHPR: STROBED SCROLLER"):
-                m.d.sync += self.scroller.stb.eq(0)
+                m.d.sync += self._scroller.stb.eq(0)
                 m.next = "CHPR: UNSTROBED SCROLLER"
 
             with m.State("CHPR: UNSTROBED SCROLLER"):
-                with m.If(~self.scroller.busy):
+                with m.If(~self._scroller.busy):
                     m.d.sync += [
-                        self.locator.row.eq(self._row),
-                        self.locator.col.eq(self._col),
-                        self.locator.stb.eq(1),
+                        self._locator.row.eq(self._row),
+                        self._locator.col.eq(self._col),
+                        self._locator.stb.eq(1),
                     ]
                     m.next = "CHPR: STROBED LOCATOR"
 
             with m.State("CHPR: STROBED LOCATOR"):
-                m.d.sync += self.locator.stb.eq(0)
+                m.d.sync += self._locator.stb.eq(0)
                 m.next = "CHPR: UNSTROBED LOCATOR"
 
             with m.State("CHPR: UNSTROBED LOCATOR"):
-                with m.If(~self.locator.busy):
+                with m.If(~self._locator.busy):
                     m.d.sync += self._chpr_run.eq(0)
                     m.next = "IDLE"
 

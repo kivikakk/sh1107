@@ -95,12 +95,12 @@ SEQUENCES.append(
 
 
 class Top(Component):
-    oled: OLED
-    sequences: list[list[int]]
-    speed: Hz
+    _oled: OLED
+    _sequences: list[list[int]]
+    _speed: Hz
 
-    rom_len: int
-    rom_rd: ReadPort
+    _rom_len: int
+    _rom_rd: ReadPort
 
     def __init__(
         self,
@@ -109,17 +109,16 @@ class Top(Component):
         sequences: list[list[int]] = SEQUENCES,
         speed: Hz = Hz(400_000),
     ):
-        self.sequences = sequences
+        self._sequences = sequences
         super().__init__()
-        self.switches = [getattr(self, f"switch_{i}") for i in range(len(sequences))]
 
-        self.oled = OLED(platform=platform, speed=speed)
-        self.speed = speed
+        self._oled = OLED(platform=platform, speed=speed)
+        self._speed = speed
 
-        self.rom_len = sum(len(seq) for seq in sequences)
-        self.rom_rd = Memory(
+        self._rom_len = sum(len(seq) for seq in sequences)
+        self._rom_rd = Memory(
             width=8,
-            depth=self.rom_len,
+            depth=self._rom_len,
             init=[i for seq in sequences for i in seq],
         ).read_port()
 
@@ -130,26 +129,30 @@ class Top(Component):
                 # Note that these remain disconnected/unused when building for an
                 # actual target.
                 f"switch_{i}": In(1)
-                for i in range(len(self.sequences))
+                for i in range(len(self._sequences))
             }
         )
+
+    @property
+    def switches(self) -> list[Signal]:
+        return [getattr(self, f"switch_{i}") for i in range(len(self._sequences))]
 
     def ports(self, platform: Platform) -> list[Signal]:
         ports = self.switches[:]
 
         if Blackbox.I2C not in platform.blackboxes:
             ports += [
-                self.oled.i2c.hw_bus.scl_o,
-                self.oled.i2c.hw_bus.scl_oe,
-                self.oled.i2c.hw_bus.sda_o,
-                self.oled.i2c.hw_bus.sda_oe,
-                self.oled.i2c.hw_bus.sda_i,
+                self._oled._i2c.hw_bus.scl_o,
+                self._oled._i2c.hw_bus.scl_oe,
+                self._oled._i2c.hw_bus.sda_o,
+                self._oled._i2c.hw_bus.sda_oe,
+                self._oled._i2c.hw_bus.sda_i,
             ]
         else:
             ports += [
-                self.oled.i_i2c_bb_in_ack,
-                self.oled.i_i2c_bb_in_out_fifo_data,
-                self.oled.i_i2c_bb_in_out_fifo_stb,
+                self._oled._i_i2c_bb_in_ack,
+                self._oled._i_i2c_bb_in_out_fifo_data,
+                self._oled._i_i2c_bb_in_out_fifo_stb,
             ]
 
         return ports
@@ -157,8 +160,8 @@ class Top(Component):
     def elaborate(self, platform: Optional[Platform]):
         m = Module()
 
-        m.submodules.oled = self.oled
-        m.submodules.rom_rd = self.rom_rd
+        m.submodules.oled = self._oled
+        m.submodules.rom_rd = self._rom_rd
 
         button_up_signals: list[Signal] = []
 
@@ -168,8 +171,8 @@ class Top(Component):
                 led_ack = cast(Signal, platform.request("led", 1).o)
 
                 m.d.comb += [
-                    led_busy.eq(self.oled.i2c_bus.busy),
-                    led_ack.eq(self.oled.i2c_bus.ack),
+                    led_busy.eq(self._oled.i2c_bus.busy),
+                    led_ack.eq(self._oled.i2c_bus.ack),
                 ]
 
                 platform.add_resources(platform.break_off_pmod)
@@ -188,7 +191,7 @@ class Top(Component):
                 led_m = platform.request("led_r", 1)
                 led_r = platform.request("led_g", 2)
 
-                m.d.comb += Cat(led_r, led_m, led_l).eq(self.oled.result)
+                m.d.comb += Cat(led_r, led_m, led_l).eq(self._oled.result)
 
             case orangecrab():
                 rgb = platform.request("rgb_led")
@@ -196,8 +199,8 @@ class Top(Component):
                 led_ack = cast(Signal, cast(Record, rgb.g).o)
 
                 m.d.comb += [
-                    led_busy.eq(self.oled.i2c_bus.busy),
-                    led_ack.eq(self.oled.i2c_bus.ack),
+                    led_busy.eq(self._oled.i2c_bus.busy),
+                    led_ack.eq(self._oled.i2c_bus.ack),
                 ]
 
                 main_switch = cast(Signal, platform.request("button", 0).i)
@@ -230,20 +233,20 @@ class Top(Component):
             case _:
                 raise NotImplementedError
 
-        offset = Signal(range(self.rom_len))
-        remain = Signal(range(self.rom_len))
+        offset = Signal(range(self._rom_len))
+        remain = Signal(range(self._rom_len))
 
-        m.d.comb += self.rom_rd.addr.eq(offset)
+        m.d.comb += self._rom_rd.addr.eq(offset)
 
         with m.FSM():
             with m.State("IDLE"):
-                m.d.sync += self.oled.fifo_in.w_en.eq(0)
+                m.d.sync += self._oled.fifo_in.w_en.eq(0)
 
                 for i, button_up in enumerate(button_up_signals):
-                    with m.If(button_up & self.oled.fifo_in.w_rdy):
+                    with m.If(button_up & self._oled.fifo_in.w_rdy):
                         m.d.sync += [
-                            offset.eq(sum(len(seq) for seq in self.sequences[:i])),
-                            remain.eq(len(self.sequences[i])),
+                            offset.eq(sum(len(seq) for seq in self._sequences[:i])),
+                            remain.eq(len(self._sequences[i])),
                         ]
                         m.next = "LOOP: ADDRESSED"
 
@@ -251,15 +254,15 @@ class Top(Component):
                 m.next = "LOOP: AVAILABLE"
 
             with m.State("LOOP: AVAILABLE"):
-                with m.If(self.oled.fifo_in.w_rdy):
+                with m.If(self._oled.fifo_in.w_rdy):
                     m.d.sync += [
-                        self.oled.fifo_in.w_data.eq(self.rom_rd.data),
-                        self.oled.fifo_in.w_en.eq(1),
+                        self._oled.fifo_in.w_data.eq(self._rom_rd.data),
+                        self._oled.fifo_in.w_en.eq(1),
                     ]
                     m.next = "LOOP: STROBED W_EN"
 
             with m.State("LOOP: STROBED W_EN"):
-                m.d.sync += self.oled.fifo_in.w_en.eq(0)
+                m.d.sync += self._oled.fifo_in.w_en.eq(0)
                 with m.If(remain == 1):
                     m.next = "IDLE"
                 with m.Else():

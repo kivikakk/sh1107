@@ -28,9 +28,9 @@ pub fn init(cxxrtl: Cxxrtl, addr: u7) I2CBBConnector {
     const stb = Sample(bool).init(cxxrtl, "oled i2c stb", false);
     const busy = Sample(bool).init(cxxrtl, "oled i2c busy", false);
 
-    const bb_in_ack = cxxrtl.get(bool, "i_i2c_bb_in_ack");
-    const bb_in_out_fifo_data = cxxrtl.get(u8, "i_i2c_bb_in_out_fifo_data");
-    const bb_in_out_fifo_stb = cxxrtl.get(bool, "i_i2c_bb_in_out_fifo_stb");
+    const bb_in_ack = cxxrtl.get(bool, "_i_i2c_bb_in_ack");
+    const bb_in_out_fifo_data = cxxrtl.get(u8, "_i_i2c_bb_in_out_fifo_data");
+    const bb_in_out_fifo_stb = cxxrtl.get(bool, "_i_i2c_bb_in_out_fifo_stb");
 
     return .{
         .addr = addr,

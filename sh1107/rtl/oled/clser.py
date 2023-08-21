@@ -9,7 +9,7 @@ __all__ = ["Clser"]
 
 
 class Clser(Component):
-    addr: int
+    _addr: int
 
     stb: Out(1)
     i2c_bus: Out(I2CBus)
@@ -21,7 +21,7 @@ class Clser(Component):
 
     def __init__(self, *, addr: int):
         super().__init__()
-        self.addr = addr
+        self._addr = addr
 
         self.stb = Signal()
 
@@ -43,7 +43,7 @@ class Clser(Component):
                         self._current_page.eq(0),
                         self._current_column.eq(0),
                         transfer.kind.eq(Transfer.Kind.START),
-                        transfer.payload.start.addr.eq(self.addr),
+                        transfer.payload.start.addr.eq(self._addr),
                         transfer.payload.start.rw.eq(RW.W),
                         self.i2c_bus.in_fifo_w_en.eq(1),
                     ]
@@ -135,7 +135,7 @@ class Clser(Component):
                 ):
                     m.d.sync += [
                         transfer.kind.eq(Transfer.Kind.START),
-                        transfer.payload.start.addr.eq(self.addr),
+                        transfer.payload.start.addr.eq(self._addr),
                         transfer.payload.start.rw.eq(RW.W),
                         self.i2c_bus.in_fifo_w_en.eq(1),
                     ]
@@ -177,7 +177,7 @@ class Clser(Component):
                             self._current_column.eq(0),
                             self._current_page.eq(self._current_page + 1),
                             transfer.kind.eq(Transfer.Kind.START),
-                            transfer.payload.start.addr.eq(self.addr),
+                            transfer.payload.start.addr.eq(self._addr),
                             transfer.payload.start.rw.eq(RW.W),
                             self.i2c_bus.in_fifo_w_en.eq(1),
                         ]
