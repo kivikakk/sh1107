@@ -108,6 +108,8 @@ class OLED(Component):
     _col: Signal
     _cursor_en: Signal
     _cursor_state: Signal
+    _cursor_last_drawn_row: Signal
+    _cursor_last_drawn_col: Signal
 
     _chpr_data: Signal
     _chpr_advance: Signal
@@ -178,6 +180,8 @@ class OLED(Component):
         self._col = Signal(range(1, 17), reset=1)
         self._cursor_en = Signal()
         self._cursor_state = Signal()
+        self._cursor_last_drawn_row = Signal(range(0, 17), reset=1)
+        self._cursor_last_drawn_col = Signal(range(0, 17), reset=1)
 
         self._chpr_data = Signal(8)
         self._chpr_advance = Signal(reset=1)
@@ -232,13 +236,19 @@ class OLED(Component):
                 m.next = "INIT: WAIT SPIFR"
 
             with m.State("IDLE"):
-                with m.If(self.fifo_in.r_rdy & self.own_i2c_bus.in_fifo_w_rdy):
-                    m.d.sync += [
-                        command.eq(self.fifo_in.r_data),
-                        self.fifo_in.r_en.eq(1),
-                        self.result.eq(OLED.Result.BUSY),
-                    ]
-                    m.next = "START: STROBED FIFO_IN R_EN"
+                with m.If(~self._chpr_run):
+                    with m.If(self.fifo_in.r_rdy & self.own_i2c_bus.in_fifo_w_rdy):
+                        m.d.sync += [
+                            command.eq(self.fifo_in.r_data),
+                            self.fifo_in.r_en.eq(1),
+                            self.result.eq(OLED.Result.BUSY),
+                        ]
+                        m.next = "START: STROBED FIFO_IN R_EN"
+                    with m.Elif(self._cursor_en &
+                        ((self._cursor_last_drawn_col != self._col) |
+                         (self._cursor_last_drawn_row != self._row))):
+                        m.d.sync += self._cursor_en.eq(0)
+                        m.next = "CURSOR_ON: RESET"
 
             with m.State("START: STROBED FIFO_IN R_EN"):
                 m.d.sync += self.fifo_in.r_en.eq(0)
@@ -286,11 +296,8 @@ class OLED(Component):
                         m.next = "PRINT: COUNT: WAIT"
 
                     with m.Case(OLED.Command.CURSOR_ON):
-                        m.d.sync += [
-                            self._cursor_en.eq(1),
-                            self.result.eq(OLED.Result.SUCCESS),
-                        ]
-                        m.next = "IDLE"
+                        m.d.sync += self._cursor_en.eq(0)
+                        m.next = "CURSOR_ON: RESET"
 
                     with m.Case(OLED.Command.CURSOR_OFF):
                         m.d.sync += [
@@ -313,6 +320,19 @@ class OLED(Component):
             self.id_states(m)
             self.print_byte_states(m)
             self.spi_test_states(m, platform)
+
+            with m.State("CURSOR_ON: RESET"):
+                m.d.sync += [
+                    self.result.eq(OLED.Result.SUCCESS),
+                    self._chpr_data.eq(ord(self._cursor_char)),
+                    self._chpr_advance.eq(0),
+                    self._chpr_run.eq(1),
+                    self._cursor_en.eq(1),
+                    self._cursor_state.eq(1),
+                    self._cursor_last_drawn_row.eq(self._row),
+                    self._cursor_last_drawn_col.eq(self._col),
+                ]
+                m.next = "IDLE"
 
             with m.State("CLSER: STROBED"):
                 m.d.sync += self._clser.stb.eq(0)
@@ -876,17 +896,20 @@ class OLED(Component):
         with m.If(self._cursor_en & ~self._cursor_c.en):
             m.d.sync += self._cursor_state.eq(1)
 
-        with m.If(self._cursor_c.full & ~self._cursor_state):
-            m.d.sync += [
-                self._cursor_state.eq(1),
-                self._chpr_data.eq(ord(self._cursor_char)),
-                self._chpr_advance.eq(0),
-                self._chpr_run.eq(1),
-            ]
-        with m.Elif(self._cursor_c.full & self._cursor_state):
-            m.d.sync += [
-                self._cursor_state.eq(0),
-                self._chpr_data.eq(ord(" ")),
-                self._chpr_advance.eq(0),
-                self._chpr_run.eq(1),
-            ]
+        with m.If(self._cursor_c.full & ~self._chpr_run):
+            with m.If(~self._cursor_state):
+                m.d.sync += [
+                    self._cursor_state.eq(1),
+                    self._chpr_data.eq(ord(self._cursor_char)),
+                    self._chpr_advance.eq(0),
+                    self._chpr_run.eq(1),
+                    self._cursor_last_drawn_row.eq(self._row),
+                    self._cursor_last_drawn_col.eq(self._col),
+                ]
+            with m.Else():
+                m.d.sync += [
+                    self._cursor_state.eq(0),
+                    self._chpr_data.eq(ord(" ")),
+                    self._chpr_advance.eq(0),
+                    self._chpr_run.eq(1),
+                ]

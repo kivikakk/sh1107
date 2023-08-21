@@ -93,6 +93,12 @@ SEQUENCES.append(
     ]
 )
 
+# 5
+SEQUENCES.append([Cm.CURSOR_ON])
+
+# 6
+SEQUENCES.append([Cm.CURSOR_OFF])
+
 
 class Top(Component):
     _oled: OLED

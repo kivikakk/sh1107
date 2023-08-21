@@ -77,7 +77,7 @@ class vsh(Platform):
 
     @property
     def default_clk_frequency(self):
-        return 2_000_000
+        return 3_000_000
 
 
 class test(Platform):
