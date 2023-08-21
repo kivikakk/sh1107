@@ -77,7 +77,9 @@ class vsh(Platform):
 
     @property
     def default_clk_frequency(self):
-        return 3_000_000
+        # XXX We can't compile `vsh -i' with this, but the timer is ~accurate for me.
+        # return 3_000_000
+        return 12_000_000
 
 
 class test(Platform):
