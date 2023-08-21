@@ -107,26 +107,26 @@ class I2C(Component):
         2_000_000,  # for vsh
     ]
 
-    speed: Hz
+    _speed: Hz
 
     _in_fifo: SyncFIFO
     _in_fifo_r_data: Transfer
 
     _out_fifo: SyncFIFO
 
-    c: Counter
+    _c: Counter
 
     bus: In(I2CBus)
     hw_bus: Out(I2CHardwareBus)
 
-    rw: Signal
-    byte: Signal
-    byte_ix: Signal
+    _rw: Signal
+    _byte: Signal
+    _byte_ix: Signal
 
-    formal_scl: Optional[Signal]
-    formal_start: Optional[Signal]
-    formal_repeated_start: Optional[Signal]
-    formal_stop: Optional[Signal]
+    _formal_scl: Optional[Signal]
+    _formal_start: Optional[Signal]
+    _formal_repeated_start: Optional[Signal]
+    _formal_stop: Optional[Signal]
 
     def __init__(self, *, speed: Hz):
         super().__init__()
@@ -139,16 +139,16 @@ class I2C(Component):
 
         self._out_fifo = SyncFIFO(width=8, depth=1)
 
-        self.c = Counter(hz=speed.value * 2)
+        self._c = Counter(hz=speed.value * 2)
 
-        self.rw = Signal(RW)
-        self.byte = Signal(8)
-        self.byte_ix = Signal(range(8))
+        self._rw = Signal(RW)
+        self._byte = Signal(8)
+        self._byte_ix = Signal(range(8))
 
-        self.formal_scl = None
-        self.formal_start = None
-        self.formal_repeated_start = None
-        self.formal_stop = None
+        self._formal_scl = None
+        self._formal_start = None
+        self._formal_repeated_start = None
+        self._formal_stop = None
 
     def elaborate(self, platform: Platform) -> Elaboratable:
         m = Module()
@@ -209,15 +209,15 @@ class I2C(Component):
         # NOTE(Mia): we might need to keep scl_o=0 and toggle scl_oe instead for
         # clock stretching?
 
-        m.submodules.c = c = self.c
+        m.submodules._c = c = self._c
         with m.If(c.full):
             m.d.sync += self.hw_bus.scl_o.eq(~self.hw_bus.scl_o)
 
         m.d.sync += self._in_fifo.r_en.eq(0)
 
-        fh(m, self.formal_start, False)
-        fh(m, self.formal_repeated_start, False)
-        fh(m, self.formal_stop, False)
+        fh(m, self._formal_start, False)
+        fh(m, self._formal_repeated_start, False)
+        fh(m, self._formal_stop, False)
 
         with m.FSM():
             with m.State("IDLE"):
@@ -234,18 +234,18 @@ class I2C(Component):
                         self.hw_bus.sda_o.eq(0),
                         c.en.eq(1),
                         self._in_fifo.r_en.eq(1),
-                        self.rw.eq(self._in_fifo_r_data.payload.start.rw),
-                        self.byte.eq(self._in_fifo_r_data.payload.data),
-                        self.byte_ix.eq(0),
+                        self._rw.eq(self._in_fifo_r_data.payload.start.rw),
+                        self._byte.eq(self._in_fifo_r_data.payload.data),
+                        self._byte_ix.eq(0),
                     ]
-                    fh(m, self.formal_start, True)
+                    fh(m, self._formal_start, True)
 
                     m.next = "START: WAIT SCL"
 
             with m.State("START: WAIT SCL"):
                 # SDA is low.
                 with m.If(c.full):
-                    fh(m, self.formal_scl, False)
+                    fh(m, self._formal_scl, False)
                     m.next = "WRITE DATA BIT: SCL LOW"
 
             # This comes from "START: WAIT SCL" or "WRITE ACK BIT: SCL HIGH".
@@ -253,28 +253,28 @@ class I2C(Component):
                 with m.If(c.half):
                     # Set SDA in prep for SCL high. (MSB)
                     m.d.sync += self.hw_bus.sda_o.eq(
-                        (self.byte >> (7 - self.byte_ix)[:3]) & 0x1
+                        (self._byte >> (7 - self._byte_ix)[:3]) & 0x1
                     )
                 with m.Elif(c.full):
-                    fh(m, self.formal_scl, True)
+                    fh(m, self._formal_scl, True)
                     m.next = "WRITE DATA BIT: SCL HIGH"
 
             with m.State("WRITE DATA BIT: SCL HIGH"):
                 with m.If(c.full):
-                    fh(m, self.formal_scl, False)
-                    with m.If(self.byte_ix == 7):
+                    fh(m, self._formal_scl, False)
+                    with m.If(self._byte_ix == 7):
                         # Let go of SDA.
                         m.d.sync += self.hw_bus.sda_oe.eq(0)
                         m.next = "WRITE ACK BIT: SCL LOW"
                         # Wait for next SCL^ before R/W.
                     with m.Else():
-                        m.d.sync += self.byte_ix.eq(self.byte_ix + 1)
+                        m.d.sync += self._byte_ix.eq(self._byte_ix + 1)
                         m.next = "WRITE DATA BIT: SCL LOW"
                         # Wait for next SCL^ before next data bit.
 
             with m.State("WRITE ACK BIT: SCL LOW"):
                 with m.If(c.full):
-                    fh(m, self.formal_scl, True)
+                    fh(m, self._formal_scl, True)
                     m.next = "WRITE ACK BIT: SCL HIGH"
 
             with m.State("WRITE ACK BIT: SCL HIGH"):
@@ -287,16 +287,16 @@ class I2C(Component):
 
             with m.State("READ DATA BIT: SCL LOW"):
                 with m.If(c.full):
-                    fh(m, self.formal_scl, True)
+                    fh(m, self._formal_scl, True)
                     m.next = "READ DATA BIT: SCL HIGH"
 
             with m.State("READ DATA BIT: SCL HIGH"):
                 with m.If(c.half):
-                    with m.If(self.byte_ix == 7):
+                    with m.If(self._byte_ix == 7):
                         m.d.sync += [
                             self._out_fifo.w_data.eq(
-                                self.byte
-                                | (self.hw_bus.sda_i << (7 - self.byte_ix)[:3])
+                                self._byte
+                                | (self.hw_bus.sda_i << (7 - self._byte_ix)[:3])
                             ),
                             self._out_fifo.w_en.eq(1),
                         ]
@@ -304,21 +304,21 @@ class I2C(Component):
 
                     with m.Else():
                         m.d.sync += [
-                            self.byte_ix.eq(self.byte_ix + 1),
-                            self.byte.eq(
-                                self.byte
-                                | (self.hw_bus.sda_i << (7 - self.byte_ix)[:3])
+                            self._byte_ix.eq(self._byte_ix + 1),
+                            self._byte.eq(
+                                self._byte
+                                | (self.hw_bus.sda_i << (7 - self._byte_ix)[:3])
                             ),
                         ]
 
                 with m.If(c.full):
-                    fh(m, self.formal_scl, False)
+                    fh(m, self._formal_scl, False)
                     m.next = "READ DATA BIT: SCL LOW"
 
             with m.State("READ DATA BIT (LAST): SCL HIGH"):
                 m.d.sync += self._out_fifo.w_en.eq(0)
                 with m.If(c.full):
-                    fh(m, self.formal_scl, False)
+                    fh(m, self._formal_scl, False)
                     m.next = "READ ACK BIT: SCL LOW"
 
             with m.State("READ ACK BIT: SCL LOW"):
@@ -335,21 +335,21 @@ class I2C(Component):
                         ),
                     ]
                 with m.Elif(c.full):
-                    fh(m, self.formal_scl, True)
+                    fh(m, self._formal_scl, True)
                     m.next = "COMMON ACK BIT: SCL HIGH"
 
             with m.State("COMMON ACK BIT: SCL HIGH"):
                 with m.If(c.full):
-                    fh(m, self.formal_scl, False)
+                    fh(m, self._formal_scl, False)
                     with m.If(self._in_fifo.r_rdy):
                         with m.If(
                             self.bus.ack
                             & (self._in_fifo_r_data.kind == Transfer.Kind.DATA)
-                            & (self.rw == RW.W)
+                            & (self._rw == RW.W)
                         ):
                             m.d.sync += [
-                                self.byte.eq(self._in_fifo_r_data.payload.data),
-                                self.byte_ix.eq(0),
+                                self._byte.eq(self._in_fifo_r_data.payload.data),
+                                self._byte_ix.eq(0),
                                 self._in_fifo.r_en.eq(1),
                                 self.hw_bus.sda_oe.eq(1),
                                 self.hw_bus.sda_o.eq(0),
@@ -358,11 +358,11 @@ class I2C(Component):
                         with m.Elif(
                             self.bus.ack
                             & (self._in_fifo_r_data.kind == Transfer.Kind.DATA)
-                            & (self.rw == RW.R)
+                            & (self._rw == RW.R)
                         ):
                             m.d.sync += [
-                                self.byte.eq(0),
-                                self.byte_ix.eq(0),
+                                self._byte.eq(0),
+                                self._byte_ix.eq(0),
                                 self._in_fifo.r_en.eq(1),
                                 self.hw_bus.sda_oe.eq(0),
                             ]
@@ -370,12 +370,12 @@ class I2C(Component):
                         with m.Elif(
                             self.bus.ack
                             & (self._in_fifo_r_data.kind == Transfer.Kind.START)
-                            & (self.rw == RW.W)
+                            & (self._rw == RW.W)
                         ):
                             m.d.sync += [
-                                self.rw.eq(self._in_fifo_r_data.payload.start.rw),
-                                self.byte.eq(self._in_fifo_r_data.payload.data),
-                                self.byte_ix.eq(0),
+                                self._rw.eq(self._in_fifo_r_data.payload.start.rw),
+                                self._byte.eq(self._in_fifo_r_data.payload.data),
+                                self._byte_ix.eq(0),
                                 self._in_fifo.r_en.eq(1),
                                 self.hw_bus.sda_oe.eq(1),
                                 self.hw_bus.sda_o.eq(0),
@@ -399,17 +399,17 @@ class I2C(Component):
                     # period.
                     m.d.sync += self.hw_bus.sda_o.eq(1)
                 with m.If(c.full):
-                    fh(m, self.formal_scl, True)
+                    fh(m, self._formal_scl, True)
                     m.next = "REP START: SCL HIGH"
 
             with m.State("REP START: SCL HIGH"):
                 # SDA is high.
                 with m.If(c.half):
                     # Bring SDA low mid SCL-high to repeat start.
-                    fh(m, self.formal_repeated_start, True)
+                    fh(m, self._formal_repeated_start, True)
                     m.d.sync += self.hw_bus.sda_o.eq(0)
                 with m.Elif(c.full):
-                    fh(m, self.formal_scl, False)
+                    fh(m, self._formal_scl, False)
                     m.next = "WRITE DATA BIT: SCL LOW"
 
             with m.State("FIN: SCL LOW"):
@@ -417,14 +417,14 @@ class I2C(Component):
                     # Bring SDA low during SCL low.
                     m.d.sync += self.hw_bus.sda_o.eq(0)
                 with m.Elif(c.full):
-                    fh(m, self.formal_scl, True)
+                    fh(m, self._formal_scl, True)
                     m.next = "FIN: SCL HIGH"
 
             with m.State("FIN: SCL HIGH"):
                 with m.If(c.half):
                     # Bring SDA high during SCL high to finish.
                     m.d.sync += self.hw_bus.sda_o.eq(1)
-                    fh(m, self.formal_stop, True)
+                    fh(m, self._formal_stop, True)
                 with m.Elif(c.full):
                     # Turn off the clock to keep SCL high.
                     m.d.sync += [
@@ -450,7 +450,7 @@ class I2CFormal(I2C):
 
     def __init__(self, *, speed: Hz):
         super().__init__(speed=speed)
-        self.formal_scl = Signal(reset=1, name="formal_scl")
-        self.formal_start = Signal(name="formal_start")
-        self.formal_repeated_start = Signal(name="formal_repeated_start")
-        self.formal_stop = Signal(name="formal_stop")
+        self._formal_scl = Signal(reset=1, name="formal_scl")
+        self._formal_start = Signal(name="formal_start")
+        self._formal_repeated_start = Signal(name="formal_repeated_start")
+        self._formal_stop = Signal(name="formal_stop")
