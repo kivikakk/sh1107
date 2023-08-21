@@ -193,7 +193,7 @@ class OLED(Component):
         self.elaborate_memory(m, platform)
         self.elaborate_submodules(m, platform)
 
-        # TODO: actually flash cursor when on
+        m.d.comb += self._cursor_c.en.eq(self._cursor_en)
 
         command = Signal(8)
 
@@ -236,19 +236,23 @@ class OLED(Component):
                 m.next = "INIT: WAIT SPIFR"
 
             with m.State("IDLE"):
-                with m.If(~self._chpr_run):
-                    with m.If(self.fifo_in.r_rdy & self.own_i2c_bus.in_fifo_w_rdy):
-                        m.d.sync += [
-                            command.eq(self.fifo_in.r_data),
-                            self.fifo_in.r_en.eq(1),
-                            self.result.eq(OLED.Result.BUSY),
-                        ]
-                        m.next = "START: STROBED FIFO_IN R_EN"
-                    with m.Elif(self._cursor_en &
-                        ((self._cursor_last_drawn_col != self._col) |
-                         (self._cursor_last_drawn_row != self._row))):
-                        m.d.sync += self._cursor_en.eq(0)
+                with m.If(self._cursor_c.full):
+                    with m.If(self._cursor_state):
+                        m.next = "CURSOR_OFF: RESET"
+                    with m.Else():
                         m.next = "CURSOR_ON: RESET"
+                with m.Elif(self.fifo_in.r_rdy & self.own_i2c_bus.in_fifo_w_rdy):
+                    m.d.sync += [
+                        command.eq(self.fifo_in.r_data),
+                        self.fifo_in.r_en.eq(1),
+                        self.result.eq(OLED.Result.BUSY),
+                    ]
+                    m.next = "START: STROBED FIFO_IN R_EN"
+                with m.Elif(self._cursor_en &
+                    ((self._cursor_last_drawn_col != self._col) |
+                     (self._cursor_last_drawn_row != self._row))):
+                    m.d.sync += self._cursor_en.eq(0)
+                    m.next = "CURSOR_ON: RESET"
 
             with m.State("START: STROBED FIFO_IN R_EN"):
                 m.d.sync += self.fifo_in.r_en.eq(0)
@@ -296,7 +300,10 @@ class OLED(Component):
                         m.next = "PRINT: COUNT: WAIT"
 
                     with m.Case(OLED.Command.CURSOR_ON):
-                        m.d.sync += self._cursor_en.eq(0)
+                        m.d.sync += [
+                            self._cursor_en.eq(0),
+                            self.result.eq(OLED.Result.SUCCESS),
+                        ]
                         m.next = "CURSOR_ON: RESET"
 
                     with m.Case(OLED.Command.CURSOR_OFF):
@@ -304,7 +311,7 @@ class OLED(Component):
                             self._cursor_en.eq(0),
                             self.result.eq(OLED.Result.SUCCESS),
                         ]
-                        m.next = "IDLE"
+                        m.next = "CURSOR_OFF: RESET"
 
                     with m.Case(OLED.Command.ID):
                         m.next = "ID: START"
@@ -323,7 +330,6 @@ class OLED(Component):
 
             with m.State("CURSOR_ON: RESET"):
                 m.d.sync += [
-                    self.result.eq(OLED.Result.SUCCESS),
                     self._chpr_data.eq(ord(self._cursor_char)),
                     self._chpr_advance.eq(0),
                     self._chpr_run.eq(1),
@@ -332,7 +338,20 @@ class OLED(Component):
                     self._cursor_last_drawn_row.eq(self._row),
                     self._cursor_last_drawn_col.eq(self._col),
                 ]
-                m.next = "IDLE"
+                m.next = "CURSOR_ON/OFF: CHPR RUNNING"
+
+            with m.State("CURSOR_OFF: RESET"):
+                m.d.sync += [
+                    self._chpr_data.eq(ord(" ")),
+                    self._chpr_advance.eq(0),
+                    self._chpr_run.eq(1),
+                    self._cursor_state.eq(0),
+                ]
+                m.next = "CURSOR_ON/OFF: CHPR RUNNING"
+
+            with m.State("CURSOR_ON/OFF: CHPR RUNNING"):
+                with m.If(~self._chpr_run):
+                    m.next = "IDLE"
 
             with m.State("CLSER: STROBED"):
                 m.d.sync += self._clser.stb.eq(0)
@@ -373,7 +392,6 @@ class OLED(Component):
                     m.next = "IDLE"
 
         self.chpr_fsm(m)
-        self.cursor_fsm(m)
 
         return m
 
@@ -887,29 +905,3 @@ class OLED(Component):
         with m.State("SPI_TEST: SECOND HALF: CHPR RUNNING"):
             with m.If(~self._chpr_run):
                 m.next = "SPI_TEST: WRITE LOOP"
-
-    def cursor_fsm(self, m: Module):
-        # When switching cursor on, initially display it.
-        # P: Note how detecting the edge necessitates the sync assignment
-        # (i.e. register), but that this is also sufficient!
-        m.d.sync += self._cursor_c.en.eq(self._cursor_en)
-        with m.If(self._cursor_en & ~self._cursor_c.en):
-            m.d.sync += self._cursor_state.eq(1)
-
-        with m.If(self._cursor_c.full & ~self._chpr_run):
-            with m.If(~self._cursor_state):
-                m.d.sync += [
-                    self._cursor_state.eq(1),
-                    self._chpr_data.eq(ord(self._cursor_char)),
-                    self._chpr_advance.eq(0),
-                    self._chpr_run.eq(1),
-                    self._cursor_last_drawn_row.eq(self._row),
-                    self._cursor_last_drawn_col.eq(self._col),
-                ]
-            with m.Else():
-                m.d.sync += [
-                    self._cursor_state.eq(0),
-                    self._chpr_data.eq(ord(" ")),
-                    self._chpr_advance.eq(0),
-                    self._chpr_run.eq(1),
-                ]
