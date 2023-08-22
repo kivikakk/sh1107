@@ -248,9 +248,13 @@ class OLED(Component):
                         self.result.eq(OLED.Result.BUSY),
                     ]
                     m.next = "START: STROBED FIFO_IN R_EN"
-                with m.Elif(self._cursor_en &
-                    ((self._cursor_last_drawn_col != self._col) |
-                     (self._cursor_last_drawn_row != self._row))):
+                with m.Elif(
+                    self._cursor_en
+                    & (
+                        (self._cursor_last_drawn_col != self._col)
+                        | (self._cursor_last_drawn_row != self._row)
+                    )
+                ):
                     m.d.sync += self._cursor_en.eq(0)
                     m.next = "CURSOR_ON: RESET"
 

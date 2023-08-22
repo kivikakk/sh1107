@@ -76,6 +76,7 @@ I2CHardwareBus = Signature(
     {
         "scl_o": Out(1, reset=1),
         "scl_oe": Out(1, reset=1),
+        "scl_i": In(1, reset=1),
         "sda_o": Out(1, reset=1),
         "sda_oe": Out(1, reset=1),
         "sda_i": In(1, reset=1),
@@ -202,16 +203,15 @@ class I2C(Component):
                 plat_i2c.scl.oe.eq(self.hw_bus.scl_oe),
                 plat_i2c.sda.o.eq(self.hw_bus.sda_o),
                 plat_i2c.sda.oe.eq(self.hw_bus.sda_oe),
+                self.hw_bus.scl_i.eq(plat_i2c.scl.i),
                 self.hw_bus.sda_i.eq(plat_i2c.sda.i),
             ]
 
-        m.d.comb += self.hw_bus.scl_oe.eq(1)
-        # NOTE(Mia): we might need to keep scl_o=0 and toggle scl_oe instead for
-        # clock stretching?
+        m.d.comb += self.hw_bus.scl_o.eq(0)
 
         m.submodules._c = c = self._c
         with m.If(c.full):
-            m.d.sync += self.hw_bus.scl_o.eq(~self.hw_bus.scl_o)
+            m.d.sync += self.hw_bus.scl_oe.eq(~self.hw_bus.scl_oe)
 
         m.d.sync += self._in_fifo.r_en.eq(0)
 
@@ -224,7 +224,7 @@ class I2C(Component):
                 m.d.sync += [
                     self.hw_bus.sda_oe.eq(1),
                     self.hw_bus.sda_o.eq(1),
-                    self.hw_bus.scl_o.eq(1),
+                    self.hw_bus.scl_oe.eq(0),
                 ]
 
                 with m.If(self.bus.stb & self._in_fifo.r_rdy):
@@ -430,7 +430,7 @@ class I2C(Component):
                     m.d.sync += [
                         c.en.eq(0),
                         self.bus.busy.eq(0),
-                        self.hw_bus.scl_o.eq(1),
+                        self.hw_bus.scl_oe.eq(0),
                     ]
                     m.next = "IDLE"
 
