@@ -20,11 +20,11 @@
     "amaranth": {
       "flake": false,
       "locked": {
-        "lastModified": 1692587983,
-        "narHash": "sha256-ZNayGDWlwVuwu2mho2M67a4mz4XK4GiG2ok6XwmXTKg=",
+        "lastModified": 1692618781,
+        "narHash": "sha256-XHq1WUUhlBydaVqb+RSic8d/Qp325qmp2+vm3+s/cZo=",
         "owner": "whitequark",
         "repo": "amaranth",
-        "rev": "7a9fa1eee488b66cd08260206b935d5add938cf1",
+        "rev": "f0d4eeaebce7d8e5ef33eedc36bd5b16832b7dae",
         "type": "github"
       },
       "original": {
@@ -375,11 +375,11 @@
         "nixpkgs": "nixpkgs_2"
       },
       "locked": {
-        "lastModified": 1692577245,
-        "narHash": "sha256-+hhC5OQc3GA4g1iORRlDOFZr/6Fjf+dwiThw/U3pta4=",
+        "lastModified": 1692663634,
+        "narHash": "sha256-wioqr80UOA0tNXaJy4D0i9fFaLG2RoQi5e9Dpd4WojE=",
         "owner": "mitchellh",
         "repo": "zig-overlay",
-        "rev": "90dbbb28495a345587ea445c4fc6c0334657a28d",
+        "rev": "d666e5137fe0c43353c555fb47748813084decab",
         "type": "github"
       },
       "original": {
