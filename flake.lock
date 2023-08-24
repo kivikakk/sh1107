@@ -20,11 +20,11 @@
     "amaranth": {
       "flake": false,
       "locked": {
-        "lastModified": 1692618781,
-        "narHash": "sha256-XHq1WUUhlBydaVqb+RSic8d/Qp325qmp2+vm3+s/cZo=",
-        "owner": "whitequark",
+        "lastModified": 1692787728,
+        "narHash": "sha256-SQaqgYII/PJctWwBqxhq1UZIlV+s7wVX7zYBawVTFuY=",
+        "owner": "amaranth-lang",
         "repo": "amaranth",
-        "rev": "f0d4eeaebce7d8e5ef33eedc36bd5b16832b7dae",
+        "rev": "f95fe451861066ae7e3ae6c9eb85778de5e949e0",
         "type": "github"
       },
       "original": {
@@ -102,11 +102,11 @@
         "systems": "systems"
       },
       "locked": {
-        "lastModified": 1689068808,
-        "narHash": "sha256-6ixXo3wt24N/melDWjq70UuHQLxGV8jZvooRanIHXw0=",
+        "lastModified": 1692799911,
+        "narHash": "sha256-3eihraek4qL744EvQXsK1Ha6C3CR7nnT8X2qWap4RNk=",
         "owner": "numtide",
         "repo": "flake-utils",
-        "rev": "919d646de7be200f3bf08cb76ae1f09402b6f9b4",
+        "rev": "f9e7cf818399d17d347f847525c5a5a8032e4e44",
         "type": "github"
       },
       "original": {
@@ -375,11 +375,11 @@
         "nixpkgs": "nixpkgs_2"
       },
       "locked": {
-        "lastModified": 1692663634,
-        "narHash": "sha256-wioqr80UOA0tNXaJy4D0i9fFaLG2RoQi5e9Dpd4WojE=",
+        "lastModified": 1692836417,
+        "narHash": "sha256-9IBc9a0Q4RTxiQ05yFCSHNjRRpXQuSKh3Xb3WCtYBmg=",
         "owner": "mitchellh",
         "repo": "zig-overlay",
-        "rev": "d666e5137fe0c43353c555fb47748813084decab",
+        "rev": "cb07d4626407c22046ddf44ae41490c6f5dd5cff",
         "type": "github"
       },
       "original": {
