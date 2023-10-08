@@ -46,7 +46,8 @@ def synchronise(i2c: I2C, start_value: int, *, wait_steps: int = 20) -> sim.Proc
     assert not (yield i2c.bus.in_fifo_w_en)
     assert (yield i2c.bus.in_fifo_r_rdy)
 
-    assert (yield i2c.hw_bus.scl_o)
+    assert not (yield i2c.hw_bus.scl_o)
+    assert not (yield i2c.hw_bus.scl_oe)
     assert (yield i2c.hw_bus.sda_o)
     yield Delay(sim.clock())
 
@@ -54,7 +55,7 @@ def synchronise(i2c: I2C, start_value: int, *, wait_steps: int = 20) -> sim.Proc
 def start(i2c: I2C) -> sim.Procedure:
     # Strobed.  I2C start condition.
     assert not (yield i2c.bus.stb)
-    assert (yield i2c.hw_bus.scl_o)
+    assert not (yield i2c.hw_bus.scl_oe)
     assert not (yield i2c.hw_bus.sda_o)
     yield Delay(5 * _tick(i2c))
 
@@ -139,6 +140,7 @@ class ValueChange(Enum):
                 return VCWFall(source)
 
 
+# As of clock stretching support, this actually checks (not scl_oe).
 def wait_scl(
     i2c: I2C,
     level: int,
@@ -146,7 +148,7 @@ def wait_scl(
     sda_o: ValueChange = ValueChange.DONT_CARE,
     sda_oe: ValueChange = ValueChange.STEADY,
 ) -> sim.Procedure:
-    assert (yield i2c.hw_bus.scl_o) != level
+    assert (yield i2c.hw_bus.scl_oe) == level
 
     vcw_sda_o = sda_o.watcher_for(i2c.hw_bus.sda_o)
     yield from vcw_sda_o.start()
@@ -159,7 +161,7 @@ def wait_scl(
         yield from vcw_sda_o.update()
         yield from vcw_sda_oe.update()
 
-        if (yield i2c.hw_bus.scl_o) == level:
+        if (yield i2c.hw_bus.scl_oe) != level:
             break
 
     vcw_sda_o.finish()
@@ -260,7 +262,7 @@ def stop(i2c: I2C) -> sim.Procedure:
     # Now while SCL is high, bring SDA high.
     while True:
         yield Delay(_tick(i2c))
-        assert (yield i2c.hw_bus.scl_o)
+        assert not (yield i2c.hw_bus.scl_oe)
         if (yield i2c.hw_bus.sda_o):
             break
 
@@ -268,7 +270,7 @@ def stop(i2c: I2C) -> sim.Procedure:
 def steady_stopped(i2c: I2C, *, wait_steps: int = 5) -> sim.Procedure:
     for _ in range(wait_steps):
         yield Delay(_tick(i2c))
-        assert (yield i2c.hw_bus.scl_o)
+        assert not (yield i2c.hw_bus.scl_oe)
         assert (yield i2c.hw_bus.sda_o)
 
     assert not (
