@@ -92,7 +92,7 @@
             AudioToolbox
             AppKit
             CoreAudio
-            # CoreHaptics XXX
+            CoreHaptics
             Metal
             QuartzCore
             Carbon
