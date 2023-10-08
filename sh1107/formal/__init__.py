@@ -103,6 +103,12 @@ def prep_formal() -> Tuple[Module, list[Signal | Value]]:
     sda_o = dut.hw_bus.sda_o
     sda_o_past = past(m, sda_o)
 
+    formal_start = dut._formal_start
+    assert formal_start
+
+    formal_repeated_start = dut._formal_repeated_start
+    assert formal_repeated_start
+
     # Start with no strobes high.
     with m.If(Initial()):
         m.d.comb += Assume(~stb & ~in_fifo_w_en)
@@ -135,11 +141,8 @@ def prep_formal() -> Tuple[Module, list[Signal | Value]]:
     m.d.comb += Cover(start_cond)
     m.d.comb += Assert(~scl_oe == dut._formal_scl)
     m.d.comb += Assert(
-        (~start_cond & ~dut._formal_start & ~dut._formal_repeated_start)
-        | (
-            (start_cond == dut._formal_start)
-            ^ (start_cond == dut._formal_repeated_start)
-        )
+        (~start_cond & ~formal_start & ~formal_repeated_start)
+        | ((start_cond == formal_start) ^ (start_cond == formal_repeated_start))
     )
 
     # SDA released to look for ACK

@@ -6,7 +6,7 @@ import unittest
 from contextlib import contextmanager
 from typing import Any, Callable, Iterator, Optional, Self, Tuple
 
-from amaranth import Elaboratable, Record, Signal
+from amaranth import Elaboratable, Signal
 from amaranth.hdl.ast import Operator, Statement
 from amaranth.hdl.ir import Fragment
 from amaranth.lib.fifo import SyncFIFO
@@ -47,7 +47,7 @@ def override_clock(new_clock: Optional[float]) -> Iterator[None]:
         _active_clock = old_sim_clock
 
 
-ValueLike = Signal | Record | Delay | Settle | Statement | Operator | None
+ValueLike = Signal | Delay | Settle | Statement | Operator | None
 
 T = typing.TypeVar("T")
 Generator = typing.Generator[ValueLike, bool | int, T]

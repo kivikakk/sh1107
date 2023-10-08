@@ -2,6 +2,7 @@ from typing import Final, Optional, Self, cast
 
 from amaranth import Elaboratable, Module, Signal
 from amaranth.build import Attrs
+from amaranth.hdl.ast import Display
 from amaranth.lib import data, enum
 from amaranth.lib.fifo import SyncFIFO
 from amaranth.lib.wiring import Component, In, Out, Signature
@@ -218,12 +219,14 @@ class I2C(Component):
             # progress and wait >= 1 cycle(s) until SCL reads as high.
             with m.If(self.hw_bus.scl_oe):
                 m.d.sync += [
-                    c.en.eq(0),
-                    stretch_wait.eq(1),
+                    # Display("starting clock stretch"),
+                    # c.en.eq(0),
+                    # stretch_wait.eq(1),
                 ]
 
         with m.If(stretch_wait & self.hw_bus.scl_i):
             m.d.sync += [
+                Display("stopping clock stretch"),
                 c.en.eq(1),
                 stretch_wait.eq(0),
             ]
@@ -458,11 +461,6 @@ def fh(m: Module, s: Optional[Signal], high: bool):
 
 
 class I2CFormal(I2C):
-    _formal_scl: Signal
-    _formal_start: Signal
-    _formal_repeated_start: Signal
-    _formal_stop: Signal
-
     def __init__(self, *, speed: Hz):
         super().__init__(speed=speed)
         self._formal_scl = Signal(reset=1, name="formal_scl")

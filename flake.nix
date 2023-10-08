@@ -8,7 +8,7 @@
       flake = false;
     };
     hdx.url = github:charlottia/hdx?ref=v0.2;
-    hdx.inputs.amaranth.url = github:amaranth-lang/amaranth;
+    hdx.inputs.amaranth.url = github:charlottia/amaranth?ref=wip;
     zig.url = github:mitchellh/zig-overlay;
   };
 
