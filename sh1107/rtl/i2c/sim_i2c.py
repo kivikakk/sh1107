@@ -185,24 +185,16 @@ class SimI2C:
     def start(self) -> sim.Procedure:
         # Strobed.  I2C start condition.
         assert not (yield self.i2c.bus.stb)
-        assert not (yield self.i2c.hw_bus.scl_oe)
         assert not (yield self.i2c.hw_bus.sda_o)
-        yield Delay(5 * _tick(self.i2c))
+
+        yield from self.wait_scl(0, sda_o=ValueChange.STEADY)
 
         # I2C clock starts.
-        assert (yield self.i2c.hw_bus.scl_oe)
         assert not (yield self.i2c.hw_bus.sda_o)
 
     def repeated_start(self) -> sim.Procedure:
-        assert (yield self.i2c.hw_bus.scl_oe)
-        yield Delay(5 * _tick(self.i2c))
-
-        assert (yield self.i2c.hw_bus.sda_o)
-        yield Delay(5 * _tick(self.i2c))
-
-        # I2C clock starts.
-        assert (yield self.i2c.hw_bus.scl_oe)
-        assert not (yield self.i2c.hw_bus.sda_o)
+        yield from self.wait_scl(1, sda_o=ValueChange.RISE)
+        yield from self.wait_scl(0, sda_o=ValueChange.FALL)
 
     # As of clock stretching support, this actually checks (not scl_oe).
     def wait_scl(
@@ -212,7 +204,9 @@ class SimI2C:
         sda_o: ValueChange = ValueChange.DONT_CARE,
         sda_oe: ValueChange = ValueChange.STEADY,
     ) -> sim.Procedure:
-        assert (yield self.i2c.hw_bus.scl_oe) == level
+        assert (
+            yield self.i2c.hw_bus.scl_oe
+        ) == level, f"scl_oe is {(yield self.i2c.hw_bus.scl_oe)}"
 
         vcw_sda_o = sda_o.watcher_for(self.i2c.hw_bus.sda_o)
         yield from vcw_sda_o.start()
