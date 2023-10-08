@@ -104,10 +104,10 @@ def prep_formal() -> Tuple[Module, list[Signal | Value]]:
     sda_o_past = past(m, sda_o)
 
     formal_start = dut._formal_start
-    assert formal_start
+    assert formal_start is not None
 
     formal_repeated_start = dut._formal_repeated_start
-    assert formal_repeated_start
+    assert formal_repeated_start is not None
 
     # Start with no strobes high.
     with m.If(Initial()):
