@@ -75,7 +75,7 @@ I2CBus = Signature(
 I2CHardwareBus = Signature(
     {
         "scl_o": Out(1, reset=1),
-        "scl_oe": Out(1, reset=1),
+        "scl_oe": Out(1, reset=0),
         "scl_i": In(1, reset=1),
         "sda_o": Out(1, reset=1),
         "sda_oe": Out(1, reset=1),

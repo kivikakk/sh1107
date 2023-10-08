@@ -94,8 +94,8 @@ def prep_formal() -> Tuple[Module, list[Signal | Value]]:
 
     byte_ix = dut._byte_ix
 
-    scl_o = dut.hw_bus.scl_o
-    scl_o_past = past(m, scl_o)
+    scl_oe = dut.hw_bus.scl_oe
+    scl_oe_past = past(m, scl_oe)
 
     sda_oe = dut.hw_bus.sda_oe
     # sda_oe_past = past(m, sda_oe)
@@ -123,7 +123,7 @@ def prep_formal() -> Tuple[Module, list[Signal | Value]]:
     m.d.comb += Cover((stb_past & ~stb) & (~in_fifo_r_en_past & ~in_fifo_r_en))
 
     # Just make sure we see some activity.
-    m.d.comb += Cover(scl_o_past & ~scl_o)
+    m.d.comb += Cover(scl_oe_past & ~scl_oe)
     m.d.comb += Cover(sda_o_past & ~sda_o)
     m.d.comb += Cover(busy)
 
@@ -131,9 +131,9 @@ def prep_formal() -> Tuple[Module, list[Signal | Value]]:
     m.d.comb += Cover(byte_ix == 1)
 
     # START condition: SDA falls while SCL high
-    start_cond = scl_o_past & scl_o & sda_o_past & ~sda_o
+    start_cond = ~scl_oe_past & ~scl_oe & sda_o_past & ~sda_o
     m.d.comb += Cover(start_cond)
-    m.d.comb += Assert(scl_o == dut._formal_scl)
+    m.d.comb += Assert(~scl_oe == dut._formal_scl)
     m.d.comb += Assert(
         (~start_cond & ~dut._formal_start & ~dut._formal_repeated_start)
         | (
@@ -156,7 +156,7 @@ def prep_formal() -> Tuple[Module, list[Signal | Value]]:
 
     # SDA should be stable when SCL is high, unless START or STOP.
     # NOTE: pasts_valid doesn't seem to be necessary.
-    with m.If(scl_o & pasts_valid):
+    with m.If(~scl_oe & pasts_valid):
         m.d.comb += Assert(
             (sda_o_past == sda_o)
             | dut._formal_start
