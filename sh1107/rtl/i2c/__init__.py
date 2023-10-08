@@ -209,9 +209,24 @@ class I2C(Component):
 
         m.d.comb += self.hw_bus.scl_o.eq(0)
 
+        stretch_wait = Signal()
         m.submodules._c = c = self._c
         with m.If(c.full):
             m.d.sync += self.hw_bus.scl_oe.eq(~self.hw_bus.scl_oe)
+
+            # If we're releasing SCL this cycle, switch off the counter to prevent
+            # progress and wait >= 1 cycle(s) until SCL reads as high.
+            with m.If(self.hw_bus.scl_oe):
+                m.d.sync += [
+                    c.en.eq(0),
+                    stretch_wait.eq(1),
+                ]
+
+        with m.If(stretch_wait & self.hw_bus.scl_i):
+            m.d.sync += [
+                c.en.eq(1),
+                stretch_wait.eq(0),
+            ]
 
         m.d.sync += self._in_fifo.r_en.eq(0)
 
