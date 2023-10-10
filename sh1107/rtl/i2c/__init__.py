@@ -3,6 +3,7 @@ from typing import Final, Optional, Self, cast
 from amaranth import Elaboratable, Module, Signal
 from amaranth.build import Attrs
 from amaranth.lib import data, enum
+from amaranth.lib.cdc import FFSynchronizer
 from amaranth.lib.fifo import SyncFIFO
 from amaranth.lib.wiring import Component, In, Out, Signature
 from amaranth_boards.resources import I2CResource
@@ -203,13 +204,21 @@ class I2C(Component):
                 plat_i2c.scl.oe.eq(self.hw_bus.scl_oe),
                 plat_i2c.sda.o.eq(self.hw_bus.sda_o),
                 plat_i2c.sda.oe.eq(self.hw_bus.sda_oe),
-                self.hw_bus.scl_i.eq(plat_i2c.scl.i),
-                self.hw_bus.sda_i.eq(plat_i2c.sda.i),
             ]
+            if False:
+                m.submodules += [
+                    FFSynchronizer(plat_i2c.scl.i, self.hw_bus.scl_i),
+                    FFSynchronizer(plat_i2c.sda.i, self.hw_bus.sda_i),
+                ]
+            else:
+                m.d.comb += [
+                    self.hw_bus.scl_i.eq(plat_i2c.scl.i),
+                    self.hw_bus.sda_i.eq(plat_i2c.sda.i),
+                ]
 
         m.d.comb += self.hw_bus.scl_o.eq(0)
 
-        stretch_wait = Signal()
+        stretch_wait = Signal(range(3))
         m.submodules._c = c = self._c
         with m.If(c.full):
             m.d.sync += self.hw_bus.scl_oe.eq(~self.hw_bus.scl_oe)
@@ -222,7 +231,9 @@ class I2C(Component):
                     stretch_wait.eq(1),
                 ]
 
-        with m.If(stretch_wait & self.hw_bus.scl_i):
+        with m.If(stretch_wait == 1):
+            m.d.sync += stretch_wait.eq(2)
+        with m.Elif(stretch_wait == 2 & self.hw_bus.scl_i):
             m.d.sync += [
                 c.en.eq(1),
                 stretch_wait.eq(0),
@@ -234,220 +245,221 @@ class I2C(Component):
         fh(m, self._formal_repeated_start, False)
         fh(m, self._formal_stop, False)
 
-        with m.FSM():
-            with m.State("IDLE"):
-                m.d.sync += [
-                    self.hw_bus.sda_oe.eq(1),
-                    self.hw_bus.sda_o.eq(1),
-                    self.hw_bus.scl_oe.eq(0),
-                ]
-
-                with m.If(self.bus.stb & self._in_fifo.r_rdy):
-                    m.d.sync += [
-                        self.bus.busy.eq(1),
-                        self.bus.ack.eq(1),
-                        self.hw_bus.sda_o.eq(0),
-                        c.en.eq(1),
-                        self._in_fifo.r_en.eq(1),
-                        self._rw.eq(self._in_fifo_r_data.payload.start.rw),
-                        self._byte.eq(self._in_fifo_r_data.payload.data),
-                        self._byte_ix.eq(0),
-                    ]
-                    fh(m, self._formal_start, True)
-
-                    m.next = "START: WAIT SCL"
-
-            with m.State("START: WAIT SCL"):
-                # SDA is low.
-                with m.If(c.full):
-                    fh(m, self._formal_scl, False)
-                    m.next = "WRITE DATA BIT: SCL LOW"
-
-            # This comes from "START: WAIT SCL" or "WRITE ACK BIT: SCL HIGH".
-            with m.State("WRITE DATA BIT: SCL LOW"):
-                with m.If(c.half):
-                    # Set SDA in prep for SCL high. (MSB)
-                    m.d.sync += self.hw_bus.sda_o.eq(
-                        (self._byte >> (7 - self._byte_ix)[:3]) & 0x1
-                    )
-                with m.Elif(c.full):
-                    fh(m, self._formal_scl, True)
-                    m.next = "WRITE DATA BIT: SCL HIGH"
-
-            with m.State("WRITE DATA BIT: SCL HIGH"):
-                with m.If(c.full):
-                    fh(m, self._formal_scl, False)
-                    with m.If(self._byte_ix == 7):
-                        # Let go of SDA.
-                        m.d.sync += self.hw_bus.sda_oe.eq(0)
-                        m.next = "WRITE ACK BIT: SCL LOW"
-                        # Wait for next SCL^ before R/W.
-                    with m.Else():
-                        m.d.sync += self._byte_ix.eq(self._byte_ix + 1)
-                        m.next = "WRITE DATA BIT: SCL LOW"
-                        # Wait for next SCL^ before next data bit.
-
-            with m.State("WRITE ACK BIT: SCL LOW"):
-                with m.If(c.full):
-                    fh(m, self._formal_scl, True)
-                    m.next = "WRITE ACK BIT: SCL HIGH"
-
-            with m.State("WRITE ACK BIT: SCL HIGH"):
-                with m.If(c.half):
-                    # Read ACK. SDA should be brought low by the addressee.
-                    # Don't take SDA back until end of the cycle, otherwise it
-                    # looks like a STOP condition if sda_o was left high.
-                    m.d.sync += self.bus.ack.eq(~self.hw_bus.sda_i)
-                    m.next = "COMMON ACK BIT: SCL HIGH"
-
-            with m.State("READ DATA BIT: SCL LOW"):
-                with m.If(c.full):
-                    fh(m, self._formal_scl, True)
-                    m.next = "READ DATA BIT: SCL HIGH"
-
-            with m.State("READ DATA BIT: SCL HIGH"):
-                with m.If(c.half):
-                    with m.If(self._byte_ix == 7):
-                        m.d.sync += [
-                            self._out_fifo.w_data.eq(
-                                self._byte
-                                | (self.hw_bus.sda_i << (7 - self._byte_ix)[:3])
-                            ),
-                            self._out_fifo.w_en.eq(1),
-                        ]
-                        m.next = "READ DATA BIT (LAST): SCL HIGH"
-
-                    with m.Else():
-                        m.d.sync += [
-                            self._byte_ix.eq(self._byte_ix + 1),
-                            self._byte.eq(
-                                self._byte
-                                | (self.hw_bus.sda_i << (7 - self._byte_ix)[:3])
-                            ),
-                        ]
-
-                with m.If(c.full):
-                    fh(m, self._formal_scl, False)
-                    m.next = "READ DATA BIT: SCL LOW"
-
-            with m.State("READ DATA BIT (LAST): SCL HIGH"):
-                m.d.sync += self._out_fifo.w_en.eq(0)
-                with m.If(c.full):
-                    fh(m, self._formal_scl, False)
-                    m.next = "READ ACK BIT: SCL LOW"
-
-            with m.State("READ ACK BIT: SCL LOW"):
-                with m.If(c.half):
-                    # Take back SDA & set.
-                    # If the next byte is more data, we want to read more, so bring SDA low.
+        with m.If(stretch_wait == 0):
+            with m.FSM():
+                with m.State("IDLE"):
                     m.d.sync += [
                         self.hw_bus.sda_oe.eq(1),
-                        self.hw_bus.sda_o.eq(
-                            ~(
-                                (self._in_fifo.r_rdy)
-                                & (self._in_fifo_r_data.kind == Transfer.Kind.DATA)
-                            )
-                        ),
-                    ]
-                with m.Elif(c.full):
-                    fh(m, self._formal_scl, True)
-                    m.next = "COMMON ACK BIT: SCL HIGH"
-
-            with m.State("COMMON ACK BIT: SCL HIGH"):
-                with m.If(c.full):
-                    fh(m, self._formal_scl, False)
-                    with m.If(self._in_fifo.r_rdy):
-                        with m.If(
-                            self.bus.ack
-                            & (self._in_fifo_r_data.kind == Transfer.Kind.DATA)
-                            & (self._rw == RW.W)
-                        ):
-                            m.d.sync += [
-                                self._byte.eq(self._in_fifo_r_data.payload.data),
-                                self._byte_ix.eq(0),
-                                self._in_fifo.r_en.eq(1),
-                                self.hw_bus.sda_oe.eq(1),
-                                self.hw_bus.sda_o.eq(0),
-                            ]
-                            m.next = "WRITE DATA BIT: SCL LOW"
-                        with m.Elif(
-                            self.bus.ack
-                            & (self._in_fifo_r_data.kind == Transfer.Kind.DATA)
-                            & (self._rw == RW.R)
-                        ):
-                            m.d.sync += [
-                                self._byte.eq(0),
-                                self._byte_ix.eq(0),
-                                self._in_fifo.r_en.eq(1),
-                                self.hw_bus.sda_oe.eq(0),
-                            ]
-                            m.next = "READ DATA BIT: SCL LOW"
-                        with m.Elif(
-                            self.bus.ack
-                            & (self._in_fifo_r_data.kind == Transfer.Kind.START)
-                            & (self._rw == RW.W)
-                        ):
-                            m.d.sync += [
-                                self._rw.eq(self._in_fifo_r_data.payload.start.rw),
-                                self._byte.eq(self._in_fifo_r_data.payload.data),
-                                self._byte_ix.eq(0),
-                                self._in_fifo.r_en.eq(1),
-                                self.hw_bus.sda_oe.eq(1),
-                                self.hw_bus.sda_o.eq(0),
-                            ]
-                            m.next = "REP START: SCL LOW"
-                        with m.Else():
-                            # Consume anything that got queued before the NACK was realised.
-                            # TODO: might need to do a few more times
-                            m.d.sync += [
-                                self._in_fifo.r_en.eq(1),
-                                self.hw_bus.sda_oe.eq(1),
-                            ]
-                            m.next = "FIN: SCL LOW"
-                    with m.Else():
-                        m.d.sync += self.hw_bus.sda_oe.eq(1)
-                        m.next = "FIN: SCL LOW"
-
-            with m.State("REP START: SCL LOW"):
-                with m.If(c.half):
-                    # Bring SDA high so we can drop it during the SCL high
-                    # period.
-                    m.d.sync += self.hw_bus.sda_o.eq(1)
-                with m.If(c.full):
-                    fh(m, self._formal_scl, True)
-                    m.next = "REP START: SCL HIGH"
-
-            with m.State("REP START: SCL HIGH"):
-                # SDA is high.
-                with m.If(c.half):
-                    # Bring SDA low mid SCL-high to repeat start.
-                    fh(m, self._formal_repeated_start, True)
-                    m.d.sync += self.hw_bus.sda_o.eq(0)
-                with m.Elif(c.full):
-                    fh(m, self._formal_scl, False)
-                    m.next = "WRITE DATA BIT: SCL LOW"
-
-            with m.State("FIN: SCL LOW"):
-                with m.If(c.half):
-                    # Bring SDA low during SCL low.
-                    m.d.sync += self.hw_bus.sda_o.eq(0)
-                with m.Elif(c.full):
-                    fh(m, self._formal_scl, True)
-                    m.next = "FIN: SCL HIGH"
-
-            with m.State("FIN: SCL HIGH"):
-                with m.If(c.half):
-                    # Bring SDA high during SCL high to finish.
-                    m.d.sync += self.hw_bus.sda_o.eq(1)
-                    fh(m, self._formal_stop, True)
-                with m.Elif(c.full):
-                    # Turn off the clock to keep SCL high.
-                    m.d.sync += [
-                        c.en.eq(0),
-                        self.bus.busy.eq(0),
+                        self.hw_bus.sda_o.eq(1),
                         self.hw_bus.scl_oe.eq(0),
                     ]
-                    m.next = "IDLE"
+
+                    with m.If(self.bus.stb & self._in_fifo.r_rdy):
+                        m.d.sync += [
+                            self.bus.busy.eq(1),
+                            self.bus.ack.eq(1),
+                            self.hw_bus.sda_o.eq(0),
+                            c.en.eq(1),
+                            self._in_fifo.r_en.eq(1),
+                            self._rw.eq(self._in_fifo_r_data.payload.start.rw),
+                            self._byte.eq(self._in_fifo_r_data.payload.data),
+                            self._byte_ix.eq(0),
+                        ]
+                        fh(m, self._formal_start, True)
+
+                        m.next = "START: WAIT SCL"
+
+                with m.State("START: WAIT SCL"):
+                    # SDA is low.
+                    with m.If(c.full):
+                        fh(m, self._formal_scl, False)
+                        m.next = "WRITE DATA BIT: SCL LOW"
+
+                # This comes from "START: WAIT SCL" or "WRITE ACK BIT: SCL HIGH".
+                with m.State("WRITE DATA BIT: SCL LOW"):
+                    with m.If(c.half):
+                        # Set SDA in prep for SCL high. (MSB)
+                        m.d.sync += self.hw_bus.sda_o.eq(
+                            (self._byte >> (7 - self._byte_ix)[:3]) & 0x1
+                        )
+                    with m.Elif(c.full):
+                        fh(m, self._formal_scl, True)
+                        m.next = "WRITE DATA BIT: SCL HIGH"
+
+                with m.State("WRITE DATA BIT: SCL HIGH"):
+                    with m.If(c.full):
+                        fh(m, self._formal_scl, False)
+                        with m.If(self._byte_ix == 7):
+                            # Let go of SDA.
+                            m.d.sync += self.hw_bus.sda_oe.eq(0)
+                            m.next = "WRITE ACK BIT: SCL LOW"
+                            # Wait for next SCL^ before R/W.
+                        with m.Else():
+                            m.d.sync += self._byte_ix.eq(self._byte_ix + 1)
+                            m.next = "WRITE DATA BIT: SCL LOW"
+                            # Wait for next SCL^ before next data bit.
+
+                with m.State("WRITE ACK BIT: SCL LOW"):
+                    with m.If(c.full):
+                        fh(m, self._formal_scl, True)
+                        m.next = "WRITE ACK BIT: SCL HIGH"
+
+                with m.State("WRITE ACK BIT: SCL HIGH"):
+                    with m.If(c.half):
+                        # Read ACK. SDA should be brought low by the addressee.
+                        # Don't take SDA back until end of the cycle, otherwise it
+                        # looks like a STOP condition if sda_o was left high.
+                        m.d.sync += self.bus.ack.eq(~self.hw_bus.sda_i)
+                        m.next = "COMMON ACK BIT: SCL HIGH"
+
+                with m.State("READ DATA BIT: SCL LOW"):
+                    with m.If(c.full):
+                        fh(m, self._formal_scl, True)
+                        m.next = "READ DATA BIT: SCL HIGH"
+
+                with m.State("READ DATA BIT: SCL HIGH"):
+                    with m.If(c.half):
+                        with m.If(self._byte_ix == 7):
+                            m.d.sync += [
+                                self._out_fifo.w_data.eq(
+                                    self._byte
+                                    | (self.hw_bus.sda_i << (7 - self._byte_ix)[:3])
+                                ),
+                                self._out_fifo.w_en.eq(1),
+                            ]
+                            m.next = "READ DATA BIT (LAST): SCL HIGH"
+
+                        with m.Else():
+                            m.d.sync += [
+                                self._byte_ix.eq(self._byte_ix + 1),
+                                self._byte.eq(
+                                    self._byte
+                                    | (self.hw_bus.sda_i << (7 - self._byte_ix)[:3])
+                                ),
+                            ]
+
+                    with m.If(c.full):
+                        fh(m, self._formal_scl, False)
+                        m.next = "READ DATA BIT: SCL LOW"
+
+                with m.State("READ DATA BIT (LAST): SCL HIGH"):
+                    m.d.sync += self._out_fifo.w_en.eq(0)
+                    with m.If(c.full):
+                        fh(m, self._formal_scl, False)
+                        m.next = "READ ACK BIT: SCL LOW"
+
+                with m.State("READ ACK BIT: SCL LOW"):
+                    with m.If(c.half):
+                        # Take back SDA & set.
+                        # If the next byte is more data, we want to read more, so bring SDA low.
+                        m.d.sync += [
+                            self.hw_bus.sda_oe.eq(1),
+                            self.hw_bus.sda_o.eq(
+                                ~(
+                                    (self._in_fifo.r_rdy)
+                                    & (self._in_fifo_r_data.kind == Transfer.Kind.DATA)
+                                )
+                            ),
+                        ]
+                    with m.Elif(c.full):
+                        fh(m, self._formal_scl, True)
+                        m.next = "COMMON ACK BIT: SCL HIGH"
+
+                with m.State("COMMON ACK BIT: SCL HIGH"):
+                    with m.If(c.full):
+                        fh(m, self._formal_scl, False)
+                        with m.If(self._in_fifo.r_rdy):
+                            with m.If(
+                                self.bus.ack
+                                & (self._in_fifo_r_data.kind == Transfer.Kind.DATA)
+                                & (self._rw == RW.W)
+                            ):
+                                m.d.sync += [
+                                    self._byte.eq(self._in_fifo_r_data.payload.data),
+                                    self._byte_ix.eq(0),
+                                    self._in_fifo.r_en.eq(1),
+                                    self.hw_bus.sda_oe.eq(1),
+                                    self.hw_bus.sda_o.eq(0),
+                                ]
+                                m.next = "WRITE DATA BIT: SCL LOW"
+                            with m.Elif(
+                                self.bus.ack
+                                & (self._in_fifo_r_data.kind == Transfer.Kind.DATA)
+                                & (self._rw == RW.R)
+                            ):
+                                m.d.sync += [
+                                    self._byte.eq(0),
+                                    self._byte_ix.eq(0),
+                                    self._in_fifo.r_en.eq(1),
+                                    self.hw_bus.sda_oe.eq(0),
+                                ]
+                                m.next = "READ DATA BIT: SCL LOW"
+                            with m.Elif(
+                                self.bus.ack
+                                & (self._in_fifo_r_data.kind == Transfer.Kind.START)
+                                & (self._rw == RW.W)
+                            ):
+                                m.d.sync += [
+                                    self._rw.eq(self._in_fifo_r_data.payload.start.rw),
+                                    self._byte.eq(self._in_fifo_r_data.payload.data),
+                                    self._byte_ix.eq(0),
+                                    self._in_fifo.r_en.eq(1),
+                                    self.hw_bus.sda_oe.eq(1),
+                                    self.hw_bus.sda_o.eq(0),
+                                ]
+                                m.next = "REP START: SCL LOW"
+                            with m.Else():
+                                # Consume anything that got queued before the NACK was realised.
+                                # TODO: might need to do a few more times
+                                m.d.sync += [
+                                    self._in_fifo.r_en.eq(1),
+                                    self.hw_bus.sda_oe.eq(1),
+                                ]
+                                m.next = "FIN: SCL LOW"
+                        with m.Else():
+                            m.d.sync += self.hw_bus.sda_oe.eq(1)
+                            m.next = "FIN: SCL LOW"
+
+                with m.State("REP START: SCL LOW"):
+                    with m.If(c.half):
+                        # Bring SDA high so we can drop it during the SCL high
+                        # period.
+                        m.d.sync += self.hw_bus.sda_o.eq(1)
+                    with m.If(c.full):
+                        fh(m, self._formal_scl, True)
+                        m.next = "REP START: SCL HIGH"
+
+                with m.State("REP START: SCL HIGH"):
+                    # SDA is high.
+                    with m.If(c.half):
+                        # Bring SDA low mid SCL-high to repeat start.
+                        fh(m, self._formal_repeated_start, True)
+                        m.d.sync += self.hw_bus.sda_o.eq(0)
+                    with m.Elif(c.full):
+                        fh(m, self._formal_scl, False)
+                        m.next = "WRITE DATA BIT: SCL LOW"
+
+                with m.State("FIN: SCL LOW"):
+                    with m.If(c.half):
+                        # Bring SDA low during SCL low.
+                        m.d.sync += self.hw_bus.sda_o.eq(0)
+                    with m.Elif(c.full):
+                        fh(m, self._formal_scl, True)
+                        m.next = "FIN: SCL HIGH"
+
+                with m.State("FIN: SCL HIGH"):
+                    with m.If(c.half):
+                        # Bring SDA high during SCL high to finish.
+                        m.d.sync += self.hw_bus.sda_o.eq(1)
+                        fh(m, self._formal_stop, True)
+                    with m.Elif(c.full):
+                        # Turn off the clock to keep SCL high.
+                        m.d.sync += [
+                            c.en.eq(0),
+                            self.bus.busy.eq(0),
+                            self.hw_bus.scl_oe.eq(0),
+                        ]
+                        m.next = "IDLE"
 
         return m
 
