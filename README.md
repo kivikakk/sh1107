@@ -81,7 +81,7 @@ To run formal tests:
 * [Z3] (4.12+ is known to work; 4.8 is known not to)
 
 [notes-0001]: https://lottia.net/notes/0001-hdl-toolchain-source.html
-[hdx]: https://github.com/charlottia/hdx
+[hdx]: https://github.com/kivikakk/hdx
 [Python 3]: https://www.python.org
 [`d218273`]: https://github.com/amaranth-lang/amaranth/commit/d218273b9b2c6e65b7d92eb0f280306ea9c07ea3
 [amaranth-boards]: https://github.com/amaranth-lang/amaranth-boards

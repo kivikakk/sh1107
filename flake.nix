@@ -7,8 +7,8 @@
       url = github:edolstra/flake-compat;
       flake = false;
     };
-    hdx.url = github:charlottia/hdx?ref=v0.2;
-    hdx.inputs.amaranth.url = github:charlottia/amaranth?ref=wip;
+    hdx.url = github:kivikakk/hdx?ref=v0.2;
+    hdx.inputs.amaranth.url = github:kivikakk/amaranth?ref=wip;
     zig.url = github:mitchellh/zig-overlay;
   };
 
