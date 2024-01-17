@@ -1,4 +1,4 @@
-# sh1107
+# [sh1107](https://hrzn.ee/kivikakk/sh1107)
 
 [![Build status]](https://buildkite.com/hrzn/sh1107)
 
