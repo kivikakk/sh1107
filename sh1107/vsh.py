@@ -141,7 +141,7 @@ def main(args: Namespace):
                 "-DCXXRTL_INCLUDE_CAPI_IMPL",
                 "-DCXXRTL_INCLUDE_VCD_CAPI_IMPL",
                 "-I" + str(path(".")),
-                "-I" + str(cast(Path, yosys.data_dir()) / "include"),
+                "-I" + str(cast(Path, yosys.data_dir()) / "include" / "backends" / "cxxrtl" / "runtime"),
                 "-c",
                 cc_path,
                 "-o",

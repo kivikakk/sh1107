@@ -184,7 +184,7 @@ fn dtStart(self: *Display) void {
 }
 
 fn drawOLED(self: *Display, sh1107: *const SH1107) void {
-    if (self.fpga_thread.idata_stale.compareAndSwap(true, false, .Acquire, .Monotonic) == null) {
+    if (self.fpga_thread.idata_stale.cmpxchgStrong(true, false, .Acquire, .Monotonic) == null) {
         self.fpga_thread.idata_mutex.lock();
         defer self.fpga_thread.idata_mutex.unlock();
         self.img.setData(gk.math.Color, &self.fpga_thread.idata);

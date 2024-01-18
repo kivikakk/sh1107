@@ -1,4 +1,5 @@
 from amaranth import Elaboratable, Module, Value
+from amaranth.lib.data import ValueCastable
 from amaranth.lib.wiring import Component, In, Out, Signature
 
 from ...platform import Platform
@@ -15,22 +16,16 @@ class TestI2CTop(Component):
     def __init__(self, data: list[int | Value], *, speed: Hz):
         assert len(data) >= 1
         for datum in data:
-            assert isinstance(datum, Value) or (0 <= datum <= 0x1FF)
+            assert isinstance(datum, ValueCastable) or (0 <= datum <= 0x1FF)
         self._data = data
         self._speed = speed
 
-        super().__init__()
+        super().__init__({
+            "switch": In(1),
+            "aborted_at": Out(range(len(self._data))),
+        })
 
         self._i2c = I2C(speed=speed)
-
-    @property
-    def signature(self):
-        return Signature(
-            {
-                "switch": In(1),
-                "aborted_at": Out(range(len(self._data))),
-            }
-        )
 
     def elaborate(self, platform: Platform) -> Elaboratable:
         m = Module()

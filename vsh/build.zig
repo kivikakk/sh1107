@@ -17,12 +17,13 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     exe.linkLibCpp();
+    exe.linkFramework("CoreImage");
 
     var it = std.mem.split(u8, cxxrtl_lib_paths, ",");
     while (it.next()) |cxxrtl_lib_path| {
         exe.addObjectFile(.{ .path = cxxrtl_lib_path });
     }
-    exe.addIncludePath(.{ .path = b.fmt("{s}/include", .{yosys_data_dir}) });
+    exe.addIncludePath(.{ .path = b.fmt("{s}/include/backends/cxxrtl/runtime", .{yosys_data_dir}) });
     gkBuild.addGameKitToArtifact(b, exe, target, "vendor/zig-gamekit/");
     b.installArtifact(exe);
 
@@ -45,7 +46,7 @@ pub fn build(b: *std.Build) void {
 }
 
 fn guessYosysDataDir(b: *std.Build) []const u8 {
-    const result = std.ChildProcess.exec(.{
+    const result = std.ChildProcess.run(.{
         .allocator = b.allocator,
         .argv = &.{ "yosys-config", "--datdir" },
         .expand_arg0 = .expand,

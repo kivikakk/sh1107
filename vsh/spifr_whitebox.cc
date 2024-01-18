@@ -36,7 +36,7 @@ struct bb_p_spifr__whitebox_impl : public bb_p_spifr__whitebox {
     p_cipo = wire<1>{0u};
   }
 
-  bool eval() override {
+  bool eval(performer *performer) override {
     bool converged = true;
     bool posedge_p_clk = this->posedge_p_clk();
 

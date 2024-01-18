@@ -1,5 +1,5 @@
 const std = @import("std");
-const Atomic = std.atomic.Atomic;
+const atomic = std.atomic;
 const gk = @import("gamekit");
 
 const main = @import("./main.zig");
@@ -14,23 +14,23 @@ const OLEDConnector = @import("./OLEDConnector.zig");
 const FPGAThread = @This();
 
 thread: std.Thread,
-stop_signal: Atomic(bool),
-press_signal: Atomic(u8),
+stop_signal: atomic.Value(bool),
+press_signal: atomic.Value(u8),
 sh1107_mutex: std.Thread.Mutex = .{},
 sh1107: SH1107,
 
 idata_mutex: std.Thread.Mutex = .{},
 idata: [DisplayBase.i2c_width * DisplayBase.i2c_height]gk.math.Color = [_]gk.math.Color{DisplayBase.black} ** (DisplayBase.i2c_width * DisplayBase.i2c_height),
-idata_stale: Atomic(bool),
+idata_stale: atomic.Value(bool),
 
 pub fn start() !*FPGAThread {
     var fpga_thread = try std.heap.c_allocator.create(FPGAThread);
     fpga_thread.* = .{
         .thread = undefined,
-        .stop_signal = Atomic(bool).init(false),
-        .press_signal = Atomic(u8).init(0),
+        .stop_signal = atomic.Value(bool).init(false),
+        .press_signal = atomic.Value(u8).init(0),
         .sh1107 = .{},
-        .idata_stale = Atomic(bool).init(true),
+        .idata_stale = atomic.Value(bool).init(true),
     };
     const thread = try std.Thread.spawn(.{}, run, .{fpga_thread});
     fpga_thread.thread = thread;
@@ -87,7 +87,7 @@ fn run(fpga_thread: *FPGAThread) void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
 
-    var allocator = gpa.allocator();
+    const allocator = gpa.allocator();
 
     var state = State.init(allocator, fpga_thread) catch @panic("State.init threw");
     defer state.deinit();
@@ -118,7 +118,7 @@ const State = struct {
 
         var i: usize = 0;
         while (true) {
-            var name = try std.fmt.allocPrintZ(allocator, "switch_{}", .{i});
+            const name = try std.fmt.allocPrintZ(allocator, "switch_{}", .{i});
             defer allocator.free(name);
 
             if (cxxrtl.find(bool, name)) |swi| {
@@ -158,7 +158,7 @@ const State = struct {
             clk.next(true);
 
             for (self.switch_connectors, 1..) |*swicon, i| {
-                if (self.fpga_thread.press_signal.compareAndSwap(@as(u8, @intCast(i)), 0, .Monotonic, .Monotonic) == null) {
+                if (self.fpga_thread.press_signal.cmpxchgStrong(@as(u8, @intCast(i)), 0, .Monotonic, .Monotonic) == null) {
                     swicon.press();
                 }
                 swicon.tick();
@@ -182,7 +182,7 @@ const State = struct {
         if (self.vcd) |*vcd| {
             defer vcd.deinit();
 
-            var buffer = try vcd.read(self.allocator);
+            const buffer = try vcd.read(self.allocator);
             defer self.allocator.free(buffer);
 
             var file = try std.fs.cwd().createFile("vsh.vcd", .{});

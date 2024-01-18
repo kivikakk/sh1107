@@ -116,28 +116,26 @@ class Top(Component):
         speed: Hz = Hz(400_000),
     ):
         self._sequences = sequences
-        super().__init__()
+        super().__init__({
+            # Note that these remain disconnected/unused when building for an
+            # actual target.
+            f"switch_{i}": In(1)
+            for i in range(len(self._sequences))
+        })
 
         self._oled = OLED(platform=platform, speed=speed)
         self._speed = speed
 
         self._rom_len = sum(len(seq) for seq in sequences)
-        self._rom_rd = Memory(
+        rom_mem = Memory(
             width=8,
             depth=self._rom_len,
             init=[i for seq in sequences for i in seq],
-        ).read_port()
-
-    @property
-    def signature(self):
-        return Signature(
-            {
-                # Note that these remain disconnected/unused when building for an
-                # actual target.
-                f"switch_{i}": In(1)
-                for i in range(len(self._sequences))
-            }
         )
+        self._rom_rd = rom_mem.read_port()
+        # XXX workaround for
+        # https://github.com/amaranth-lang/amaranth/commit/ae36b596bb736c257c8385492e2a76fbeab00df5#diff-3fbf587fc3a75ad4e497dfcbb16540303693b62a97697f350332266ab096effdR952
+        rom_mem.write_port()
 
     @property
     def switches(self) -> list[Signal]:
@@ -197,7 +195,11 @@ class Top(Component):
                 led_m = platform.request("led_r", 1)
                 led_r = platform.request("led_g", 2)
 
-                m.d.comb += Cat(led_r, led_m, led_l).eq(self._oled.result)
+                m.d.comb += [
+                    led_r.o.eq(self._oled.result[0]),
+                    led_m.o.eq(self._oled.result[1]),
+                    led_l.o.eq(0),
+                ]
 
             case orangecrab():
                 rgb = platform.request("rgb_led")

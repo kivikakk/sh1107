@@ -58,7 +58,7 @@ struct bb_p_i2c_impl : public bb_p_i2c {
     p_out__fifo__r__data = wire<8>{0u};
   }
 
-  bool eval() override {
+  bool eval(performer *performer) override {
     bool converged = true;
     bool posedge_p_clk = this->posedge_p_clk();
 

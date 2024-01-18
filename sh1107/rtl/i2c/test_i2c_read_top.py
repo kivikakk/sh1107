@@ -24,20 +24,14 @@ class TestI2CReadTop(Component):
         self._count = count
         self._speed = speed
 
-        super().__init__()
+        super().__init__({
+            "switch": In(1),
+            "busy": Out(1),
+            "remaining": Out(range(self._count + 1)),
+        })
 
         self._result = SyncFIFO(width=8, depth=count)
         self._i2c = I2C(speed=speed)
-
-    @property
-    def signature(self):
-        return Signature(
-            {
-                "switch": In(1),
-                "busy": Out(1),
-                "remaining": Out(range(self._count + 1)),
-            }
-        )
 
     def elaborate(self, platform: Platform) -> Elaboratable:
         m = Module()

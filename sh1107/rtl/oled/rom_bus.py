@@ -1,7 +1,7 @@
 from amaranth import Module
 from amaranth.hdl.ast import ShapeCastable
 from amaranth.hdl.mem import ReadPort
-from amaranth.lib.wiring import In, Interface, Out, Signature
+from amaranth.lib.wiring import In, Out, Signature
 
 __all__ = ["ROMBus"]
 
@@ -20,7 +20,7 @@ class ROMBus(Signature):
         )
 
     @staticmethod
-    def connect_read_port(m: Module, rom_rd: ReadPort, rom_bus: Interface):
+    def connect_read_port(m: Module, rom_rd: ReadPort, rom_bus: object):
         m.d.comb += [
             rom_rd.addr.eq(rom_bus.addr),
             rom_bus.data.eq(rom_rd.data),

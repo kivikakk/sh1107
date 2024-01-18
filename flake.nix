@@ -2,21 +2,26 @@
   description = "Development shell for sh1107";
 
   inputs = {
-    nixpkgs.follows = "hdx/nixpkgs";
-    flake-compat = {
-      url = github:edolstra/flake-compat;
-      flake = false;
+    nixpkgs.url = github:NixOS/nixpkgs/nixos-23.11;
+    flake-utils.url = github:numtide/flake-utils;
+    hdx = {
+      url = github:charlottia/hdx;
+      inputs.amaranth.url = github:amaranth-lang/amaranth;
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-utils.follows = "flake-utils";
     };
-    hdx.url = github:charlottia/hdx?ref=v0.1;
-    hdx.inputs.amaranth.url = github:amaranth-lang/amaranth;
-    zig.url = github:mitchellh/zig-overlay;
+    zig = {
+      url = github:mitchellh/zig-overlay;
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-utils.follows = "flake-utils";
+      inputs.flake-compat.follows = "hdx/flake-compat";
+    };
   };
 
   outputs = inputs @ {
     self,
     nixpkgs,
     flake-utils,
-    flake-compat,
     ...
   }: let
     overlays = [
@@ -49,8 +54,10 @@
               (python.pkgs)
               setuptools
               black
-              isort
-              python-lsp-server
+              # isort
+              
+              # python-lsp-server
+              
               ;
 
             inherit
@@ -69,7 +76,8 @@
               ;
           }
           // lib.optionalAttrs (pkgs.stdenv.isDarwin) {
-            inherit (pkgs) xcbuild;
+            # XXX To use frameworks included below.
+            # inherit (pkgs.darwin.apple_sdk_11_0) xcodebuild;
           });
 
         buildInputs =
@@ -81,25 +89,29 @@
               ;
             inherit zig;
           })
-          ++ lib.optionals (pkgs.stdenv.isDarwin) (with pkgs.darwin.apple_sdk.frameworks; [
-            OpenGL
-            ForceFeedback
-            CoreGraphics
-            CoreVideo
-            MetalKit
-            Cocoa
-            IOKit
-            AudioToolbox
-            AppKit
-            CoreAudio
-            # CoreHaptics XXX
-            Metal
-            QuartzCore
-            Carbon
-            GameController
-            Foundation
-            Quartz
-          ]);
+          # XXX I'm getting issues linking against system (?) QuickLook/QuickLookUI, and I just
+          # cbf. Impure all frameworks against system for now.
+          # ++ lib.optionals (pkgs.stdenv.isDarwin) (with pkgs.darwin.apple_sdk_11_0.frameworks; [
+          #   # CoreHaptics XXX
+          #   AppKit
+          #   AudioToolbox
+          #   Carbon
+          #   Cocoa
+          #   CoreAudio
+          #   CoreGraphics
+          #   CoreVideo
+          #   ForceFeedback
+          #   Foundation
+          #   GameController
+          #   IOKit
+          #   Metal
+          #   MetalKit
+          #   OpenGL
+          #   Quartz
+          #   QuartzCore
+          #   QuickLook
+          # ])
+          ;
 
         dontAddExtraLibs = true;
 

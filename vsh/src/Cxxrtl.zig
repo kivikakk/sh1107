@@ -1,8 +1,8 @@
 const std = @import("std");
 
 const c = @cImport({
-    @cInclude("backends/cxxrtl/cxxrtl_capi.h");
-    @cInclude("backends/cxxrtl/cxxrtl_vcd_capi.h");
+    @cInclude("cxxrtl/capi/cxxrtl_capi.h");
+    @cInclude("cxxrtl/capi/cxxrtl_capi_vcd.h");
 });
 
 extern "c" fn cxxrtl_design_create() c.cxxrtl_toplevel;
