@@ -2,17 +2,15 @@
   description = "Development shell for sh1107";
 
   inputs = {
-    nixpkgs.url = github:NixOS/nixpkgs/nixos-23.11;
     flake-utils.url = github:numtide/flake-utils;
     hdx = {
-      url = github:charlottia/hdx;
-      inputs.amaranth.url = github:amaranth-lang/amaranth;
-      inputs.nixpkgs.follows = "nixpkgs";
+      url = git+https://hrzn.ee/kivikakk/hdx;
+      inputs.nixpkgs.follows = "hdx/nixpkgs";
       inputs.flake-utils.follows = "flake-utils";
     };
     zig = {
       url = github:mitchellh/zig-overlay;
-      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.nixpkgs.follows = "hdx/nixpkgs";
       inputs.flake-utils.follows = "flake-utils";
       inputs.flake-compat.follows = "hdx/flake-compat";
     };
