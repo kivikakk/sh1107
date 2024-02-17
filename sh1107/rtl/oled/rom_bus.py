@@ -1,6 +1,5 @@
 from amaranth import Module
-from amaranth.hdl.ast import ShapeCastable
-from amaranth.hdl.mem import ReadPort
+from amaranth.hdl import ReadPort, ShapeCastable
 from amaranth.lib.wiring import In, Out, Signature
 
 __all__ = ["ROMBus"]

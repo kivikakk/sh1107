@@ -1,9 +1,9 @@
 from typing import Optional, cast
 
-from amaranth import Cat, Memory, Module, Record, Signal
+from amaranth import Memory, Module, Record, Signal
 from amaranth.build.res import ResourceError
-from amaranth.hdl.mem import ReadPort
-from amaranth.lib.wiring import Component, In, Signature
+from amaranth.hdl import ReadPort
+from amaranth.lib.wiring import Component, In
 
 from ..base import Blackbox
 from ..platform import Platform, icebreaker, orangecrab, vsh

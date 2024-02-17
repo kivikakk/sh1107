@@ -1,6 +1,6 @@
 from amaranth import Elaboratable, Module
 from amaranth.lib.fifo import SyncFIFO
-from amaranth.lib.wiring import Component, In, Out, Signature
+from amaranth.lib.wiring import Component, In, Out
 
 from ...platform import Platform
 from ..common import Hz
@@ -24,11 +24,13 @@ class TestI2CReadTop(Component):
         self._count = count
         self._speed = speed
 
-        super().__init__({
-            "switch": In(1),
-            "busy": Out(1),
-            "remaining": Out(range(self._count + 1)),
-        })
+        super().__init__(
+            {
+                "switch": In(1),
+                "busy": Out(1),
+                "remaining": Out(range(self._count + 1)),
+            }
+        )
 
         self._result = SyncFIFO(width=8, depth=count)
         self._i2c = I2C(speed=speed)

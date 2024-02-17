@@ -5,7 +5,7 @@ from typing import Optional, Tuple
 from amaranth import ClockSignal, Module, ResetSignal, Signal, Value
 from amaranth.asserts import Assert, Assume, Cover, Initial
 from amaranth.back import rtlil
-from amaranth.hdl.ast import ValueCastable
+from amaranth.hdl import ValueCastable
 
 from ..base import path
 from ..platform import Platform

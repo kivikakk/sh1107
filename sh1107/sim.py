@@ -7,10 +7,10 @@ from contextlib import contextmanager
 from typing import Any, Callable, Iterator, Optional, Self, Tuple
 
 from amaranth import Elaboratable, Record, Signal
+from amaranth.hdl import Fragment
 from amaranth.hdl.ast import Operator, Statement
-from amaranth.hdl.ir import Fragment
 from amaranth.lib.fifo import SyncFIFO
-from amaranth.sim import Delay, Settle, Simulator
+from amaranth.sim import Delay, Simulator, Tick
 
 from .base import path
 from .platform import Platform
@@ -47,7 +47,7 @@ def override_clock(new_clock: Optional[float]) -> Iterator[None]:
         _active_clock = old_sim_clock
 
 
-ValueLike = Signal | Record | Delay | Settle | Statement | Operator | None
+ValueLike: typing.TypeAlias = Signal | Record | Delay | Statement | Operator | Tick
 
 T = typing.TypeVar("T")
 Generator = typing.Generator[ValueLike, bool | int, T]
@@ -124,7 +124,7 @@ class TestCase(unittest.TestCase):
 
                 sim = Simulator(Fragment.get(dut, platform))
                 sim.add_clock(clock())
-                sim.add_sync_process(bench)
+                sim.add_testbench(bench)
 
                 vcd_path = path(f"build/{cls.__name__}.{target}.vcd")
                 sim_exc = None
@@ -201,8 +201,8 @@ def fifo_content(fifo: SyncFIFO) -> Generator[list[int]]:
     while (yield fifo.r_rdy):
         content.append((yield fifo.r_data))
         yield fifo.r_en.eq(1)
-        yield
+        yield Tick()
         yield fifo.r_en.eq(0)
-        yield
+        yield Tick()
 
     return content

@@ -1,4 +1,4 @@
-from amaranth.sim import Delay, Settle
+from amaranth.sim import Delay, Tick
 
 from ... import sim
 from . import RW, Transfer, sim_i2c
@@ -43,8 +43,7 @@ class TestI2C(sim.TestCase):
     def test_sim_i2c_repeated_start(self, dut: TestI2CTop) -> sim.Procedure:
         def trigger() -> sim.Procedure:
             yield dut.switch.eq(1)
-            yield
-            yield Settle()
+            yield Tick()
             yield dut.switch.eq(0)
 
         yield from sim_i2c.full_sequence(

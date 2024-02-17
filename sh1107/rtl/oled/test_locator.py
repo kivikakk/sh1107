@@ -2,7 +2,7 @@ from typing import Final
 
 from amaranth import Elaboratable, Module
 from amaranth.lib.wiring import connect
-from amaranth.sim import Settle
+from amaranth.sim import Tick
 
 from ... import sim
 from ...platform import Platform
@@ -43,8 +43,7 @@ class TestLocator(sim.TestCase):
             yield dut.locator.row.eq(16)
             yield dut.locator.col.eq(8)
             yield dut.locator.stb.eq(1)
-            yield
-            yield Settle()
+            yield Tick()
             yield dut.locator.stb.eq(0)
 
         yield from sim_i2c.full_sequence(
@@ -65,8 +64,7 @@ class TestLocator(sim.TestCase):
             yield dut.locator.row.eq(7)
             yield dut.locator.col.eq(0)
             yield dut.locator.stb.eq(1)
-            yield
-            yield Settle()
+            yield Tick()
             yield dut.locator.stb.eq(0)
 
         yield from sim_i2c.full_sequence(
@@ -86,8 +84,7 @@ class TestLocator(sim.TestCase):
             yield dut.locator.row.eq(0)
             yield dut.locator.col.eq(13)
             yield dut.locator.stb.eq(1)
-            yield
-            yield Settle()
+            yield Tick()
             yield dut.locator.stb.eq(0)
 
         yield from sim_i2c.full_sequence(

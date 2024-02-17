@@ -1,4 +1,4 @@
-from amaranth.sim import Delay, Settle
+from amaranth.sim import Delay, Tick
 
 from ... import sim
 from .timer import Timer
@@ -13,14 +13,13 @@ class TestTimer(sim.TestCase):
         assert not (yield d.o)
 
         yield d.i.eq(1)
-        yield
+        yield Tick()
         assert not (yield d.o)
 
         yield Delay(d._time)
-        yield
+        yield Tick()
         assert (yield d.o)
 
         yield d.i.eq(0)
-        yield
-        yield Settle()
+        yield Tick()
         assert not (yield d.o)

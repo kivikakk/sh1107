@@ -1,4 +1,4 @@
-from amaranth.sim import Settle
+from amaranth.sim import Tick
 
 from ... import sim
 from . import sim_i2c
@@ -10,8 +10,7 @@ class TestI2CRead(sim.TestCase):
     @sim.i2c_speeds
     def test_sim_i2c_read_one(self, dut: TestI2CReadTop) -> sim.Procedure:
         yield dut.switch.eq(1)
-        yield
-        yield Settle()
+        yield Tick()
         yield dut.switch.eq(0)
 
         yield from sim_i2c.synchronise(dut._i2c, 0x179)
@@ -30,8 +29,7 @@ class TestI2CRead(sim.TestCase):
     @sim.i2c_speeds
     def test_sim_i2c_read_two(self, dut: TestI2CReadTop) -> sim.Procedure:
         yield dut.switch.eq(1)
-        yield
-        yield Settle()
+        yield Tick()
         yield dut.switch.eq(0)
 
         yield from sim_i2c.synchronise(dut._i2c, 0x17B)

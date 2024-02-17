@@ -1,6 +1,6 @@
 from amaranth import Elaboratable, Module, Value
 from amaranth.lib.data import ValueCastable
-from amaranth.lib.wiring import Component, In, Out, Signature
+from amaranth.lib.wiring import Component, In, Out
 
 from ...platform import Platform
 from ..common import Hz
@@ -20,10 +20,12 @@ class TestI2CTop(Component):
         self._data = data
         self._speed = speed
 
-        super().__init__({
-            "switch": In(1),
-            "aborted_at": Out(range(len(self._data))),
-        })
+        super().__init__(
+            {
+                "switch": In(1),
+                "aborted_at": Out(range(len(self._data))),
+            }
+        )
 
         self._i2c = I2C(speed=speed)
 

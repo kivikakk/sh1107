@@ -1,7 +1,7 @@
 from typing import Final
 
 from amaranth import Elaboratable, Memory, Module
-from amaranth.hdl.mem import ReadPort
+from amaranth.hdl import ReadPort
 from amaranth.lib.wiring import connect
 from amaranth.sim import Delay
 

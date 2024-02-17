@@ -1,4 +1,4 @@
-from amaranth.sim import Delay, Settle
+from amaranth.sim import Delay, Tick
 
 from ... import sim
 from .debounce import Debounce
@@ -13,24 +13,16 @@ class TestDebounce(sim.TestCase):
 
         yield d.i.eq(1)
         yield Delay(d._hold_time / 2)
-        yield Settle()
-        yield
-        yield Settle()
+        yield Tick()
         assert not (yield d.o)
         yield Delay(d._hold_time / 2)
-        yield Settle()
-        yield
-        yield Settle()
+        yield Tick()
         assert (yield d.o)
 
         yield d.i.eq(0)
         yield Delay(d._hold_time / 2)
-        yield Settle()
-        yield
-        yield Settle()
+        yield Tick()
         assert (yield d.o)
         yield Delay(d._hold_time / 2)
-        yield Settle()
-        yield
-        yield Settle()
+        yield Tick()
         assert not (yield d.o)

@@ -1,4 +1,4 @@
-from amaranth.sim import Delay, Settle
+from amaranth.sim import Delay, Tick
 
 from ... import sim
 from .button import Button, ButtonWithHold
@@ -16,14 +16,11 @@ class TestButton(sim.TestCase):
         yield b.i.eq(1)
 
         yield Delay(b._debounce._hold_time)
-        yield Settle()
-        yield
-        yield Settle()
+        yield Tick()
         assert (yield b.down)
         assert not (yield b.up)
 
-        yield
-        yield Settle()
+        yield Tick()
         assert not (yield b.down)
 
     def _button_up(self, b: Button) -> sim.Procedure:
@@ -31,16 +28,13 @@ class TestButton(sim.TestCase):
         yield b.i.eq(0)
 
         yield Delay(b._debounce._hold_time)
-        yield Settle()
-        yield
-        yield Settle()
+        yield Tick()
         assert not (yield b.down)
         assert (yield b.up)
 
     def _button_up_post(self, b: Button) -> sim.Procedure:
         assert (yield b.up)
-        yield
-        yield Settle()
+        yield Tick()
         assert not (yield b.up)
 
     def test_sim_button(self, b: Button) -> sim.Procedure:

@@ -26,7 +26,7 @@ class Transfer(data.Struct):
     @classmethod
     def C_start(cls, rw: RW, addr: int) -> Self:
         return cast(
-            cls,
+            Self,
             cls.const(
                 {
                     "kind": Transfer.Kind.START,

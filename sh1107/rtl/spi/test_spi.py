@@ -1,7 +1,8 @@
 from amaranth import C, Cat, Elaboratable, Module, Signal, Value
-from amaranth.hdl.ast import ValueCastable
+from amaranth.hdl import ValueCastable
 from amaranth.lib.fifo import SyncFIFO
 from amaranth.lib.wiring import Component, In, Out
+from amaranth.sim import Tick
 
 from ... import sim
 from ...platform import Platform
@@ -153,12 +154,12 @@ class TestSPIFlashReader(sim.TestCase):
     @sim.args(data=C(0xBEEFFEED, 32))
     def test_sim_spifr(self, dut: TestSPIFlashReaderTop, data: Value) -> sim.Procedure:
         yield dut.stb.eq(1)
-        yield
+        yield Tick()
         yield dut.stb.eq(0)
-        yield
+        yield Tick()
 
         while (yield dut.busy):
-            yield
+            yield Tick()
 
         expected = []
         for i in reversed(range(len(data) // 8)):
