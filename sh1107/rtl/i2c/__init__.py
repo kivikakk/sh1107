@@ -62,7 +62,7 @@ I2CBus = Signature(
         "in_fifo_w_en": Out(1),
         "out_fifo_r_en": Out(1),
         "stb": Out(1),
-        "ack": In(1, reset=1),
+        "ack": In(1, init=1),
         "busy": In(1),
         "in_fifo_w_rdy": In(1),
         "in_fifo_r_rdy": In(1),
@@ -74,11 +74,11 @@ I2CBus = Signature(
 
 I2CHardwareBus = Signature(
     {
-        "scl_o": Out(1, reset=1),
-        "scl_oe": Out(1, reset=1),
-        "sda_o": Out(1, reset=1),
-        "sda_oe": Out(1, reset=1),
-        "sda_i": In(1, reset=1),
+        "scl_o": Out(1, init=1),
+        "scl_oe": Out(1, init=1),
+        "sda_o": Out(1, init=1),
+        "sda_oe": Out(1, init=1),
+        "sda_i": In(1, init=1),
     }
 )
 
@@ -450,7 +450,7 @@ class I2CFormal(I2C):
 
     def __init__(self, *, speed: Hz):
         super().__init__(speed=speed)
-        self._formal_scl = Signal(reset=1, name="formal_scl")
+        self._formal_scl = Signal(init=1, name="formal_scl")
         self._formal_start = Signal(name="formal_start")
         self._formal_repeated_start = Signal(name="formal_repeated_start")
         self._formal_stop = Signal(name="formal_stop")

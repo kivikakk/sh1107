@@ -1,17 +1,8 @@
 import math
 from typing import Final
 
-from amaranth import (
-    C,
-    Cat,
-    ClockSignal,
-    Elaboratable,
-    Instance,
-    Memory,
-    Module,
-    Mux,
-    Signal,
-)
+from amaranth import (C, Cat, ClockSignal, Elaboratable, Instance, Memory,
+                      Module, Mux, Signal)
 from amaranth.lib.enum import IntEnum
 from amaranth.lib.fifo import SyncFIFO
 from amaranth.lib.wiring import Component, In, Out, connect, flipped
@@ -102,7 +93,7 @@ class OLED(Component):
     _cursor_c: Counter
 
     _fifo_in: SyncFIFO
-    result: In(Result, reset=Result.BUSY)
+    result: In(Result, init=Result.BUSY)
 
     _row: Signal
     _col: Signal
@@ -176,15 +167,15 @@ class OLED(Component):
 
         self.fifo_in = SyncFIFO(width=8, depth=1)
 
-        self._row = Signal(range(1, 17), reset=1)
-        self._col = Signal(range(1, 17), reset=1)
+        self._row = Signal(range(1, 17), init=1)
+        self._col = Signal(range(1, 17), init=1)
         self._cursor_en = Signal()
         self._cursor_state = Signal()
-        self._cursor_last_drawn_row = Signal(range(0, 17), reset=1)
-        self._cursor_last_drawn_col = Signal(range(0, 17), reset=1)
+        self._cursor_last_drawn_row = Signal(range(0, 17), init=1)
+        self._cursor_last_drawn_col = Signal(range(0, 17), init=1)
 
         self._chpr_data = Signal(8)
-        self._chpr_advance = Signal(reset=1)
+        self._chpr_advance = Signal(init=1)
         self._chpr_run = Signal()
 
     def elaborate(self, platform: Platform) -> Elaboratable:
@@ -248,9 +239,13 @@ class OLED(Component):
                         self.result.eq(OLED.Result.BUSY),
                     ]
                     m.next = "START: STROBED FIFO_IN R_EN"
-                with m.Elif(self._cursor_en &
-                    ((self._cursor_last_drawn_col != self._col) |
-                     (self._cursor_last_drawn_row != self._row))):
+                with m.Elif(
+                    self._cursor_en
+                    & (
+                        (self._cursor_last_drawn_col != self._col)
+                        | (self._cursor_last_drawn_row != self._row)
+                    )
+                ):
                     m.d.sync += self._cursor_en.eq(0)
                     m.next = "CURSOR_ON: RESET"
 

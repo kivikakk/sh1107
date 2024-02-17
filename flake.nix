@@ -4,15 +4,14 @@
   inputs = {
     flake-utils.url = github:numtide/flake-utils;
     hdx = {
-      url = git+https://hrzn.ee/kivikakk/hdx;
-      inputs.nixpkgs.follows = "hdx/nixpkgs";
+      url = git+https://hrzn.ee/kivikakk/hdx?ref=stripped;
       inputs.flake-utils.follows = "flake-utils";
     };
+    nixpkgs.follows = "hdx/nixpkgs";
     zig = {
       url = github:mitchellh/zig-overlay;
       inputs.nixpkgs.follows = "hdx/nixpkgs";
       inputs.flake-utils.follows = "flake-utils";
-      inputs.flake-compat.follows = "hdx/flake-compat";
     };
   };
 
@@ -47,46 +46,46 @@
         format = "pyproject";
         src = ./.;
 
-        nativeBuildInputs = builtins.attrValues ({
-            inherit
-              (python.pkgs)
-              setuptools
-              black
-              # isort
-              
-              # python-lsp-server
-              
-              ;
+        nativeBuildInputs = builtins.attrValues {
+          inherit
+            (python.pkgs)
+            setuptools
+            black
+            # isort
+            
+            # python-lsp-server
+            
+            ;
 
-            inherit
-              (pkgs.nodePackages)
-              pyright
-              ;
+          inherit
+            (pkgs.nodePackages)
+            pyright
+            ;
 
-            inherit
-              (pkgs)
-              dfu-util
-              ;
+          inherit
+            (pkgs)
+            dfu-util
+            ;
 
-            inherit
-              hdx
-              zig
-              ;
-          }
-          // lib.optionalAttrs (pkgs.stdenv.isDarwin) {
-            # XXX To use frameworks included below.
-            # inherit (pkgs.darwin.apple_sdk_11_0) xcodebuild;
-          });
+          inherit
+            hdx
+            zig
+            ;
+        };
+        #// lib.optionalAttrs (pkgs.stdenv.isDarwin) {
+        # XXX To use frameworks included below.
+        # inherit (pkgs.darwin.apple_sdk_11_0) xcodebuild;
+        #});
 
         buildInputs =
-          (builtins.attrValues {
+          builtins.attrValues {
             inherit
               (pkgs)
               SDL2
               iconv
               ;
             inherit zig;
-          })
+          }
           # XXX I'm getting issues linking against system (?) QuickLook/QuickLookUI, and I just
           # cbf. Impure all frameworks against system for now.
           # ++ lib.optionals (pkgs.stdenv.isDarwin) (with pkgs.darwin.apple_sdk_11_0.frameworks; [
