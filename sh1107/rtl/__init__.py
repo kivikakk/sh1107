@@ -116,12 +116,14 @@ class Top(Component):
         speed: Hz = Hz(400_000),
     ):
         self._sequences = sequences
-        super().__init__({
-            # Note that these remain disconnected/unused when building for an
-            # actual target.
-            f"switch_{i}": In(1)
-            for i in range(len(self._sequences))
-        })
+        super().__init__(
+            {
+                # Note that these remain disconnected/unused when building for an
+                # actual target.
+                f"switch_{i}": In(1)
+                for i in range(len(self._sequences))
+            }
+        )
 
         self._oled = OLED(platform=platform, speed=speed)
         self._speed = speed
@@ -133,9 +135,6 @@ class Top(Component):
             init=[i for seq in sequences for i in seq],
         )
         self._rom_rd = rom_mem.read_port()
-        # XXX workaround for
-        # https://github.com/amaranth-lang/amaranth/commit/ae36b596bb736c257c8385492e2a76fbeab00df5#diff-3fbf587fc3a75ad4e497dfcbb16540303693b62a97697f350332266ab096effdR952
-        rom_mem.write_port()
 
     @property
     def switches(self) -> list[Signal]:
