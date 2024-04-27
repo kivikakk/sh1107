@@ -4,7 +4,7 @@ name = "sh1107"
 version = "0.0"
 description = ""
 authors = [
-    {name = "Charlotte", email = "charlotte@lottia.net"},
+    {name = "Amelia Cuss", email = "amelia@kivikakk.ee"},
 ]
 dependencies = [
     "amaranth >= 0.4.0dev0, < 0.6",
